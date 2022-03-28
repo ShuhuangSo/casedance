@@ -21,7 +21,7 @@ from django.conf import settings
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet
-from setting.views import TagViewSet
+from setting.views import TagViewSet, OperateLogViewSet
 
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
@@ -42,7 +42,9 @@ router.register('suppliers', SupplierViewSet, basename='suppliers')
 
 # ---------------------------系统设置-------------------------------------------------
 # 标签库
-router.register('tags', TagViewSet, basename='tags')
+router.register('settings/tags', TagViewSet, basename='tags')
+# 标签库
+router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

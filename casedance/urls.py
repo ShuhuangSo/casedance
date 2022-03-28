@@ -24,6 +24,9 @@ from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelVi
 from setting.views import TagViewSet, OperateLogViewSet
 
 from rest_framework.routers import DefaultRouter
+
+from store.views import StoreViewSet
+
 router = DefaultRouter()
 
 # ---------------------------产品模块-------------------------------------------------
@@ -45,6 +48,10 @@ router.register('suppliers', SupplierViewSet, basename='suppliers')
 router.register('settings/tags', TagViewSet, basename='tags')
 # 标签库
 router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
+
+# ---------------------------仓库/商店模块 -------------------------------------------------
+# 仓库、销售门店
+router.register('stores', StoreViewSet, basename='stores')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

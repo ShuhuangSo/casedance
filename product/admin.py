@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+
+
 # Register your models here.
 
 
@@ -33,3 +35,10 @@ class CompatibleModelAdmin(admin.ModelAdmin):
 @admin.register(ProductTag)
 class ProductTagAdmin(admin.ModelAdmin):
     list_display = ['product', 'tag']
+
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ['supplier_name', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['supplier_name']

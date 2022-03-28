@@ -2,6 +2,7 @@ from django.db import models
 
 from setting.models import Tag
 
+
 # Create your models here.
 
 
@@ -46,6 +47,7 @@ class Product(models.Model):
     alert_days = models.IntegerField(null=True, blank=True, verbose_name='警戒天数', help_text='警戒天数')
     mini_pq = models.IntegerField(null=True, blank=True, verbose_name='最小采购量', help_text='最小采购量')
     max_pq = models.IntegerField(null=True, blank=True, verbose_name='采购上限', help_text='采购上限')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:
@@ -103,8 +105,10 @@ class CompatibleModel(models.Model):
     产品兼容手机型号
     """
 
-    product = models.ForeignKey(Product, related_name='product_comp_model', on_delete=models.DO_NOTHING, verbose_name='产品', help_text='产品')
-    phone_model = models.ForeignKey(DeviceModel, related_name='device_comp_model', on_delete=models.DO_NOTHING, verbose_name='市面手机型号', help_text='市面手机型号')
+    product = models.ForeignKey(Product, related_name='product_comp_model', on_delete=models.DO_NOTHING,
+                                verbose_name='产品', help_text='产品')
+    phone_model = models.ForeignKey(DeviceModel, related_name='device_comp_model', on_delete=models.DO_NOTHING,
+                                    verbose_name='市面手机型号', help_text='市面手机型号')
 
     class Meta:
         verbose_name = '产品兼容手机型号'
@@ -120,7 +124,8 @@ class ProductTag(models.Model):
     产品标签表
     """
 
-    product = models.ForeignKey(Product, related_name='product_p_tag', on_delete=models.CASCADE, verbose_name='产品', help_text='产品')
+    product = models.ForeignKey(Product, related_name='product_p_tag', on_delete=models.CASCADE, verbose_name='产品',
+                                help_text='产品')
     tag = models.ForeignKey(Tag, related_name='tag_p_tag', on_delete=models.CASCADE, verbose_name='标签', help_text='标签')
 
     class Meta:
@@ -130,3 +135,35 @@ class ProductTag(models.Model):
 
     def __str__(self):
         return str(self.id)
+
+
+class Supplier(models.Model):
+    """
+    供应商
+    """
+    WAY = (
+        ('FACTORY', '工厂'),
+        ('1688', '1688'),
+        ('OTHERS', '其它'),
+    )
+
+    supplier_name = models.CharField(max_length=80, verbose_name='供应商名称', help_text='供应商名称')
+    buy_way = models.CharField(max_length=10, choices=WAY, default='FACTORY', verbose_name='采购渠道',
+                               help_text='采购渠道')
+    address = models.CharField(null=True, blank=True, max_length=200, verbose_name='地址', help_text='地址')
+    contact_name = models.CharField(null=True, blank=True, max_length=20, verbose_name='联系人', help_text='联系人')
+    phone = models.CharField(null=True, blank=True, max_length=15, verbose_name='电话', help_text='电话')
+    qq = models.CharField(null=True, blank=True, max_length=15, verbose_name='QQ', help_text='QQ')
+    wechat = models.CharField(null=True, blank=True, max_length=15, verbose_name='微信', help_text='微信')
+    email = models.CharField(null=True, blank=True, max_length=50, verbose_name='邮箱', help_text='邮箱')
+    is_active = models.BooleanField(default=True, verbose_name='状态', help_text='状态')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '供应商'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.supplier_name

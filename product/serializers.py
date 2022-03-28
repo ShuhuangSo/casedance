@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 
 
 class ProductTagSerializer(serializers.ModelSerializer):
@@ -52,7 +52,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ('id', 'sku', 'p_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
                   'length', 'width', 'heigth', 'weight', 'url', 'is_auto_promote', 'stock_strategy', 'stock_days',
-                  'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'create_time')
+                  'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note', 'create_time')
 
 
 class ProductExtraInfoSerializer(serializers.ModelSerializer):
@@ -75,3 +75,11 @@ class DeviceModelSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class SupplierSerializer(serializers.ModelSerializer):
+    """
+    供应商
+    """
+
+    class Meta:
+        model = Supplier
+        fields = "__all__"

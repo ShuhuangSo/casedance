@@ -5,8 +5,9 @@ from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag
-from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, CompatibleModelSerializer, ProductTagSerializer
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, \
+    CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer
 
 
 # Create your views here.
@@ -134,26 +135,54 @@ class CompatibleModelViewSet(mixins.ListModelMixin,
     search_fields = ('phone_model',)  # 配置搜索字段
 
 
-class TagViewSet(mixins.ListModelMixin,
-                 mixins.CreateModelMixin,
-                 mixins.UpdateModelMixin,
-                 mixins.DestroyModelMixin,
-                 mixins.RetrieveModelMixin,
-                 viewsets.GenericViewSet):
+class ProductTagViewSet(mixins.ListModelMixin,
+                        mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
     """
     list:
-        产品兼容手机型号,分页,过滤,搜索,排序
+        产品标签,分页,过滤,搜索,排序
     create:
-        产品兼容手机型号新增
+        产品标签新增
     retrieve:
-        产品兼容手机型号详情页
+        产品标签详情页
     update:
-        产品兼容手机型号修改
+        产品标签修改
     destroy:
-        产品兼容手机型号删除
+        产品标签删除
     """
     queryset = ProductTag.objects.all()
     serializer_class = ProductTagSerializer  # 序列化
 
-    filter_backends = (DjangoFilterBackend, )  # 过滤
+    filter_backends = (DjangoFilterBackend,)  # 过滤
     filter_fields = ('product', 'tag',)  # 配置过滤字段
+
+
+class SupplierViewSet(mixins.ListModelMixin,
+                      mixins.CreateModelMixin,
+                      mixins.UpdateModelMixin,
+                      mixins.DestroyModelMixin,
+                      mixins.RetrieveModelMixin,
+                      viewsets.GenericViewSet):
+    """
+    list:
+        供应商列表,分页,过滤,搜索,排序
+    create:
+        供应商新增
+    retrieve:
+        供应商详情页
+    update:
+        供应商修改
+    destroy:
+        供应商删除
+    """
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('buy_way', 'is_active')  # 配置过滤字段
+    search_fields = ('supplier_name', 'contact_name', 'phone', 'email')  # 配置搜索字段
+    ordering_fields = ('create_time',)  # 配置排序字段

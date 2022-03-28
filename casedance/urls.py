@@ -19,7 +19,8 @@ from django.conf.urls import include
 from django.views.static import serve
 from django.conf import settings
 
-from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet
+from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
+    ProductTagViewSet, SupplierViewSet
 from setting.views import TagViewSet
 
 from rest_framework.routers import DefaultRouter
@@ -34,6 +35,10 @@ router.register('product_extra_info', ProductExtraInfoViewSet, basename='product
 router.register('device_models', DeviceModelViewSet, basename='device_models')
 # 产品兼容手机型号
 router.register('comp_models', CompatibleModelViewSet, basename='comp_models')
+# 产品标签
+router.register('product_tags', ProductTagViewSet, basename='product_tags')
+# 产品标签
+router.register('suppliers', SupplierViewSet, basename='suppliers')
 
 # ---------------------------系统设置-------------------------------------------------
 # 标签库

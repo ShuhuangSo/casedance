@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from store.serializers import StockSerializer
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 
 
@@ -44,15 +45,18 @@ class ProductSerializer(serializers.ModelSerializer):
     """
 
     # 兼容手机型号
-    product_comp_model = CompatibleModelSerializer(many=True, required=False)
+    product_comp_model = CompatibleModelSerializer(many=True, required=False, read_only=True)
     # 产品标签
-    product_p_tag = ProductTagSerializer(many=True, required=False)
+    product_p_tag = ProductTagSerializer(many=True, required=False, read_only=True)
+    # 产品库存
+    product_stock = StockSerializer(many=True, required=False, read_only=True)
 
     class Meta:
         model = Product
         fields = ('id', 'sku', 'p_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
                   'length', 'width', 'heigth', 'weight', 'url', 'is_auto_promote', 'stock_strategy', 'stock_days',
-                  'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note', 'create_time')
+                  'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note',
+                  'product_stock', 'create_time')
 
 
 class ProductExtraInfoSerializer(serializers.ModelSerializer):

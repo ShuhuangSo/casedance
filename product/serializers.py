@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from store.models import Stock
 from store.serializers import StockSerializer
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 
@@ -51,12 +52,37 @@ class ProductSerializer(serializers.ModelSerializer):
     # 产品库存
     product_stock = StockSerializer(many=True, required=False, read_only=True)
 
+    #  产品总库存
+    total_qty = serializers.SerializerMethodField()
+    #  产品总锁仓库存
+    total_lock_qty = serializers.SerializerMethodField()
+
+    # 计算所有仓库，门店库存之和
+    def get_total_qty(self, obj):
+        queryset = Stock.objects.filter(product=obj)
+        if queryset:
+            total = 0
+            for s in queryset:
+                total += s.qty
+            return total
+        return 0
+
+    # 计算所有仓库，门店锁仓库存之和
+    def get_total_lock_qty(self, obj):
+        queryset = Stock.objects.filter(product=obj)
+        if queryset:
+            total = 0
+            for s in queryset:
+                total += s.lock_qty
+            return total
+        return 0
+
     class Meta:
         model = Product
         fields = ('id', 'sku', 'p_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
                   'length', 'width', 'heigth', 'weight', 'url', 'is_auto_promote', 'stock_strategy', 'stock_days',
                   'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note',
-                  'product_stock', 'create_time')
+                  'product_stock', 'total_qty', 'total_lock_qty', 'create_time')
 
 
 class ProductExtraInfoSerializer(serializers.ModelSerializer):

@@ -18,6 +18,7 @@ from django.urls import path, re_path
 from django.conf.urls import include
 from django.views.static import serve
 from django.conf import settings
+from rest_framework_jwt.views import obtain_jwt_token
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet
@@ -25,7 +26,7 @@ from setting.views import TagViewSet, OperateLogViewSet
 
 from rest_framework.routers import DefaultRouter
 
-from store.views import StoreViewSet
+from store.views import StoreViewSet, StockInOutViewSet
 
 router = DefaultRouter()
 
@@ -52,9 +53,12 @@ router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
 # ---------------------------仓库/商店模块 -------------------------------------------------
 # 仓库、销售门店
 router.register('stores', StoreViewSet, basename='stores')
+# 手工出入库/调拨
+router.register('stock_in_out', StockInOutViewSet, basename='stock_in_out')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456
+    path('api-token-auth/', obtain_jwt_token),
     re_path(r'media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),  # 配置media root
     path('api/', include(router.urls)),
 ]

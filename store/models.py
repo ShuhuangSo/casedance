@@ -1,7 +1,10 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+
+from product.models import Product
 
 # Create your models here.
-from product.models import Product
+User = get_user_model()
 
 
 class Store(models.Model):
@@ -57,6 +60,82 @@ class Stock(models.Model):
         verbose_name = '产品库存'
         verbose_name_plural = verbose_name
         ordering = ['-create_time']
+
+    def __str__(self):
+        return str(self.qty)
+
+
+class StockInOut(models.Model):
+    """
+    手工出入库/调拨
+    """
+    INOUT_TYPE = (
+        ('IN', '入库'),
+        ('OUT', '出库'),
+        ('MOVE', '调拨'),
+    )
+    R_IN = (
+        ('RETURN', '客户退货'),
+        ('OTHERS', '其它原因'),
+    )
+    R_OUT = (
+        ('GIFT', '非销售出库'),
+        ('LOST', '丢失'),
+        ('OTHERS', '其它原因'),
+    )
+    R_MOVE = (
+        ('SUPPORT', '库存支援'),
+        ('OTHERS', '其它原因'),
+    )
+
+    batch_number = models.CharField(max_length=20, verbose_name='批次号', help_text='批次号')
+    origin_store = models.ForeignKey(Store, null=True, related_name='store_inout_or', on_delete=models.CASCADE,
+                                     verbose_name='源仓库/店铺',
+                                     help_text='源仓库/店铺')
+    target_store = models.ForeignKey(Store, null=True, related_name='store_inout_ta', on_delete=models.CASCADE,
+                                     verbose_name='目标仓库/店铺',
+                                     help_text='目标仓库/店铺')
+    user = models.ForeignKey(User, null=True, related_name='user_store_inout', on_delete=models.CASCADE,
+                             verbose_name='操作人',
+                             help_text='操作人')
+    type = models.CharField(max_length=10, choices=INOUT_TYPE, default='IN', verbose_name='类型',
+                            help_text='类型')
+    reason_in = models.CharField(max_length=10, choices=R_IN, default='RETURN', verbose_name='入库原因',
+                                 help_text='入库原因')
+    reason_out = models.CharField(max_length=10, choices=R_OUT, default='LOST', verbose_name='出库原因',
+                                  help_text='出库原因')
+    reason_move = models.CharField(max_length=10, choices=R_MOVE, default='SUPPORT ', verbose_name='调拨原因',
+                                   help_text='调拨原因')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    is_active = models.BooleanField(default=True, verbose_name='状态', help_text='状态')
+
+    class Meta:
+        verbose_name = '手工出入库/调拨'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.batch_number
+
+
+class StockInOutDetail(models.Model):
+    """
+    出入库产品明细
+    """
+
+    stock_in_out = models.ForeignKey(StockInOut, related_name='inout_detail', on_delete=models.CASCADE,
+                                     verbose_name='所属出入库单',
+                                     help_text='所属出入库单')
+    product = models.ForeignKey(Product, related_name='product_inout_detail', on_delete=models.DO_NOTHING,
+                                verbose_name='产品',
+                                help_text='产品')
+    qty = models.IntegerField(default=0, verbose_name='出入数量', help_text='出入数量')
+    stock_before = models.IntegerField(default=0, verbose_name='变动前库存', help_text='变动前库存')
+
+    class Meta:
+        verbose_name = '出入库产品明细'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
 
     def __str__(self):
         return str(self.qty)

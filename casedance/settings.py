@@ -11,11 +11,10 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 from pathlib import Path
-import os
+import os, datetime
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -27,8 +26,6 @@ SECRET_KEY = 'django-insecure-b))!t$-8-_h1+jh99tf2ogv_t7@+6zlj^afuj06whq8!^%it^)
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-
-
 
 # Application definition
 
@@ -77,7 +74,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'casedance.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
@@ -91,7 +87,6 @@ DATABASES = {
         'PORT': 3306,
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
@@ -111,7 +106,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
@@ -125,7 +119,6 @@ USE_L10N = True
 
 USE_TZ = False
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
@@ -136,14 +129,23 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     )
 }
 
-
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
+
+JWT_AUTH = {
+    # 配置用户认证token有效期
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(hours=12),
+    # 定义与令牌一起发送的Authorization标头值前缀
+    'JWT_AUTH_HEADER_PREFIX': 'JWT',
+}

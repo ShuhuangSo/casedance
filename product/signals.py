@@ -1,23 +1,22 @@
-from django.db.models.signals import post_save, post_init
+from django.db.models.signals import post_save, post_init, post_delete
 from django.dispatch import receiver
 
-from product.models import Product
+from product.models import Product, ProductTag, CompatibleModel
 from setting.models import OperateLog
 from store.models import Store, Stock
+import inspect
 
 
 # 产品数据保存后，如果不是新建数据，将新旧数据拿出来对比
 @receiver(post_save, sender=Product)
 def product_edit_signal(sender, instance, created, **kwargs):
     # 获取当前user
-    import inspect
     for frame_record in inspect.stack():
         if frame_record[3] == 'get_response':
             request = frame_record[0].f_locals['request']
             break
     else:
         request = None
-    print(request.user)
 
     if not created:
         # 记录修改操作日志
@@ -80,7 +79,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             add_list = []
             for store in queryset:
                 add_list.append(Stock(product=instance, store=store))
-                print(add_list)
+
             Stock.objects.bulk_create(add_list)
 
         #  记录创建产品日志
@@ -117,3 +116,85 @@ def product_init_signal(instance, **kwargs):
     instance.__original_mini_pq = instance.mini_pq
     instance.__original_max_pq = instance.max_pq
     instance.__original_note = instance.note
+
+
+# 记录新增产品标签的操作日志
+@receiver(post_save, sender=ProductTag)
+def product_tag_create_signal(sender, instance, created, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    if created:
+        op = OperateLog()
+        if request:
+            op.user = request.user
+        op.op_log = '增加标签：' + instance.tag.tag_name
+        op.op_type = 'PRODUCT'
+        op.target_id = instance.product.id
+        op.save()
+
+
+# 记录删除产品标签的操作日志
+@receiver(post_delete, sender=ProductTag)
+def product_tag_delete_signal(sender, instance, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    op = OperateLog()
+    if request:
+        op.user = request.user
+    op.op_log = '删除标签：' + instance.tag.tag_name
+    op.op_type = 'PRODUCT'
+    op.target_id = instance.product.id
+    op.save()
+
+
+# 记录新增兼容产品型号的操作日志
+@receiver(post_save, sender=CompatibleModel)
+def product_comp_model_create_signal(sender, instance, created, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    if created:
+        op = OperateLog()
+        if request:
+            op.user = request.user
+        op.op_log = '增加兼容产品型号：' + instance.phone_model.model
+        op.op_type = 'PRODUCT'
+        op.target_id = instance.product.id
+        op.save()
+
+
+# 记录删除兼容产品型号的操作日志
+@receiver(post_delete, sender=CompatibleModel)
+def product_tag_delete_signal(sender, instance, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    op = OperateLog()
+    if request:
+        op.user = request.user
+    op.op_log = '删除兼容产品型号：' + instance.phone_model.model
+    op.op_type = 'PRODUCT'
+    op.target_id = instance.product.id
+    op.save()

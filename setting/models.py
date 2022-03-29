@@ -45,7 +45,7 @@ class OperateLog(models.Model):
 
     op_type = models.CharField(max_length=10, choices=O_TYPE, default='PRODUCT', verbose_name='日志类型',
                                help_text='日志类型')
-    op_log = models.CharField(max_length=300, verbose_name='操作描述', help_text='操作描述')
+    op_log = models.TextField(null=True, blank=True, default='', verbose_name='操作描述', help_text='操作描述')
     target_id = models.IntegerField(null=True, blank=True, verbose_name='目标id', help_text='目标id')
     user = models.ForeignKey(User, related_name='user_op_log', on_delete=models.DO_NOTHING, null=True, verbose_name='user',
                              help_text='user')

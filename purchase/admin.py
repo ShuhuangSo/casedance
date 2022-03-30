@@ -13,6 +13,6 @@ class StockInOutAdmin(admin.ModelAdmin):
 
 @admin.register(PurchaseDetail)
 class StockInOutAdmin(admin.ModelAdmin):
-    list_display = ['purchase_order', 'product', 'qty', 'unit_cost', 'is_paid']
+    list_display = ['purchase_order', 'product', 'qty', 'paid_qty', 'unit_cost', 'is_paid']
     list_filter = ['is_paid', ]
     search_fields = ['product', ]

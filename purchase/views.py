@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from product.models import Product, Supplier
 from .models import PurchaseOrder, PurchaseDetail
-from .serializers import PurchaseOrderSerializer
+from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer
 from store.models import Store, Stock
 
 
@@ -99,6 +99,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                     PurchaseDetail(
                         purchase_order=purchase_order,
                         product=product,
+                        unit_cost=i['unit_cost'],
                         qty=i['qty'],
                         stock_before=stock.qty,
                         short_note=i['short_note']
@@ -107,3 +108,29 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
             PurchaseDetail.objects.bulk_create(add_list)
 
         return Response({'message': '操作成功！'}, status=status.HTTP_201_CREATED)
+
+
+class PurchaseDetailViewSet(mixins.ListModelMixin,
+                            mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.RetrieveModelMixin,
+                            mixins.DestroyModelMixin,
+                            viewsets.GenericViewSet):
+    """
+    list:
+        采购单详情列表,过滤,排序
+    create:
+        采购单详情新增
+    update:
+        采购单详情修改
+    retrieve:
+        采购单详情
+    destroy:
+        采购单详情删除
+    """
+    queryset = PurchaseDetail.objects.all()
+    serializer_class = PurchaseDetailSerializer  # 序列化
+
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('purchase_order', )  # 配置过滤字段
+    ordering_fields = ('create_time',)  # 配置排序字段

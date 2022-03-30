@@ -22,6 +22,7 @@ from rest_framework_jwt.views import obtain_jwt_token
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet
+from purchase.views import PurchaseOrderViewSet
 from setting.views import TagViewSet, OperateLogViewSet
 
 from rest_framework.routers import DefaultRouter
@@ -55,6 +56,10 @@ router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
 router.register('stores', StoreViewSet, basename='stores')
 # 手工出入库/调拨
 router.register('stock_in_out', StockInOutViewSet, basename='stock_in_out')
+
+# ---------------------------采购模块 -------------------------------------------------
+# 采购单
+router.register('purchase_orders', PurchaseOrderViewSet, basename='purchase_orders')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

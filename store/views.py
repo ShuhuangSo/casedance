@@ -78,7 +78,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
-    'origin_store', 'target_store', 'user', 'type', 'reason_in', 'reason_out', 'reason_move', 'is_active')  # 配置过滤字段
+        'origin_store', 'target_store', 'user', 'type', 'reason_in', 'reason_out', 'reason_move', 'is_active')  # 配置过滤字段
     search_fields = ('batch_number',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 

@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'setting',  # 系统设置
     'store',  # 仓库/商店模块
     'purchase',  # 采购模块
+    'sale',  # 销售模块
 ]
 
 MIDDLEWARE = [

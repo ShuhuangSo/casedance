@@ -21,9 +21,11 @@ class PurchaseOrder(models.Model):
     )
     O_STATUS = (
         ('CANCEL', '作废'),
+        ('PRE_SUMMIT', '未提交'),
         ('WAIT_CONFIRM', '待确认'),
         ('IN_PRODUCTION', '生产中'),
         ('SENT', '已发货'),
+        ('PART_SENT', '部分发货'),
         ('PART_REC', '部分收货'),
         ('FINISHED', '已完成'),
         ('EXCEPTION', '异常'),
@@ -41,11 +43,9 @@ class PurchaseOrder(models.Model):
     logistic = models.CharField(null=True, blank=True, max_length=20, verbose_name='发货物流公司', help_text='发货物流公司')
     tracking_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='快递单号', help_text='快递单号')
     postage = models.FloatField(default=0.0, verbose_name='采购运费', help_text='采购运费')
-    total_cost = models.FloatField(default=0.0, verbose_name='采购单总金额', help_text='采购单总金额')
-    total_paid = models.FloatField(default=0.0, verbose_name='已结算总金额', help_text='已结算总金额')
     paid_status = models.CharField(max_length=20, choices=P_STATUS, default='UNPAID', verbose_name='结算状态',
                                    help_text='结算状态')
-    order_status = models.CharField(max_length=20, choices=O_STATUS, default='WAIT_CONFIRM', verbose_name='采购单状态',
+    order_status = models.CharField(max_length=20, choices=O_STATUS, default='PRE_SUMMIT', verbose_name='采购单状态',
                                     help_text='采购单状态')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
@@ -73,6 +73,8 @@ class PurchaseDetail(models.Model):
                                 help_text='产品')
     qty = models.IntegerField(default=0, verbose_name='采购数量', help_text='采购数量')
     unit_cost = models.FloatField(default=0.0, verbose_name='采购单价', help_text='采购单价')
+    sent_qty = models.IntegerField(default=0, verbose_name='发货数量', help_text='发货数量')
+    is_supply_case = models.BooleanField(default=False, verbose_name='是否提供素材壳', help_text='是否提供素材壳')
     received_qty = models.IntegerField(default=0, verbose_name='收货入库数量', help_text='收货入库数量')
     paid_qty = models.IntegerField(default=0, verbose_name='已结算数量', help_text='已结算数量')
     is_paid = models.BooleanField(default=False, verbose_name='是否已结算', help_text='是否已结算')

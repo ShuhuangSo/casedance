@@ -63,7 +63,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
             return Response({'message': '数据错误！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
         data_detail_status = False
         for i in request.data['purchase_detail']:
-            data_detail_status = 'qty' in i.keys() and 'unit_cost' in i.keys() and 'product' in i.keys() and 'short_note' in i.keys()
+            data_detail_status = 'qty' in i.keys() and 'unit_cost' in i.keys() and 'product' in i.keys() and 'short_note' in i.keys() and 'is_supply_case' in i.keys()
             if not data_detail_status:
                 return Response({'message': '数据错误！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
@@ -101,6 +101,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                         product=product,
                         unit_cost=i['unit_cost'],
                         qty=i['qty'],
+                        is_supply_case=i['is_supply_case'],
                         stock_before=stock.qty,
                         short_note=i['short_note']
                     )

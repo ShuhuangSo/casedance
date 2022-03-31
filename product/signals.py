@@ -64,13 +64,14 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_note != instance.note:
             str_list.append('备注: %s ===>> %s' % (instance.__original_note, instance.note))
 
-        op = OperateLog()
-        if request:
-            op.user = request.user
-        op.op_log = ';'.join(str_list)
-        op.op_type = 'PRODUCT'
-        op.target_id = instance.id
-        op.save()
+        if str_list:
+            op = OperateLog()
+            if request:
+                op.user = request.user
+            op.op_log = ';'.join(str_list)
+            op.op_type = 'PRODUCT'
+            op.target_id = instance.id
+            op.save()
 
     if created:
         # 如果是新建产品，则为所有门店创建一份产品库存记录

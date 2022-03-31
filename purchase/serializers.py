@@ -1,7 +1,27 @@
 from rest_framework import serializers
 
 from casedance.settings import BASE_URL, MEDIA_URL
-from purchase.models import PurchaseOrder, PurchaseDetail
+from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
+
+
+class PurchaseOrderTagSerializer(serializers.ModelSerializer):
+    """
+    采购单标签表
+    """
+    tag_name = serializers.SerializerMethodField()
+    color = serializers.SerializerMethodField()
+
+    # 获取标签名
+    def get_tag_name(self, obj):
+        return obj.tag.tag_name
+
+    # 获取颜色
+    def get_color(self, obj):
+        return obj.tag.color
+
+    class Meta:
+        model = PurchaseOrderTag
+        fields = ('id', 'purchase_order', 'tag_name', 'color')
 
 
 class PurchaseDetailSerializer(serializers.ModelSerializer):
@@ -47,6 +67,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     #  采购商品明细
     purchase_detail = PurchaseDetailSerializer(many=True, required=False, read_only=True)
+    #  采购单标签
+    purchase_p_tag = PurchaseOrderTagSerializer(many=True, required=False, read_only=True)
 
     username = serializers.SerializerMethodField()
     store_name = serializers.SerializerMethodField()
@@ -137,5 +159,5 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrder
         fields = ('id', 'p_number', 'store_name', 'supplier_name', 'username', 'logistic', 'tracking_number', 'postage',
-                  'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty', 'total_rec_qty', 'total_paid_qty', 'paid_status', 'order_status', 'note', 'purchase_detail', 'create_time',
-                  'is_active')
+                  'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty', 'total_rec_qty', 'total_paid_qty',
+                  'paid_status', 'order_status', 'note', 'purchase_detail', 'purchase_p_tag', 'create_time', 'is_active')

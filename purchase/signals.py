@@ -6,7 +6,7 @@ from store.models import Stock
 
 import inspect
 
-from purchase.models import PurchaseDetail, PurchaseOrder
+from purchase.models import PurchaseDetail, PurchaseOrder, PurchaseOrderTag
 
 
 # 采购单详情，检测有增量的收货库存数量，则增加库存
@@ -167,7 +167,7 @@ def purchase_order_signal(sender, instance, created, **kwargs):
 
 # 采购单数据保存前的初始化，将原数据保存起来
 @receiver(post_init, sender=PurchaseOrder)
-def product_init_signal(instance, **kwargs):
+def purchase_order_init_signal(instance, **kwargs):
     instance.__original_store = instance.store
     instance.__original_supplier = instance.supplier
     instance.__original_logistic = instance.logistic
@@ -176,3 +176,44 @@ def product_init_signal(instance, **kwargs):
     instance.__original_note = instance.note
     instance.__original_paid_status = instance.paid_status
     instance.__original_order_status = instance.order_status
+
+
+# 记录新增采购单标签的操作日志
+@receiver(post_save, sender=PurchaseOrderTag)
+def purchase_order_tag_create_signal(sender, instance, created, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    if created:
+        op = OperateLog()
+        if request:
+            op.user = request.user
+        op.op_log = '增加标签：' + instance.tag.tag_name
+        op.op_type = 'PURCHASE'
+        op.target_id = instance.purchase_order.id
+        op.save()
+
+
+# 记录删除采购单标签的操作日志
+@receiver(post_delete, sender=PurchaseOrderTag)
+def product_tag_delete_signal(sender, instance, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    op = OperateLog()
+    if request:
+        op.user = request.user
+    op.op_log = '删除标签：' + instance.tag.tag_name
+    op.op_type = 'PURCHASE'
+    op.target_id = instance.purchase_order.id
+    op.save()

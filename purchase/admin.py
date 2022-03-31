@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from purchase.models import PurchaseOrder, PurchaseDetail
+from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
 
 
 @admin.register(PurchaseOrder)
@@ -16,3 +16,10 @@ class StockInOutAdmin(admin.ModelAdmin):
     list_display = ['purchase_order', 'product', 'qty', 'paid_qty', 'unit_cost', 'is_paid']
     list_filter = ['is_paid', ]
     search_fields = ['product', ]
+
+
+@admin.register(PurchaseOrderTag)
+class PurchaseOrderTagAdmin(admin.ModelAdmin):
+    list_display = ['purchase_order', 'tag']
+    list_filter = ['purchase_order', ]
+    search_fields = ['purchase_order', ]

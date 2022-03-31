@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
+from setting.models import Tag
 from store.models import Store
 from product.models import Supplier
 
@@ -78,7 +79,8 @@ class PurchaseDetail(models.Model):
     received_qty = models.IntegerField(default=0, verbose_name='收货入库数量', help_text='收货入库数量')
     paid_qty = models.IntegerField(default=0, verbose_name='已结算数量', help_text='已结算数量')
     is_paid = models.BooleanField(default=False, verbose_name='是否已结算', help_text='是否已结算')
-    short_note = models.CharField(null=True, blank=True, max_length=100, default='', verbose_name='简短备注', help_text='简短备注')
+    short_note = models.CharField(null=True, blank=True, max_length=100, default='', verbose_name='简短备注',
+                                  help_text='简短备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
     stock_before = models.IntegerField(default=0, verbose_name='采购前库存', help_text='采购前库存')
 
@@ -89,3 +91,22 @@ class PurchaseDetail(models.Model):
 
     def __str__(self):
         return str(self.qty)
+
+
+class PurchaseOrderTag(models.Model):
+    """
+    采购单标签表
+    """
+
+    purchase_order = models.ForeignKey(PurchaseOrder, related_name='purchase_p_tag', on_delete=models.CASCADE,
+                                       verbose_name='采购单',
+                                       help_text='采购单')
+    tag = models.ForeignKey(Tag, related_name='tag_purchase_tag', on_delete=models.CASCADE, verbose_name='标签', help_text='标签')
+
+    class Meta:
+        verbose_name = '采购单标签表'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return str(self.id)

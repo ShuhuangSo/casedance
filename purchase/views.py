@@ -9,8 +9,8 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
 from product.models import Product, Supplier
-from .models import PurchaseOrder, PurchaseDetail
-from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer
+from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
+from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer, PurchaseOrderTagSerializer
 from store.models import Store, Stock
 
 
@@ -133,5 +133,30 @@ class PurchaseDetailViewSet(mixins.ListModelMixin,
     serializer_class = PurchaseDetailSerializer  # 序列化
 
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('purchase_order', )  # 配置过滤字段
+    filter_fields = ('purchase_order',)  # 配置过滤字段
     ordering_fields = ('create_time',)  # 配置排序字段
+
+
+class PurchaseOrderTagViewSet(mixins.ListModelMixin,
+                              mixins.CreateModelMixin,
+                              mixins.UpdateModelMixin,
+                              mixins.DestroyModelMixin,
+                              mixins.RetrieveModelMixin,
+                              viewsets.GenericViewSet):
+    """
+    list:
+        采购单标签,分页,过滤,搜索,排序
+    create:
+        采购单标签新增
+    retrieve:
+        采购单标签详情页
+    update:
+        采购单标签修改
+    destroy:
+        采购单标签删除
+    """
+    queryset = PurchaseOrderTag.objects.all()
+    serializer_class = PurchaseOrderTagSerializer  # 序列化
+
+    filter_backends = (DjangoFilterBackend,)  # 过滤
+    filter_fields = ('purchase_order', 'tag',)  # 配置过滤字段

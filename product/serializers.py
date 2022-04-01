@@ -79,7 +79,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ('id', 'sku', 'p_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
+        fields = ('id', 'sku', 'p_name', 'label_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
                   'length', 'width', 'heigth', 'weight', 'url', 'is_auto_promote', 'stock_strategy', 'stock_days',
                   'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note',
                   'product_stock', 'total_qty', 'total_lock_qty', 'create_time')

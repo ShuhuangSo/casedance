@@ -23,6 +23,8 @@ def product_edit_signal(sender, instance, created, **kwargs):
         str_list = []
         if instance.__original_p_name != instance.p_name:
             str_list.append('名称: %s ===>> %s' % (instance.__original_p_name, instance.p_name))
+        if instance.__original_label_name != instance.label_name:
+            str_list.append('条码标签名: %s ===>> %s' % (instance.__original_label_name, instance.label_name))
         if instance.__original_sku != instance.sku:
             str_list.append('sku: %s ===>> %s' % (instance.__original_sku, instance.sku))
         if instance.__original_status != instance.status:
@@ -97,6 +99,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
 @receiver(post_init, sender=Product)
 def product_init_signal(instance, **kwargs):
     instance.__original_p_name = instance.p_name
+    instance.__original_label_name = instance.label_name
     instance.__original_sku = instance.sku
     instance.__original_status = instance.status
     instance.__original_brand = instance.brand

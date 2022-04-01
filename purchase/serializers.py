@@ -31,7 +31,7 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
     product_image = serializers.SerializerMethodField()
     product_sku = serializers.SerializerMethodField()
     product_name = serializers.SerializerMethodField()
-    is_paid = serializers.SerializerMethodField()
+    # is_paid = serializers.SerializerMethodField()
     onway_qty = serializers.SerializerMethodField()
 
     # # 获取产品图片
@@ -47,8 +47,8 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
         return obj.product.p_name
 
     # 如果结算数量大于等于收货数量，则将该项标为已结算(付款数量不等于0)
-    def get_is_paid(self, obj):
-        return obj.paid_qty >= obj.received_qty if obj.paid_qty else False
+    # def get_is_paid(self, obj):
+    #     return obj.paid_qty >= obj.received_qty if obj.paid_qty else False
 
     # 获取在途数量
     def get_onway_qty(self, obj):

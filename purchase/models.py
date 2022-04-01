@@ -32,7 +32,7 @@ class PurchaseOrder(models.Model):
         ('EXCEPTION', '异常'),
     )
 
-    p_number = models.CharField(max_length=20, verbose_name='采购单号', help_text='采购单号')
+    p_number = models.CharField(max_length=30, verbose_name='采购单号', help_text='采购单号')
     store = models.ForeignKey(Store, null=True, related_name='store_purchase_order', on_delete=models.DO_NOTHING,
                               verbose_name='收货仓库/店铺', help_text='收货仓库/店铺')
     supplier = models.ForeignKey(Supplier, null=True, related_name='supplier_purchase_order',

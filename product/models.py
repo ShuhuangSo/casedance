@@ -25,6 +25,7 @@ class Product(models.Model):
 
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
     p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    label_name = models.CharField(max_length=30, null=True, blank=True, verbose_name='条码标签名', help_text='条码标签名')
     image = models.ImageField(null=True, blank=True, upload_to='product_image', max_length=200, verbose_name='产品图片',
                               help_text='产品图片')
     status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='UN_LISTED', verbose_name='产品状态',

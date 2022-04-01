@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from sale.models import Customer, CustomerDiscount, CustomerTag
+from sale.models import Customer, CustomerDiscount, CustomerTag, Order, OrderDetail, OrderTag
 
 
 @admin.register(Customer)
@@ -21,3 +21,24 @@ class CustomerDiscountAdmin(admin.ModelAdmin):
 @admin.register(CustomerTag)
 class CustomerTagAdmin(admin.ModelAdmin):
     list_display = ['customer', 'tag']
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ['order_number', 'store', 'customer', 'user', 'is_active']
+    list_filter = ['store', 'customer']
+    search_fields = ['order_number', ]
+
+
+@admin.register(OrderDetail)
+class OrderDetailAdmin(admin.ModelAdmin):
+    list_display = ['order', 'product', 'qty', 'unit_price', 'sent_qty', 'paid_qty', 'is_paid']
+    list_filter = ['is_paid', ]
+    search_fields = ['product', ]
+
+
+@admin.register(OrderTag)
+class OrderTagAdmin(admin.ModelAdmin):
+    list_display = ['order', 'tag']
+    list_filter = ['order', ]
+    search_fields = ['order', ]

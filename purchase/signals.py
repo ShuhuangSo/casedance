@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, post_init, post_delete
+from django.db.models.signals import post_save, post_init, post_delete, pre_save
 from django.dispatch import receiver
 
 from setting.models import OperateLog
@@ -9,7 +9,7 @@ import inspect
 from purchase.models import PurchaseDetail, PurchaseOrder, PurchaseOrderTag
 
 
-# 采购单详情，检测有增量的收货库存数量，则增加库存
+# 采购单详情，检测有增量的收货数量，则增加库存
 @receiver(post_save, sender=PurchaseDetail)
 def purchase_detail_signal(sender, instance, created, **kwargs):
     # 获取当前user
@@ -64,7 +64,7 @@ def purchase_detail_signal(sender, instance, created, **kwargs):
         op.save()
 
 
-# 记录删除采购单详情产品的操作日志
+# 记录删除采购单明细产品的操作日志
 @receiver(post_delete, sender=PurchaseDetail)
 def product_detail_delete_signal(sender, instance, **kwargs):
     # 获取当前user
@@ -84,7 +84,20 @@ def product_detail_delete_signal(sender, instance, **kwargs):
     op.save()
 
 
-# 采购单详情，获取原数据
+# 采购明细更新前判断结算状态
+@receiver(pre_save, sender=PurchaseDetail)
+def purchase_detail_paid_signal(sender, instance, created=False, **kwargs):
+    # 判断是否create
+    if not instance._state.adding:
+        # 如果结算数量有变动
+        if instance.__original_paid_qty != instance.paid_qty:
+            if instance.paid_qty >= instance.received_qty and instance.paid_qty > 0:
+                instance.is_paid = True
+            else:
+                instance.is_paid = False
+
+
+# 采购单明细，获取原数据
 @receiver(post_init, sender=PurchaseDetail)
 def purchase_detail_init_signal(instance, **kwargs):
     instance.__original_received_qty = instance.received_qty

@@ -88,7 +88,7 @@ class StockInOut(models.Model):
         ('OTHERS', '其它原因'),
     )
 
-    batch_number = models.CharField(max_length=20, verbose_name='批次号', help_text='批次号')
+    batch_number = models.CharField(max_length=30, verbose_name='批次号', help_text='批次号')
     origin_store = models.ForeignKey(Store, null=True, related_name='store_inout_or', on_delete=models.CASCADE,
                                      verbose_name='源仓库/店铺',
                                      help_text='源仓库/店铺')

@@ -25,7 +25,7 @@ class CustomerTagAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['order_number', 'store', 'customer', 'user', 'is_active']
+    list_display = ['order_number', 'store', 'customer', 'user', 'mode']
     list_filter = ['store', 'customer']
     search_fields = ['order_number', ]
 

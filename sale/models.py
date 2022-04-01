@@ -98,6 +98,10 @@ class Order(models.Model):
         ('PAY_NOW', '现结'),
         ('CONTRACT', '约定付款'),
     )
+    ORDER_MODE = (
+        ('STANDARD', '标准流程'),
+        ('POS', '快捷流程'),
+    )
     P_STATUS = (
         ('UNPAID', '未结算'),
         ('PART_PAID', '部分结算'),
@@ -105,10 +109,8 @@ class Order(models.Model):
     )
     O_STATUS = (
         ('CANCEL', '作废'),
-        ('PRE_SUMMIT', '待处理'),
         ('PREPARING', '备货中'),
         ('READY', '已备货'),
-        ('SENDING', '送货中'),
         ('PART_SENT', '部分发货'),
         ('FINISHED', '已完成'),
         ('EXCEPTION', '异常'),
@@ -125,7 +127,9 @@ class Order(models.Model):
                              help_text='操作人')
     order_type = models.CharField(max_length=20, choices=O_TYPE, default='PICKUP', verbose_name='订单类型',
                                   help_text='订单类型')
-    order_status = models.CharField(max_length=20, choices=O_STATUS, default='PRE_SUMMIT', verbose_name='订单状态',
+    mode = models.CharField(max_length=10, choices=ORDER_MODE, default='STANDARD', verbose_name='订单模式',
+                            help_text='订单模式')
+    order_status = models.CharField(max_length=20, choices=O_STATUS, default='PREPARING', verbose_name='订单状态',
                                     help_text='订单状态')
     pay_way = models.CharField(max_length=20, choices=WAY, default='PAY_NOW', verbose_name='结算类型',
                                help_text='结算类型')

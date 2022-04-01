@@ -138,7 +138,8 @@ class OrderViewSet(mixins.ListModelMixin,
         data_status = 'store' in request.data.keys() and 'customer' in request.data.keys() \
                       and 'order_type' in request.data.keys() and 'pay_way' in request.data.keys() \
                       and 'address' in request.data.keys() and 'contact_name' in request.data.keys() \
-                      and 'phone' in request.data.keys() and 'postage' in request.data.keys() and 'note' in request.data.keys()
+                      and 'phone' in request.data.keys() and 'postage' in request.data.keys() \
+                      and 'note' in request.data.keys() and 'mode' in request.data.keys()
         if not data_status:
             return Response({'message': '数据错误！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
         data_detail_status = False
@@ -171,6 +172,7 @@ class OrderViewSet(mixins.ListModelMixin,
         order.phone = request.data['phone']
         order.postage = request.data['postage']
         order.note = request.data['note']
+        order.mode = request.data['mode']
         order.save()
 
         # 创建销售单产品明细

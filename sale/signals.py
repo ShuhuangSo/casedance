@@ -5,7 +5,7 @@ import inspect
 from django.db.models.signals import pre_save, post_save, post_init, post_delete
 from django.dispatch import receiver
 
-from sale.models import Customer, CustomerDiscount, CustomerTag, Order, OrderDetail
+from sale.models import Customer, CustomerDiscount, CustomerTag, Order, OrderDetail, OrderTag
 from setting.models import OperateLog
 
 
@@ -273,6 +273,23 @@ def order_signal(sender, instance, created, **kwargs):
                 stock.lock_qty -= i.qty
                 stock.save()
 
+        # 如果销售单的状态 部分发货转为异常，则进行未发货产品库存解锁
+        if instance.__original_order_status == 'PART_SENT' and instance.order_status == 'EXCEPTION':
+            queryset = OrderDetail.objects.filter(order=instance)
+            for i in queryset:
+                stock = Stock.objects.filter(store=instance.store).get(product=i.product)
+                if i.qty - i.sent_qty:
+                    stock.lock_qty -= (i.qty - i.sent_qty)
+                    stock.save()
+
+        # 如果销售单的状态 为FINISHED，则直接进行产品库存扣除,不经过发货流程-- POS模式
+        if instance.mode == 'POS' and instance.order_status == 'FINISHED':
+            queryset = OrderDetail.objects.filter(order=instance)
+            for i in queryset:
+                stock = Stock.objects.filter(store=instance.store).get(product=i.product)
+                stock.qty -= i.qty
+                stock.save()
+
         # 记录修改操作日志
         str_list = []
         if instance.__original_store != instance.store:
@@ -318,8 +335,6 @@ def order_signal(sender, instance, created, **kwargs):
                                                    '现结' if instance.pay_way == 'PAY_NOW' else '约定付款'))
         if instance.__original_is_active != instance.is_active:
             str_list.append('状态: %s ===>> %s' % (instance.__original_is_active, instance.is_active))
-        if instance.__original_is_active != instance.is_active:
-            str_list.append('状态: %s ===>> %s' % (instance.__original_is_active, instance.is_active))
         if instance.__original_paid_status != instance.paid_status:
             if instance.paid_status == 'PART_PAID':
                 str_list.append('订单进行部分结算')
@@ -328,20 +343,16 @@ def order_signal(sender, instance, created, **kwargs):
         if instance.__original_order_status != instance.order_status:
             if instance.order_status == 'CANCEL':
                 str_list.append('订单作废')
-            if instance.order_status == 'PRE_SUMMIT':
-                str_list.append('订单放入草稿箱')
             if instance.order_status == 'PREPARING':
-                str_list.append('订单开始备货')
+                str_list.append('订单放入草稿箱')
             if instance.order_status == 'READY':
                 str_list.append('订单已完成备货')
-            if instance.order_status == 'SENDING':
-                str_list.append('订单已标记全部发货')
             if instance.order_status == 'PART_SENT':
                 str_list.append('订单已标记部分发货')
             if instance.order_status == 'FINISHED':
                 str_list.append('订单已完成')
             if instance.order_status == 'EXCEPTION':
-                str_list.append('订单已标记异常')
+                str_list.append('订单标记异常完成')
 
         if str_list:
             op = OperateLog()
@@ -374,13 +385,14 @@ def order_detail_signal(sender, instance, created, **kwargs):
     else:
         request = None
 
-    # 检测有增量的发货数量，则减去库存
+    # 检测有增量的发货数量，则减去库存,减锁仓量
     if not created:
         # 订单产品出库操作
         reduce_stock = instance.sent_qty - instance.__original_sent_qty  # 增加的发货数量，用于出库
         if reduce_stock:
             stock = Stock.objects.filter(store=instance.order.store).get(product=instance.product)
             stock.qty -= reduce_stock
+            stock.lock_qty -= reduce_stock
             stock.save()
 
         # 操作日志记录
@@ -430,6 +442,47 @@ def order_detail_delete_signal(sender, instance, **kwargs):
     if request:
         op.user = request.user
     op.op_log = '删除sku：%s(%s)' % (instance.product.sku, instance.product.p_name)
+    op.op_type = 'ORDER'
+    op.target_id = instance.order.id
+    op.save()
+
+
+# 记录新增销售单标签的操作日志
+@receiver(post_save, sender=OrderTag)
+def order_tag_create_signal(sender, instance, created, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    if created:
+        op = OperateLog()
+        if request:
+            op.user = request.user
+        op.op_log = '增加标签：' + instance.tag.tag_name
+        op.op_type = 'ORDER'
+        op.target_id = instance.order.id
+        op.save()
+
+
+# 记录删除销售单标签的操作日志
+@receiver(post_delete, sender=OrderTag)
+def order_tag_delete_signal(sender, instance, **kwargs):
+    # 获取当前user
+    for frame_record in inspect.stack():
+        if frame_record[3] == 'get_response':
+            request = frame_record[0].f_locals['request']
+            break
+    else:
+        request = None
+
+    op = OperateLog()
+    if request:
+        op.user = request.user
+    op.op_log = '删除标签：' + instance.tag.tag_name
     op.op_type = 'ORDER'
     op.target_id = instance.order.id
     op.save()

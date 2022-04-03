@@ -17,7 +17,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             break
     else:
         request = None
-
+    print(created)
     if not created:
         # 记录修改操作日志
         str_list = []

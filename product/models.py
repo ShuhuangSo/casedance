@@ -168,3 +168,4 @@ class Supplier(models.Model):
 
     def __str__(self):
         return self.supplier_name
+

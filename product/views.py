@@ -4,7 +4,11 @@ from rest_framework.response import Response
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+import openpyxl
 
+from setting.models import OperateLog
+from store.models import Store, Stock
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, \
     CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer
@@ -52,6 +56,133 @@ class ProductViewSet(mixins.ListModelMixin,
     def destroy(self, request, *args, **kwargs):
         print('delete!!')
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # 产品excel批量上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        data = request.data
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['sku上传模板']
+
+        # 取出从第二行开始的所有数据, 检查必填项列是否为空
+        # 1 SKU
+        # 2 产品名称
+        # 4 成本价
+        # 5 售价
+        # 6 产品系列
+        err_list = []  # 错误列表
+        add_list = []  # 批量新增sku
+        if sheet.max_row <= 1:
+            err_list.append({'msg': '表格不能为空'})
+            return Response(err_list, status=status.HTTP_406_NOT_ACCEPTABLE)
+        for cell_row in list(sheet)[1:]:
+            err_item = {}
+            row_status = cell_row[0].value and cell_row[1].value and cell_row[3].value and cell_row[4].value and cell_row[5].value
+
+            if not row_status:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '价格有误'})
+                err_list.append(err_item)
+                continue
+            if not type(cell_row[3].value) in [float, int]:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '价格有误'})
+                err_list.append(err_item)
+                continue
+            if not type(cell_row[4].value) in [float, int]:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '价格有误'})
+                err_list.append(err_item)
+                continue
+
+            # 检查sku是否已存在
+            sku_is_exist = Product.objects.filter(sku=cell_row[0].value.strip()).count()
+            if sku_is_exist:
+                err_item = {}
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': 'sku: %s 已存在' % cell_row[0].value.strip()})
+                err_list.append(err_item)
+                continue
+
+            # 检查产品系列是否存在
+            series_is_exist = ProductExtraInfo.objects.filter(type='SERIES', name=cell_row[5].value.strip()).count()
+            if not series_is_exist:
+                err_item = {}
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '产品系列: %s 不存在' % cell_row[5].value.strip()})
+                err_list.append(err_item)
+                continue
+
+            # 创建产品对象
+            sku = cell_row[0].value.strip()
+            p_name = cell_row[1].value.strip()
+            label_name = cell_row[2].value.strip() if cell_row[2].value else ''
+            unit_cost = cell_row[3].value
+            sale_price = cell_row[4].value
+            series = cell_row[5].value.strip()
+            image = cell_row[6].value.strip() if cell_row[6].value else None
+            brand = cell_row[7].value.strip() if cell_row[7].value else ''
+            p_type = cell_row[8].value.strip() if cell_row[8].value else ''
+            length = cell_row[9].value if cell_row[9].value else None
+            width = cell_row[10].value if cell_row[10].value else None
+            heigth = cell_row[11].value if cell_row[11].value else None
+            weight = cell_row[12].value if cell_row[12].value else None
+            stock_strategy = cell_row[13].value.strip() if cell_row[13].value else 'STANDARD'
+            stock_days = cell_row[14].value if cell_row[14].value else None
+            alert_qty = cell_row[15].value if cell_row[15].value else None
+            alert_days = cell_row[16].value if cell_row[16].value else None
+            mini_pq = cell_row[17].value if cell_row[17].value else None
+            max_pq = cell_row[18].value if cell_row[18].value else None
+            note = cell_row[19].value.strip() if cell_row[19].value else ''
+            add_list.append(Product(
+                sku=sku,
+                p_name=p_name,
+                label_name=label_name,
+                unit_cost=unit_cost,
+                sale_price=sale_price,
+                series=series,
+                image=image,
+                brand=brand,
+                p_type=p_type,
+                length=length,
+                width=width,
+                heigth=heigth,
+                weight=weight,
+                stock_strategy=stock_strategy,
+                stock_days=stock_days,
+                alert_qty=alert_qty,
+                alert_days=alert_days,
+                mini_pq=mini_pq,
+                max_pq=max_pq,
+                note=note
+            ))
+        Product.objects.bulk_create(add_list)
+
+        # bulk_create 无法发送信号，所以手动为所有门店创建一份产品库存记录
+        queryset = Store.objects.all()
+        if queryset:
+            store_add_list = []
+            for p in add_list:
+                # 根据sku查询拿出批量创建的产品
+                product = Product.objects.all().get(sku=p.sku)
+                # 记录创建产品日志
+                op = OperateLog()
+                op.user = request.user
+                op.op_log = '通过批量导入创建了产品'
+                op.op_type = 'PRODUCT'
+                op.target_id = product.id
+                op.save()
+                for store in queryset:
+                    store_add_list.append(Stock(product=product, store=store))
+            Stock.objects.bulk_create(store_add_list)
+
+        success_count = len(add_list)
+        fail_count = sheet.max_row - 1 - success_count
+        all_data = {}
+        all_data.update({'err_list': err_list})
+        all_data.update({'fail_count': fail_count})
+        all_data.update({'success_count': success_count})
+        return Response(all_data, status=status.HTTP_201_CREATED)
 
 
 class ProductExtraInfoViewSet(mixins.ListModelMixin,

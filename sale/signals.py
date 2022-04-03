@@ -9,10 +9,10 @@ from sale.models import Customer, CustomerDiscount, CustomerTag, Order, OrderDet
 from setting.models import OperateLog
 
 
+from store.models import Stock, StockLog
+
+
 # 客户创建前生成客户代码并保存
-from store.models import Stock
-
-
 @receiver(pre_save, sender=Customer)
 def customer_code_signal(sender, instance, created=False, **kwargs):
     if instance._state.adding:  # 判断是否create
@@ -265,6 +265,18 @@ def order_signal(sender, instance, created, **kwargs):
                 stock = Stock.objects.filter(store=instance.store).get(product=i.product)
                 stock.lock_qty += i.qty
                 stock.save()
+
+                #  产品库存锁定日志记录保存
+                stock_log = StockLog()
+                stock_log.qty = i.qty
+                stock_log.product = i.product
+                stock_log.store = instance.store
+                if request:
+                    stock_log.user = request.user
+                stock_log.op_type = 'LOCK'
+                stock_log.op_origin_id = instance.id
+                stock_log.save()
+
         # 如果销售单的状态 已备货转为备货中，则进行库存解锁
         if instance.__original_order_status == 'READY' and instance.order_status == 'PREPARING':
             queryset = OrderDetail.objects.filter(order=instance)
@@ -272,6 +284,17 @@ def order_signal(sender, instance, created, **kwargs):
                 stock = Stock.objects.filter(store=instance.store).get(product=i.product)
                 stock.lock_qty -= i.qty
                 stock.save()
+
+                #  产品库存解锁日志记录保存
+                stock_log = StockLog()
+                stock_log.qty = i.qty
+                stock_log.product = i.product
+                stock_log.store = instance.store
+                if request:
+                    stock_log.user = request.user
+                stock_log.op_type = 'UNLOCK'
+                stock_log.op_origin_id = instance.id
+                stock_log.save()
 
         # 如果销售单的状态 部分发货转为异常，则进行未发货产品库存解锁
         if instance.__original_order_status == 'PART_SENT' and instance.order_status == 'EXCEPTION':
@@ -282,6 +305,17 @@ def order_signal(sender, instance, created, **kwargs):
                     stock.lock_qty -= (i.qty - i.sent_qty)
                     stock.save()
 
+                    #  未发货产品库存解锁日志记录保存
+                    stock_log = StockLog()
+                    stock_log.qty = i.qty - i.sent_qty
+                    stock_log.product = i.product
+                    stock_log.store = instance.store
+                    if request:
+                        stock_log.user = request.user
+                    stock_log.op_type = 'UNLOCK'
+                    stock_log.op_origin_id = instance.id
+                    stock_log.save()
+
         # 如果销售单的状态 为FINISHED，则直接进行产品库存扣除,不经过发货流程-- POS模式
         if instance.mode == 'POS' and instance.order_status == 'FINISHED':
             queryset = OrderDetail.objects.filter(order=instance)
@@ -289,6 +323,17 @@ def order_signal(sender, instance, created, **kwargs):
                 stock = Stock.objects.filter(store=instance.store).get(product=i.product)
                 stock.qty -= i.qty
                 stock.save()
+
+                #  产品销售出库日志记录保存
+                stock_log = StockLog()
+                stock_log.qty = i.qty
+                stock_log.product = i.product
+                stock_log.store = instance.store
+                if request:
+                    stock_log.user = request.user
+                stock_log.op_type = 'S_OUT'
+                stock_log.op_origin_id = instance.id
+                stock_log.save()
 
         # 记录修改操作日志
         str_list = []
@@ -394,6 +439,17 @@ def order_detail_signal(sender, instance, created, **kwargs):
             stock.qty -= reduce_stock
             stock.lock_qty -= reduce_stock
             stock.save()
+
+            #  产品销售出库日志记录保存
+            stock_log = StockLog()
+            stock_log.qty = reduce_stock
+            stock_log.product = instance.product
+            stock_log.store = instance.order.store
+            if request:
+                stock_log.user = request.user
+            stock_log.op_type = 'S_OUT'
+            stock_log.op_origin_id = instance.order.id
+            stock_log.save()
 
         # 操作日志记录
         str_list = []

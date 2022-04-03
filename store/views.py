@@ -9,8 +9,8 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
 from product.models import Product
-from .models import Store, StockInOut, StockInOutDetail, Stock
-from .serializers import StoreSerializer, StockInOutSerializer
+from .models import Store, StockInOut, StockInOutDetail, Stock, StockLog
+from .serializers import StoreSerializer, StockInOutSerializer, StockLogSerializer
 
 
 # Create your views here.
@@ -132,12 +132,32 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 stock.qty += i.qty  # 现有库存加上入库库存
                 stock.save()
 
+                #  产品入库日志记录保存
+                stock_log = StockLog()
+                stock_log.qty = i.qty
+                stock_log.product = i.product
+                stock_log.store = target_store
+                stock_log.user = request.user
+                stock_log.op_type = 'M_IN'
+                stock_log.op_origin_id = stock_inout.id
+                stock_log.save()
+
         #  产品出库操作
         if stock_inout.type == 'OUT' and target_store:
             for i in add_list:
                 stock = Stock.objects.filter(store=target_store).get(product=i.product)
                 stock.qty -= i.qty  # 现有库存减去出库库存
                 stock.save()
+
+                #  产品出库日志记录保存
+                stock_log = StockLog()
+                stock_log.qty = i.qty
+                stock_log.product = i.product
+                stock_log.store = target_store
+                stock_log.user = request.user
+                stock_log.op_type = 'M_OUT'
+                stock_log.op_origin_id = stock_inout.id
+                stock_log.save()
 
         #  库存调拨操作
         if stock_inout.type == 'MOVE' and target_store and origin_store:
@@ -149,4 +169,51 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 ta_stock.qty += i.qty  # 目标仓库加上入库库存
                 ta_stock.save()
 
+                #  源仓库产品出库日志记录保存
+                or_stock_log = StockLog()
+                or_stock_log.qty = i.qty
+                or_stock_log.product = i.product
+                or_stock_log.store = origin_store
+                or_stock_log.user = request.user
+                or_stock_log.op_type = 'M_OUT'
+                or_stock_log.op_origin_id = stock_inout.id
+                or_stock_log.save()
+
+                #  目标仓库产品入库日志记录保存
+                ta_stock_log = StockLog()
+                ta_stock_log.qty = i.qty
+                ta_stock_log.product = i.product
+                ta_stock_log.store = target_store
+                ta_stock_log.user = request.user
+                ta_stock_log.op_type = 'M_IN'
+                ta_stock_log.op_origin_id = stock_inout.id
+                ta_stock_log.save()
+
         return Response({'message': '操作成功！'}, status=status.HTTP_201_CREATED)
+
+
+class StockLogViewSet(mixins.ListModelMixin,
+                      mixins.CreateModelMixin,
+                      mixins.UpdateModelMixin,
+                      mixins.DestroyModelMixin,
+                      mixins.RetrieveModelMixin,
+                      viewsets.GenericViewSet):
+    """
+    list:
+        库存出入日志列表,分页,过滤,搜索,排序
+    create:
+        库存出入日志新增
+    retrieve:
+        库存出入日志详情页
+    update:
+        库存出入日志修改
+    destroy:
+        库存出入日志删除
+    """
+    queryset = StockLog.objects.all()
+    serializer_class = StockLogSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('op_type', 'user', 'store', 'product')  # 配置过滤字段
+    ordering_fields = ('create_time',)  # 配置排序字段

@@ -29,7 +29,7 @@ from setting.views import TagViewSet, OperateLogViewSet
 
 from rest_framework.routers import DefaultRouter
 
-from store.views import StoreViewSet, StockInOutViewSet
+from store.views import StoreViewSet, StockInOutViewSet, StockLogViewSet
 
 router = DefaultRouter()
 
@@ -58,6 +58,8 @@ router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
 router.register('stores', StoreViewSet, basename='stores')
 # 手工出入库/调拨
 router.register('stock_in_out', StockInOutViewSet, basename='stock_in_out')
+# 库存出入日志
+router.register('stock_log', StockLogViewSet, basename='stock_log')
 
 # ---------------------------采购模块 -------------------------------------------------
 # 采购单

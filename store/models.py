@@ -139,3 +139,36 @@ class StockInOutDetail(models.Model):
 
     def __str__(self):
         return str(self.qty)
+
+
+class StockLog(models.Model):
+    """
+    库存出入日志
+    """
+    O_TYPE = (
+        ('M_IN', '手工入库'),
+        ('M_OUT', '手工出库'),
+        ('S_OUT', '销售出库'),
+        ('LOCK', '锁仓'),
+        ('UNLOCK', '解锁'),
+    )
+
+    op_type = models.CharField(max_length=10, choices=O_TYPE, default='S_OUT', verbose_name='日志类型',
+                               help_text='日志类型')
+    op_origin_id = models.IntegerField(null=True, blank=True, verbose_name='操作单id', help_text='操作单id')
+    qty = models.IntegerField(null=True, blank=True, default=0, verbose_name='数量', help_text='数量')
+    user = models.ForeignKey(User, related_name='user_stock_log', on_delete=models.DO_NOTHING, null=True,
+                             verbose_name='user', help_text='user')
+    store = models.ForeignKey(Store, related_name='store_stock_log', on_delete=models.DO_NOTHING, null=True,
+                              verbose_name='店铺', help_text='店铺')
+    product = models.ForeignKey(Product, related_name='product_stock_log', on_delete=models.DO_NOTHING, null=True,
+                                verbose_name='产品', help_text='产品')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='操作时间', help_text='操作时间')
+
+    class Meta:
+        verbose_name = '库存出入日志'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.op_type

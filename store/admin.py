@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Store, Stock, StockInOut, StockInOutDetail
+from .models import Store, Stock, StockInOut, StockInOutDetail, StockLog
 
 
 # Register your models here.
@@ -14,7 +14,7 @@ class StoreAdmin(admin.ModelAdmin):
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
-    list_display = ['qty', 'lock_qty', 'product', 'store', 'lock_qty']
+    list_display = ['id', 'qty', 'lock_qty', 'product', 'store', 'create_time']
     list_filter = ['product', 'store', 'is_active']
     search_fields = ['product', 'store']
 
@@ -29,5 +29,11 @@ class StockInOutAdmin(admin.ModelAdmin):
 @admin.register(StockInOutDetail)
 class StockInOutDetailAdmin(admin.ModelAdmin):
     list_display = ['stock_in_out', 'product', 'qty', 'stock_before']
-    list_filter = ['stock_in_out', ]
+    search_fields = ['product', ]
+
+
+@admin.register(StockLog)
+class StockLogAdmin(admin.ModelAdmin):
+    list_display = ['op_type', 'product', 'qty', 'op_origin_id', 'store', 'user']
+    list_filter = ['op_type', ]
     search_fields = ['product', ]

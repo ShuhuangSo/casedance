@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import mixins, status
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -7,8 +8,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import openpyxl
 
+from purchase.models import PurchaseDetail
+from sale.models import OrderDetail
 from setting.models import OperateLog
-from store.models import Store, Stock
+from store.models import Store, Stock, StockInOutDetail
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, \
     CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer
@@ -54,7 +57,26 @@ class ProductViewSet(mixins.ListModelMixin,
 
     #  重写产品删除
     def destroy(self, request, *args, **kwargs):
-        print('delete!!')
+        product = self.get_object()
+        # 检查是否有手机兼容产品存在
+        is_comp_product = CompatibleModel.objects.filter(product=product).count()
+        # 检查是否有产品标签存在
+        is_product_tag = ProductTag.objects.filter(product=product).count()
+        # 检查是否有采购单存在
+        is_purchase_order = PurchaseDetail.objects.filter(product=product).count()
+        # 检查是否有销售单存在
+        is_order = OrderDetail.objects.filter(product=product).count()
+        # 检查是否有手工出入库单存在
+        is_stock_inout = StockInOutDetail.objects.filter(product=product).count()
+        # 检查是否有库存
+        stock_num = Stock.objects.filter(product=product).aggregate(Sum('qty'))
+        is_stock = stock_num['qty__sum']
+
+        if is_comp_product or is_product_tag or is_purchase_order or is_order or is_stock_inout or is_stock:
+            return Response({'msg': 'sku有关联数据，无法删除'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        # 如果满足条件，则可以删除产品
+        product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # 产品excel批量上传

@@ -94,6 +94,11 @@ class ProductViewSet(mixins.ListModelMixin,
                 err_item.update({'msg': '价格有误'})
                 err_list.append(err_item)
                 continue
+            if cell_row[6].value and not cell_row[6].value.strip() in ['ON_SALE', 'OFFLINE', 'CLEAN', 'UN_LISTED', 'PRIVATE']:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '产品状态有误'})
+                err_list.append(err_item)
+                continue
 
             # 检查sku是否已存在
             sku_is_exist = Product.objects.filter(sku=cell_row[0].value.strip()).count()
@@ -120,20 +125,21 @@ class ProductViewSet(mixins.ListModelMixin,
             unit_cost = cell_row[3].value
             sale_price = cell_row[4].value
             series = cell_row[5].value.strip()
-            image = cell_row[6].value.strip() if cell_row[6].value else None
-            brand = cell_row[7].value.strip() if cell_row[7].value else ''
-            p_type = cell_row[8].value.strip() if cell_row[8].value else ''
-            length = cell_row[9].value if cell_row[9].value else None
-            width = cell_row[10].value if cell_row[10].value else None
-            heigth = cell_row[11].value if cell_row[11].value else None
-            weight = cell_row[12].value if cell_row[12].value else None
-            stock_strategy = cell_row[13].value.strip() if cell_row[13].value else 'STANDARD'
-            stock_days = cell_row[14].value if cell_row[14].value else None
-            alert_qty = cell_row[15].value if cell_row[15].value else None
-            alert_days = cell_row[16].value if cell_row[16].value else None
-            mini_pq = cell_row[17].value if cell_row[17].value else None
-            max_pq = cell_row[18].value if cell_row[18].value else None
-            note = cell_row[19].value.strip() if cell_row[19].value else ''
+            p_status = cell_row[6].value.strip() if cell_row[6].value else 'UN_LISTED'
+            image = cell_row[7].value.strip() if cell_row[7].value else None
+            brand = cell_row[8].value.strip() if cell_row[8].value else ''
+            p_type = cell_row[9].value.strip() if cell_row[9].value else ''
+            length = cell_row[10].value if cell_row[10].value else None
+            width = cell_row[11].value if cell_row[11].value else None
+            heigth = cell_row[12].value if cell_row[12].value else None
+            weight = cell_row[13].value if cell_row[13].value else None
+            stock_strategy = cell_row[14].value.strip() if cell_row[14].value else 'STANDARD'
+            stock_days = cell_row[15].value if cell_row[15].value else None
+            alert_qty = cell_row[16].value if cell_row[16].value else None
+            alert_days = cell_row[17].value if cell_row[17].value else None
+            mini_pq = cell_row[18].value if cell_row[18].value else None
+            max_pq = cell_row[19].value if cell_row[19].value else None
+            note = cell_row[20].value.strip() if cell_row[20].value else ''
             add_list.append(Product(
                 sku=sku,
                 p_name=p_name,
@@ -141,6 +147,7 @@ class ProductViewSet(mixins.ListModelMixin,
                 unit_cost=unit_cost,
                 sale_price=sale_price,
                 series=series,
+                status=p_status,
                 image=image,
                 brand=brand,
                 p_type=p_type,

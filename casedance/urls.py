@@ -19,6 +19,7 @@ from django.conf.urls import include
 from django.views.static import serve
 from django.conf import settings
 from rest_framework_jwt.views import obtain_jwt_token
+from rest_framework.documentation import include_docs_urls
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet
@@ -85,6 +86,7 @@ router.register('order_tags', OrderTagViewSet, basename='order_tags')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456
+    path('docs/', include_docs_urls(title='CaseDance项目接口文档')),
     path('api-token-auth/', obtain_jwt_token),
     re_path(r'media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),  # 配置media root
     path('api/', include(router.urls)),

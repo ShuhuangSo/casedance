@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Tag, OperateLog
+from .models import Tag, OperateLog, Menu
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -19,4 +22,40 @@ class OperateLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperateLog
+        fields = "__all__"
+
+
+class SubMenuSerializer(serializers.ModelSerializer):
+    """
+    前端导航二级菜单
+    """
+
+    class Meta:
+        model = Menu
+        fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children')
+
+
+class MenuSerializer(serializers.ModelSerializer):
+    """
+    前端导航菜单
+    """
+    children = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        user = self.context['request'].user  # 当前登录u用户
+        # 返回嵌套序列化筛选数据
+        return SubMenuSerializer(obj.children.filter(is_active=True, user=user), many=True).data
+
+    class Meta:
+        model = Menu
+        fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children', 'user')
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """
+    用户信息
+    """
+
+    class Meta:
+        model = User
         fields = "__all__"

@@ -4,9 +4,13 @@ from rest_framework.response import Response
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
 
-from .models import Tag, OperateLog
-from .serializers import TagSerializer, OperateLogSerializer
+from .models import Tag, OperateLog, Menu
+from .serializers import TagSerializer, OperateLogSerializer, MenuSerializer, UserSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 # Create your views here.
@@ -73,3 +77,40 @@ class OperateLogViewSet(mixins.ListModelMixin,
     filter_fields = ('op_type', 'target_id', 'user')  # 配置过滤字段
     search_fields = ('op_log',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
+
+
+class MenuViewSet(mixins.ListModelMixin,
+                  viewsets.GenericViewSet):
+    """
+    list:
+        前端导航菜单列表
+    """
+    queryset = Menu.objects.all()
+    serializer_class = MenuSerializer  # 序列化
+
+    def get_queryset(self):
+        # 返回当前用户数据
+        return Menu.objects.filter(user=self.request.user, is_active=True, parent=None)
+
+
+class UserViewSet(mixins.ListModelMixin,
+                  viewsets.GenericViewSet):
+    """
+    list:
+        user信息
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer  # 序列化
+
+    # 获取当前用户信息
+    @action(methods=['get'], detail=False, url_path='user_info')
+    def get_user_info(self, request):
+        user = self.request.user
+
+        info = {}
+        info.update({'username': user.username})
+        info.update({'name': user.first_name})
+        info.update({'email': user.email})
+        info.update({'is_superuser': user.is_superuser})
+
+        return Response(info, status=status.HTTP_200_OK)

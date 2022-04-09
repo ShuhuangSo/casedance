@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, OperateLog
+from .models import Tag, OperateLog, Menu
 
 
 # Register your models here.
@@ -17,3 +17,11 @@ class OperateLogAdmin(admin.ModelAdmin):
     list_display = ['op_type', 'op_log', 'target_id', 'user', 'create_time']
     list_filter = ['op_type', 'target_id', 'user']
     search_fields = ['op_log']
+
+
+@admin.register(Menu)
+class MenuAdmin(admin.ModelAdmin):
+    list_display = ['parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'user']
+    list_filter = ['is_active']
+    search_fields = ['name']
+

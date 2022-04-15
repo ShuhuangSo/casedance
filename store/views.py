@@ -93,19 +93,27 @@ class StockInOutViewSet(mixins.ListModelMixin,
         # 创建出入库单
         origin_store = None
         target_store = None
-        if Store.objects.filter(id=request.data['origin_store']):
-            origin_store = Store.objects.all().get(id=request.data['origin_store'])
         if Store.objects.filter(id=request.data['target_store']):
             target_store = Store.objects.all().get(id=request.data['target_store'])
+        if request.data['origin_store']:
+            if Store.objects.filter(id=request.data['origin_store']):
+                origin_store = Store.objects.all().get(id=request.data['origin_store'])
+        else:
+            origin_store = target_store
+
         stock_inout = StockInOut()
         stock_inout.batch_number = batch_number
         stock_inout.origin_store = origin_store
         stock_inout.target_store = target_store
         stock_inout.user = request.user
         stock_inout.type = request.data['type']
-        stock_inout.reason_in = request.data['reason_in']
-        stock_inout.reason_out = request.data['reason_out']
-        stock_inout.reason_move = request.data['reason_move']
+        if request.data['reason_in']:
+            stock_inout.reason_in = request.data['reason_in']
+        if request.data['reason_out']:
+            stock_inout.reason_out = request.data['reason_out']
+        if request.data['reason_move']:
+            stock_inout.reason_move = request.data['reason_move']
+        stock_inout.note = request.data['note']
         stock_inout.save()
 
         # 创建出入库单产品详情
@@ -113,7 +121,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
         if inout_detail:
             add_list = []
             for i in inout_detail:
-                product = Product.objects.all().get(id=i['product'])
+                product = Product.objects.all().get(id=i['id'])
                 stock = Stock.objects.filter(store=target_store).get(product=product)
                 add_list.append(
                     StockInOutDetail(
@@ -189,7 +197,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 ta_stock_log.op_origin_id = stock_inout.id
                 ta_stock_log.save()
 
-        return Response({'message': '操作成功！'}, status=status.HTTP_201_CREATED)
+        return Response({'msg': '操作成功！'}, status=status.HTTP_200_OK)
 
 
 class StockLogViewSet(mixins.ListModelMixin,

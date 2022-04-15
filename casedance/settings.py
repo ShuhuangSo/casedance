@@ -27,7 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-BASE_URL = 'http://10.211.55.9:8000/'
+BASE_URL = 'http://10.211.55.9:8000'
 
 # Application definition
 

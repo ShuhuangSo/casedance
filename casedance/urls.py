@@ -22,7 +22,7 @@ from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.documentation import include_docs_urls
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
-    ProductTagViewSet, SupplierViewSet
+    ProductTagViewSet, SupplierViewSet, SimpleProductViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
@@ -37,6 +37,8 @@ router = DefaultRouter()
 # ---------------------------产品模块-------------------------------------------------
 # 产品列表
 router.register('products', ProductViewSet, basename='products')
+# 简易产品列表
+router.register('simple_products', SimpleProductViewSet, basename='simple_products')
 # 产品附属信息
 router.register('product_extra_info', ProductExtraInfoViewSet, basename='product_extra_info')
 # 市面手机型号表

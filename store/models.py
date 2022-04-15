@@ -104,8 +104,9 @@ class StockInOut(models.Model):
                                  help_text='入库原因')
     reason_out = models.CharField(max_length=10, choices=R_OUT, default='LOST', verbose_name='出库原因',
                                   help_text='出库原因')
-    reason_move = models.CharField(max_length=10, choices=R_MOVE, default='SUPPORT ', verbose_name='调拨原因',
+    reason_move = models.CharField(max_length=10, choices=R_MOVE, default='SUPPORT', verbose_name='调拨原因',
                                    help_text='调拨原因')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
     is_active = models.BooleanField(default=True, verbose_name='状态', help_text='状态')
 

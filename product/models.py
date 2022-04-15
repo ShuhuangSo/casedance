@@ -43,11 +43,11 @@ class Product(models.Model):
     is_auto_promote = models.BooleanField(default=True, verbose_name='是否补货推荐', help_text='是否补货推荐')
     stock_strategy = models.CharField(max_length=10, choices=STRATEGY, default='STANDARD', verbose_name='备货策略',
                                       help_text='备货策略')
-    stock_days = models.IntegerField(null=True, blank=True, verbose_name='备货天数', help_text='备货天数')
-    alert_qty = models.IntegerField(null=True, blank=True, verbose_name='警戒库存', help_text='警戒库存')
-    alert_days = models.IntegerField(null=True, blank=True, verbose_name='警戒天数', help_text='警戒天数')
-    mini_pq = models.IntegerField(null=True, blank=True, verbose_name='最小采购量', help_text='最小采购量')
-    max_pq = models.IntegerField(null=True, blank=True, verbose_name='采购上限', help_text='采购上限')
+    stock_days = models.IntegerField(default=0, null=True, blank=True, verbose_name='备货天数', help_text='备货天数')
+    alert_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='警戒库存', help_text='警戒库存')
+    alert_days = models.IntegerField(default=0, null=True, blank=True, verbose_name='警戒天数', help_text='警戒天数')
+    mini_pq = models.IntegerField(default=0, null=True, blank=True, verbose_name='最小采购量', help_text='最小采购量')
+    max_pq = models.IntegerField(default=0, null=True, blank=True, verbose_name='采购上限', help_text='采购上限')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 
@@ -135,7 +135,7 @@ class ProductTag(models.Model):
         ordering = ['id']
 
     def __str__(self):
-        return str(self.id)
+        return str(self.tag)
 
 
 class Supplier(models.Model):

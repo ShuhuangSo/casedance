@@ -10,11 +10,11 @@ import openpyxl
 
 from purchase.models import PurchaseDetail
 from sale.models import OrderDetail
-from setting.models import OperateLog
+from setting.models import OperateLog, Tag
 from store.models import Store, Stock, StockInOutDetail
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
 from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, \
-    CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer
+    CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer, SimpleProductSerializer
 
 
 # Create your views here.
@@ -26,6 +26,17 @@ class DefaultPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     page_query_param = 'page'
     max_page_size = 100
+
+
+class SimpleProductViewSet(mixins.ListModelMixin,
+                           viewsets.GenericViewSet):
+    """
+        list:
+            简易产品列表
+
+        """
+    queryset = Product.objects.all()
+    serializer_class = SimpleProductSerializer  # 序列化
 
 
 class ProductViewSet(mixins.ListModelMixin,
@@ -51,9 +62,10 @@ class ProductViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('status', 'brand', 'series', 'p_type', 'is_auto_promote', 'stock_strategy')  # 配置过滤字段
-    search_fields = ('sku', 'p_name')  # 配置搜索字段
-    ordering_fields = ('create_time',)  # 配置排序字段
+    filter_fields = ('status', 'brand', 'series', 'p_type', 'is_auto_promote', 'stock_strategy',
+                     'product_p_tag__tag__tag_name')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'product_p_tag__tag__tag_name')  # 配置搜索字段
+    ordering_fields = ('create_time', 'sku', 'p_name')  # 配置排序字段
 
     #  重写产品删除
     def destroy(self, request, *args, **kwargs):
@@ -79,6 +91,64 @@ class ProductViewSet(mixins.ListModelMixin,
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # 产品批量修改
+    @action(methods=['post'], detail=False, url_path='bulk_edit')
+    def bulk_edit(self, request):
+        if not 'ids' in request.data:
+            return Response({'msg': '非法操作'}, status=status.HTTP_400_BAD_REQUEST)
+        change_item = request.data['changeItems']
+        for id in request.data['ids']:
+            if Product.objects.filter(id=id).count():
+                product = Product.objects.get(id=id)
+                if 'image' in change_item:
+                    product.image = change_item['image']
+                if 'status' in change_item:
+                    product.status = change_item['status']
+                if 'series' in change_item:
+                    product.series = change_item['series']
+                if 'p_type' in change_item:
+                    product.p_type = change_item['p_type']
+                if 'unit_cost' in change_item:
+                    product.unit_cost = change_item['unit_cost']
+                if 'sale_price' in change_item:
+                    product.sale_price = change_item['sale_price']
+                if 'length' in change_item:
+                    product.length = change_item['length']
+                if 'width' in change_item:
+                    product.width = change_item['width']
+                if 'heigth' in change_item:
+                    product.heigth = change_item['heigth']
+                if 'weight' in change_item:
+                    product.weight = change_item['weight']
+                if 'is_auto_promote' in change_item:
+                    product.is_auto_promote = change_item['is_auto_promote']
+                if 'stock_strategy' in change_item:
+                    product.stock_strategy = change_item['stock_strategy']
+                if 'stock_days' in change_item:
+                    product.stock_days = change_item['stock_days']
+                if 'alert_qty' in change_item:
+                    product.alert_qty = change_item['alert_qty']
+                if 'alert_days' in change_item:
+                    product.alert_days = change_item['alert_days']
+                if 'mini_pq' in change_item:
+                    product.mini_pq = change_item['mini_pq']
+                if 'max_pq' in change_item:
+                    product.max_pq = change_item['max_pq']
+                if 'note' in change_item:
+                    product.note = change_item['note']
+                product.save()
+                if 'tag' in change_item:
+                    tag_id = change_item['tag']
+                    tag = Tag.objects.get(id=tag_id)
+                    # 产品标签在这个产品中不存在才添加
+                    if not ProductTag.objects.filter(tag=tag, product=product).count():
+                        product_tag = ProductTag()
+                        product_tag.product = product
+                        product_tag.tag = tag
+                        product_tag.save()
+
+        return Response({'msg': '修改成功'}, status=status.HTTP_200_OK)
+
     # 产品excel批量上传
     @action(methods=['post'], detail=False, url_path='bulk_upload')
     def bulk_upload(self, request):
@@ -99,7 +169,8 @@ class ProductViewSet(mixins.ListModelMixin,
             return Response(err_list, status=status.HTTP_406_NOT_ACCEPTABLE)
         for cell_row in list(sheet)[1:]:
             err_item = {}
-            row_status = cell_row[0].value and cell_row[1].value and cell_row[3].value and cell_row[4].value and cell_row[5].value
+            row_status = cell_row[0].value and cell_row[1].value and cell_row[3].value and cell_row[4].value and \
+                         cell_row[5].value
 
             if not row_status:
                 err_item.update({'row': '第 %s 行' % cell_row[0].row})
@@ -116,7 +187,8 @@ class ProductViewSet(mixins.ListModelMixin,
                 err_item.update({'msg': '价格有误'})
                 err_list.append(err_item)
                 continue
-            if cell_row[6].value and not cell_row[6].value.strip() in ['ON_SALE', 'OFFLINE', 'CLEAN', 'UN_LISTED', 'PRIVATE']:
+            if cell_row[6].value and not cell_row[6].value.strip() in ['ON_SALE', 'OFFLINE', 'CLEAN', 'UN_LISTED',
+                                                                       'PRIVATE']:
                 err_item.update({'row': '第 %s 行' % cell_row[0].row})
                 err_item.update({'msg': '产品状态有误'})
                 err_list.append(err_item)

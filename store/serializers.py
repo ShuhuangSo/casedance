@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from casedance.settings import BASE_URL, MEDIA_URL
 
 from sale.models import Order
 from .models import Store, Stock, StockInOut, StockInOutDetail, StockLog
@@ -36,6 +37,7 @@ class StockInOutDetailSerializer(serializers.ModelSerializer):
     """
     sku = serializers.SerializerMethodField()
     p_name = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     # 获取sku
     def get_sku(self, obj):
@@ -45,9 +47,13 @@ class StockInOutDetailSerializer(serializers.ModelSerializer):
     def get_p_name(self, obj):
         return obj.product.p_name
 
+    # 获取产品image
+    def get_image(self, obj):
+        return BASE_URL + MEDIA_URL + str(obj.product.image) if obj.product.image else ''
+
     class Meta:
         model = StockInOutDetail
-        fields = ('id', 'qty', 'stock_before', 'sku', 'p_name')
+        fields = ('id', 'qty', 'stock_before', 'sku', 'p_name', 'image')
 
 
 class StockInOutSerializer(serializers.ModelSerializer):
@@ -61,10 +67,15 @@ class StockInOutSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     origin_store_name = serializers.SerializerMethodField()
     target_store_name = serializers.SerializerMethodField()
+    sku_num = serializers.SerializerMethodField()
 
     # 获取username
     def get_username(self, obj):
-        return obj.user.username
+        return obj.user.first_name
+
+    # 获取sku数
+    def get_sku_num(self, obj):
+        return obj.inout_detail.count()
 
     # 获取源仓库名称
     def get_origin_store_name(self, obj):
@@ -76,8 +87,8 @@ class StockInOutSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockInOut
-        fields = ('id', 'batch_number', 'origin_store_name', 'target_store_name', 'username', 'type', 'reason_in', 'reason_out',
-                  'reason_move', 'inout_detail', 'create_time', 'is_active')
+        fields = ('id', 'batch_number', 'origin_store', 'origin_store_name', 'target_store', 'target_store_name', 'username', 'type', 'reason_in', 'reason_out',
+                  'reason_move', 'inout_detail', 'sku_num', 'note', 'create_time', 'is_active')
 
 
 class StockLogSerializer(serializers.ModelSerializer):

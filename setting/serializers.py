@@ -19,10 +19,14 @@ class OperateLogSerializer(serializers.ModelSerializer):
     """
     操作日志
     """
+    user_name = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+        return obj.user.first_name
 
     class Meta:
         model = OperateLog
-        fields = "__all__"
+        fields = ('id', 'op_type', 'op_log', 'target_id', 'create_time', 'user_name')
 
 
 class SubMenuSerializer(serializers.ModelSerializer):

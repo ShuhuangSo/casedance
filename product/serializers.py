@@ -22,7 +22,7 @@ class ProductTagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductTag
-        fields = ('id', 'product', 'tag_name', 'color')
+        fields = ('id', 'product', 'tag', 'tag_name', 'color')
 
 
 class CompatibleModelSerializer(serializers.ModelSerializer):
@@ -38,6 +38,15 @@ class CompatibleModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompatibleModel
         fields = ('id', 'product', 'phone_model')
+
+
+class SimpleProductSerializer(serializers.ModelSerializer):
+    """
+    简易产品库
+    """
+    class Meta:
+        model = Product
+        fields = ('id', 'sku', 'p_name', 'image', 'unit_cost', 'sale_price')
 
 
 class ProductSerializer(serializers.ModelSerializer):

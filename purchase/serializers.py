@@ -79,7 +79,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     total_onway_qty = serializers.SerializerMethodField()
     total_rec_qty = serializers.SerializerMethodField()
     total_paid_qty = serializers.SerializerMethodField()
-    paid_status = serializers.SerializerMethodField()
+    # paid_status = serializers.SerializerMethodField()
 
     # 获取username
     def get_username(self, obj):
@@ -142,19 +142,26 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         return total
 
     # 获取采购单结算状态
-    def get_paid_status(self, obj):
-        queryset = PurchaseDetail.objects.filter(purchase_order=obj)
-        count = PurchaseDetail.objects.filter(purchase_order=obj).count()
-        num = 0
-        status = 'UNPAID'
-        for i in queryset:
-            if i.paid_qty >= i.received_qty and i.paid_qty > 0:
-                num += 1
-        if num == count:
-            status = 'FULL_PAID'
-        elif 0 < num < count:
-            status = 'PART_PAID'
-        return status
+    # def get_paid_status(self, obj):
+    #     queryset = PurchaseDetail.objects.filter(purchase_order=obj)
+    #     count = PurchaseDetail.objects.filter(purchase_order=obj).count()
+    #     num = 0
+    #     status = 'UNPAID'
+    #     for i in queryset:
+    #         if i.paid_qty >= i.received_qty and i.paid_qty > 0:
+    #             num += 1
+    #     if num == count:
+    #         status = 'FULL_PAID'
+    #         # 将付款状态保存更新到数据库里
+    #         if obj.paid_status != 'FULL_PAID':
+    #             obj.paid_status = 'FULL_PAID'
+    #             obj.save()
+    #     elif 0 < num < count:
+    #         status = 'PART_PAID'
+    #         if obj.paid_status != 'PART_PAID':
+    #             obj.paid_status = 'PART_PAID'
+    #             obj.save()
+    #     return status
 
     class Meta:
         model = PurchaseOrder

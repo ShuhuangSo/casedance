@@ -28,6 +28,21 @@ def purchase_detail_signal(sender, instance, created, **kwargs):
             stock.qty += add_stock
             stock.save()
 
+        # 更新采购单的结算状态
+        queryset = PurchaseDetail.objects.filter(purchase_order=instance.purchase_order)
+        pd_count = PurchaseDetail.objects.filter(purchase_order=instance.purchase_order).count()
+        num = 0
+        for i in queryset:
+            if i.is_paid:
+                num += 1
+        if num == pd_count:
+            # 将付款状态保存更新到数据库里
+            instance.purchase_order.paid_status = 'FULL_PAID'
+            instance.purchase_order.save()
+        elif 0 < num < pd_count:
+            instance.purchase_order.paid_status = 'PART_PAID'
+            instance.purchase_order.save()
+
         # 操作日志记录
         str_list = []
         if instance.__original_received_qty != instance.received_qty:

@@ -51,7 +51,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
-        'store', 'supplier', 'user', 'paid_status', 'order_status', 'is_active')  # 配置过滤字段
+        'store', 'supplier', 'user', 'paid_status', 'order_status', 'is_active', 'purchase_p_tag__tag__tag_name')  # 配置过滤字段
     search_fields = ('p_number',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 

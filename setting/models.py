@@ -12,6 +12,7 @@ class Tag(models.Model):
     TAG_TYPE = (
         ('PRODUCT', '产品标签'),
         ('ORDER', '订单标签'),
+        ('PURCHASE', '采购标签'),
         ('CUSTOMER', '客户标签'),
     )
 

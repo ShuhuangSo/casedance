@@ -28,22 +28,22 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
     """
     采购商品明细
     """
-    product_image = serializers.SerializerMethodField()
-    product_sku = serializers.SerializerMethodField()
-    product_name = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    sku = serializers.SerializerMethodField()
+    p_name = serializers.SerializerMethodField()
     # is_paid = serializers.SerializerMethodField()
     onway_qty = serializers.SerializerMethodField()
 
     # # 获取产品图片
-    def get_product_image(self, obj):
+    def get_image(self, obj):
         return BASE_URL + MEDIA_URL + str(obj.product.image) if obj.product.image else ''
 
     # 获取产品sku
-    def get_product_sku(self, obj):
+    def get_sku(self, obj):
         return obj.product.sku
 
     # 获取产品名称
-    def get_product_name(self, obj):
+    def get_p_name(self, obj):
         return obj.product.p_name
 
     # 如果结算数量大于等于收货数量，则将该项标为已结算(付款数量不等于0)
@@ -57,7 +57,7 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseDetail
         fields = ('id', 'qty', 'unit_cost', 'received_qty', 'paid_qty', 'sent_qty', 'onway_qty', 'is_supply_case', 'is_paid',
-                  'short_note', 'stock_before', 'product_image', 'product_sku', 'product_name')
+                  'short_note', 'stock_before', 'image', 'sku', 'p_name')
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -165,6 +165,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseOrder
-        fields = ('id', 'p_number', 'store_name', 'supplier_name', 'username', 'logistic', 'tracking_number', 'postage',
+        fields = ('id', 'p_number', 'store', 'store_name', 'supplier', 'supplier_name', 'username', 'logistic', 'tracking_number', 'postage',
                   'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty', 'total_rec_qty', 'total_paid_qty',
                   'paid_status', 'order_status', 'note', 'purchase_detail', 'purchase_p_tag', 'create_time', 'is_active')

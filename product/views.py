@@ -63,7 +63,7 @@ class ProductViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('status', 'brand', 'series', 'p_type', 'is_auto_promote', 'stock_strategy',
-                     'product_p_tag__tag__tag_name')  # 配置过滤字段
+                     'product_p_tag__tag__tag_name', 'product_stock__store', 'product_stock__product')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'product_p_tag__tag__tag_name')  # 配置搜索字段
     ordering_fields = ('create_time', 'sku', 'p_name')  # 配置排序字段
 

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
 
 from product.models import Product, Supplier
 from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
@@ -58,12 +59,14 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
     # 重写create
     def create(self, request, *args, **kwargs):
 
-        data_status = 'store' in request.data.keys() and 'supplier' in request.data.keys() and 'postage' in request.data.keys() and 'note' in request.data.keys() and 'purchase_detail' in request.data.keys()
+        data_status = 'store' in request.data.keys() and 'supplier' in request.data.keys() and 'postage' \
+                      in request.data.keys() and 'note' in request.data.keys() and 'purchase_detail' \
+                      in request.data.keys() and 'order_status' in request.data.keys()
         if not data_status:
             return Response({'message': '数据错误！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
         data_detail_status = False
         for i in request.data['purchase_detail']:
-            data_detail_status = 'qty' in i.keys() and 'unit_cost' in i.keys() and 'product' in i.keys() and 'short_note' in i.keys() and 'is_supply_case' in i.keys()
+            data_detail_status = 'qty' in i.keys() and 'unit_cost' in i.keys() and 'product_id' in i.keys() and 'short_note' in i.keys() and 'is_supply_case' in i.keys()
             if not data_detail_status:
                 return Response({'message': '数据错误！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
@@ -75,11 +78,15 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
 
         # 创建采购单
         store = None
+        supplier = None
         if Store.objects.filter(id=request.data['store']):
             store = Store.objects.all().get(id=request.data['store'])
         if Supplier.objects.filter(id=request.data['supplier']):
             supplier = Supplier.objects.all().get(id=request.data['supplier'])
         purchase_order = PurchaseOrder()
+        # 判断采购单是直接提交还是放入草稿箱
+        if request.data['order_status'] == 'WAIT_CONFIRM':
+            purchase_order.order_status = 'WAIT_CONFIRM'
         purchase_order.p_number = p_number
         purchase_order.store = store
         purchase_order.supplier = supplier
@@ -93,7 +100,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
         if purchase_detail:
             add_list = []
             for i in purchase_detail:
-                product = Product.objects.all().get(id=i['product'])
+                product = Product.objects.all().get(id=i['product_id'])
                 stock = Stock.objects.filter(store=store).get(product=product)
                 add_list.append(
                     PurchaseDetail(
@@ -108,7 +115,68 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                 )
             PurchaseDetail.objects.bulk_create(add_list)
 
-        return Response({'message': '操作成功！'}, status=status.HTTP_201_CREATED)
+        return Response({'id': purchase_order.id}, status=status.HTTP_201_CREATED)
+
+    # 采购单修改，涉及采购商品明细的增加，删除,修改
+    @action(methods=['put'], detail=False, url_path='purchase_edit')
+    def bulk_edit(self, request):
+        p_id = request.data['id']
+        store_id = request.data['store']
+        supplier_id = request.data['supplier']
+        postage = request.data['postage']
+        order_status = request.data['order_status']
+        note = request.data['note']
+        purchase_detail = request.data['purchase_detail']
+
+        store = Store.objects.get(id=store_id)
+        supplier = Supplier.objects.get(id=supplier_id)
+        purchase_order = PurchaseOrder.objects.get(id=p_id)
+        purchase_order.store = store
+        purchase_order.supplier = supplier
+        purchase_order.postage = postage
+        purchase_order.order_status = order_status
+        purchase_order.note = note
+        purchase_order.save()
+
+        add_list = []
+        purchase_detail_ids = []
+        for i in purchase_detail:
+            if 'id' in i.keys():
+                purchase_detail_ids.append(i['id'])
+                # 有id，证明是修改
+                purchase_detail = PurchaseDetail.objects.get(id=i['id'])
+                purchase_detail.unit_cost = i['unit_cost']
+                purchase_detail.qty = i['qty']
+                purchase_detail.is_supply_case = i['is_supply_case']
+                purchase_detail.short_note = i['short_note']
+                purchase_detail.save()
+
+            else:
+                product = Product.objects.all().get(id=i['product_id'])
+                stock = Stock.objects.filter(store=store).get(product=product)
+                add_list.append(
+                    PurchaseDetail(
+                        purchase_order=purchase_order,
+                        product=product,
+                        unit_cost=i['unit_cost'],
+                        qty=i['qty'],
+                        is_supply_case=i['is_supply_case'],
+                        stock_before=stock.qty,
+                        short_note=i['short_note']
+                    )
+                )
+
+        queryset = PurchaseDetail.objects.filter(purchase_order=purchase_order)
+        # 如果id不存在，证明已被删除
+        for i in queryset:
+            is_exist = i.id in purchase_detail_ids
+            if not is_exist:
+                i.delete()
+
+        if add_list:
+            PurchaseDetail.objects.bulk_create(add_list)
+
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
 
 class PurchaseDetailViewSet(mixins.ListModelMixin,

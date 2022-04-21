@@ -150,16 +150,7 @@ def purchase_order_signal(sender, instance, created, **kwargs):
             str_list.append('仓库/门店: %s ===>> %s' % (instance.__original_store, instance.store))
         if instance.__original_supplier != instance.supplier:
             str_list.append('供应商: %s ===>> %s' % (instance.__original_supplier, instance.supplier))
-        if instance.__original_logistic != instance.logistic:
-            if not instance.__original_logistic:
-                str_list.append('新增物流公司： %s' % instance.logistic)
-            else:
-                str_list.append('物流公司: %s ===>> %s' % (instance.__original_logistic, instance.logistic))
-        if instance.__original_tracking_number != instance.tracking_number:
-            if not instance.__original_tracking_number:
-                str_list.append('新增物流单号： %s' % instance.tracking_number)
-            else:
-                str_list.append('物流单号: %s ===>> %s' % (instance.__original_tracking_number, instance.tracking_number))
+
         if instance.__original_postage != instance.postage:
             str_list.append('运费: %s ===>> %s' % (instance.__original_postage, instance.postage))
         if instance.__original_note != instance.note:
@@ -174,6 +165,8 @@ def purchase_order_signal(sender, instance, created, **kwargs):
                 str_list.append('采购单作废')
             if instance.order_status == 'WAIT_CONFIRM':
                 str_list.append('采购单已发送给供应商')
+            if instance.order_status == 'PRE_SUMMIT':
+                str_list.append('采购单放入草稿箱')
             if instance.order_status == 'IN_PRODUCTION':
                 str_list.append('供应商已确认')
             if instance.order_status == 'SENT':
@@ -198,8 +191,6 @@ def purchase_order_signal(sender, instance, created, **kwargs):
 def purchase_order_init_signal(instance, **kwargs):
     instance.__original_store = instance.store
     instance.__original_supplier = instance.supplier
-    instance.__original_logistic = instance.logistic
-    instance.__original_tracking_number = instance.tracking_number
     instance.__original_postage = instance.postage
     instance.__original_note = instance.note
     instance.__original_paid_status = instance.paid_status

@@ -41,13 +41,16 @@ class PurchaseOrder(models.Model):
     user = models.ForeignKey(User, null=True, related_name='user_purchase_order', on_delete=models.DO_NOTHING,
                              verbose_name='操作人',
                              help_text='操作人')
-    logistic = models.CharField(null=True, blank=True, max_length=20, verbose_name='发货物流公司', help_text='发货物流公司')
-    tracking_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='快递单号', help_text='快递单号')
+    rec_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='收件人', help_text='收件人')
+    rec_phone = models.CharField(null=True, blank=True, max_length=30, verbose_name='收件人', help_text='收件人')
+    rec_address = models.CharField(null=True, blank=True, max_length=200, verbose_name='收件地址', help_text='收件地址')
     postage = models.FloatField(default=0.0, verbose_name='采购运费', help_text='采购运费')
+    inner_case_price = models.FloatField(default=0.0, null=True, verbose_name='素材壳价格', help_text='素材壳价格')
     paid_status = models.CharField(max_length=20, choices=P_STATUS, default='UNPAID', verbose_name='结算状态',
                                    help_text='结算状态')
     order_status = models.CharField(max_length=20, choices=O_STATUS, default='PRE_SUMMIT', verbose_name='采购单状态',
                                     help_text='采购单状态')
+    sup_tips = models.TextField(null=True, blank=True, default='', verbose_name='公告提示', help_text='公告提示')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
     is_active = models.BooleanField(default=True, verbose_name='状态', help_text='状态')
@@ -79,6 +82,7 @@ class PurchaseDetail(models.Model):
     received_qty = models.IntegerField(default=0, verbose_name='收货入库数量', help_text='收货入库数量')
     paid_qty = models.IntegerField(default=0, verbose_name='已结算数量', help_text='已结算数量')
     is_paid = models.BooleanField(default=False, verbose_name='是否已结算', help_text='是否已结算')
+    urgent = models.BooleanField(default=False, verbose_name='是否加急', help_text='是否加急')
     short_note = models.CharField(null=True, blank=True, max_length=100, default='', verbose_name='简短备注',
                                   help_text='简短备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
@@ -110,3 +114,24 @@ class PurchaseOrderTag(models.Model):
 
     def __str__(self):
         return str(self.id)
+
+
+class PostInfo(models.Model):
+    """
+    采购发货物流信息
+    """
+    logistic = models.CharField(null=True, blank=True, max_length=20, verbose_name='发货物流公司', help_text='发货物流公司')
+    tracking_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='快递单号', help_text='快递单号')
+    package_count = models.IntegerField(default=0, verbose_name='发货箱数', help_text='发货箱数')
+    purchase_order = models.ForeignKey(PurchaseOrder, related_name='purchase_post_info', on_delete=models.CASCADE,
+                                       verbose_name='采购单',
+                                       help_text='采购单')
+    post_time = models.DateTimeField(auto_now_add=True, verbose_name='发货时间', help_text='发货时间')
+
+    class Meta:
+        verbose_name = '采购发货物流信息'
+        verbose_name_plural = verbose_name
+        ordering = ['post_time']
+
+    def __str__(self):
+        return self.logistic

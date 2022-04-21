@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from casedance.settings import BASE_URL, MEDIA_URL
-from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
+from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo
+from store.models import Stock
 
 
 class PurchaseOrderTagSerializer(serializers.ModelSerializer):
@@ -34,6 +35,43 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
     # is_paid = serializers.SerializerMethodField()
     onway_qty = serializers.SerializerMethodField()
 
+    #  产品总库存
+    total_qty = serializers.SerializerMethodField()
+    #  产品总锁仓库存
+    total_lock_qty = serializers.SerializerMethodField()
+    ava_qty = serializers.SerializerMethodField()
+
+    # 计算所有仓库，门店库存之和
+    def get_total_qty(self, obj):
+        queryset = Stock.objects.filter(product=obj.product)
+        if queryset:
+            total = 0
+            for s in queryset:
+                total += s.qty
+            return total
+        return 0
+
+    # 计算所有仓库，门店锁仓库存之和
+    def get_total_lock_qty(self, obj):
+        queryset = Stock.objects.filter(product=obj.product)
+        if queryset:
+            total = 0
+            for s in queryset:
+                total += s.lock_qty
+            return total
+        return 0
+
+    def get_ava_qty(self, obj):
+        queryset = Stock.objects.filter(product=obj.product)
+        if queryset:
+            total = 0
+            lock = 0
+            for s in queryset:
+                total += s.qty
+                lock += s.lock_qty
+            return total - lock
+        return 0
+
     # # 获取产品图片
     def get_image(self, obj):
         return BASE_URL + MEDIA_URL + str(obj.product.image) if obj.product.image else ''
@@ -56,8 +94,17 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseDetail
-        fields = ('id', 'qty', 'unit_cost', 'received_qty', 'paid_qty', 'sent_qty', 'onway_qty', 'is_supply_case', 'is_paid',
-                  'short_note', 'stock_before', 'image', 'sku', 'p_name')
+        fields = ('id', 'urgent', 'total_qty', 'total_lock_qty', 'ava_qty', 'qty', 'unit_cost', 'received_qty', 'paid_qty',
+                  'sent_qty', 'onway_qty', 'is_supply_case', 'is_paid', 'short_note', 'stock_before', 'image', 'sku', 'p_name')
+
+
+class PostInfoSerializer(serializers.ModelSerializer):
+    """
+    采购发货物流信息
+    """
+    class Meta:
+        model = PostInfo
+        fields = "__all__"
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -69,6 +116,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     purchase_detail = PurchaseDetailSerializer(many=True, required=False, read_only=True)
     #  采购单标签
     purchase_p_tag = PurchaseOrderTagSerializer(many=True, required=False, read_only=True)
+    #  发货物流信息
+    purchase_post_info = PostInfoSerializer(many=True, required=False, read_only=True)
 
     username = serializers.SerializerMethodField()
     store_name = serializers.SerializerMethodField()
@@ -165,6 +214,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseOrder
-        fields = ('id', 'p_number', 'store', 'store_name', 'supplier', 'supplier_name', 'username', 'logistic', 'tracking_number', 'postage',
-                  'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty', 'total_rec_qty', 'total_paid_qty',
-                  'paid_status', 'order_status', 'note', 'purchase_detail', 'purchase_p_tag', 'create_time', 'is_active')
+        fields = ('id', 'p_number', 'store', 'store_name', 'supplier', 'supplier_name', 'username', 'postage',
+                  'inner_case_price', 'rec_name', 'rec_phone', 'rec_address', 'purchase_post_info',
+                  'sup_tips', 'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty',
+                  'total_rec_qty', 'total_paid_qty', 'paid_status', 'order_status', 'note', 'purchase_detail',
+                  'purchase_p_tag', 'create_time', 'is_active')

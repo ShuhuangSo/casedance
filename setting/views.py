@@ -110,6 +110,7 @@ class UserViewSet(mixins.ListModelMixin,
         info = {}
         info.update({'username': user.username})
         info.update({'name': user.first_name})
+        info.update({'role': user.last_name})
         info.update({'email': user.email})
         info.update({'is_superuser': user.is_superuser})
 

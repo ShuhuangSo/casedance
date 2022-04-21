@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
+from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo
 
 
 @admin.register(PurchaseOrder)
@@ -23,3 +23,10 @@ class PurchaseOrderTagAdmin(admin.ModelAdmin):
     list_display = ['purchase_order', 'tag']
     list_filter = ['purchase_order', ]
     search_fields = ['purchase_order', ]
+
+
+@admin.register(PostInfo)
+class PostInfoAdmin(admin.ModelAdmin):
+    list_display = ['logistic', 'tracking_number', 'package_count']
+    list_filter = ['logistic', ]
+    search_fields = ['logistic', ]

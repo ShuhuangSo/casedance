@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 
 from product.models import Product, Supplier
-from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag
+from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo
 from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer, PurchaseOrderTagSerializer
 from store.models import Store, Stock
 
@@ -93,6 +93,10 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
         purchase_order.user = request.user
         purchase_order.postage = request.data['postage']
         purchase_order.note = request.data['note']
+        purchase_order.rec_name = request.data['rec_name']
+        purchase_order.rec_phone = request.data['rec_phone']
+        purchase_order.rec_address = request.data['rec_address']
+        purchase_order.sup_tips = request.data['sup_tips']
         purchase_order.save()
 
         # 创建采购单产品详情
@@ -110,6 +114,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                         qty=i['qty'],
                         is_supply_case=i['is_supply_case'],
                         stock_before=stock.qty,
+                        urgent=i['urgent'],
                         short_note=i['short_note']
                     )
                 )
@@ -127,6 +132,11 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
         order_status = request.data['order_status']
         note = request.data['note']
         purchase_detail = request.data['purchase_detail']
+        inner_case_price = request.data['inner_case_price']
+        rec_name = request.data['rec_name']
+        rec_phone = request.data['rec_phone']
+        rec_address = request.data['rec_address']
+        sup_tips = request.data['sup_tips']
 
         store = Store.objects.get(id=store_id)
         supplier = Supplier.objects.get(id=supplier_id)
@@ -134,9 +144,39 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
         purchase_order.store = store
         purchase_order.supplier = supplier
         purchase_order.postage = postage
+        purchase_order.inner_case_price = inner_case_price
         purchase_order.order_status = order_status
         purchase_order.note = note
+        purchase_order.rec_name = rec_name
+        purchase_order.rec_phone = rec_phone
+        purchase_order.rec_address = rec_address
+        purchase_order.sup_tips = sup_tips
         purchase_order.save()
+
+        # 如果是部分发货或者全部发货，记录发货物流信息
+        if order_status == 'SENT' or order_status == 'PART_SENT':
+            if 'logistic' in request.data.keys():
+                logistic = request.data['logistic']
+                tracking_number = request.data['tracking_number']
+                package_count = request.data['package_count']
+                post_info = PostInfo()
+                post_info.logistic = logistic
+                post_info.tracking_number = tracking_number
+                post_info.package_count = package_count
+                post_info.purchase_order = purchase_order
+                post_info.save()
+
+        # 如果是部分发货或者全部发货，检查收货情况，更改订单状态
+        if order_status == 'SENT' or order_status == 'PART_SENT':
+            is_full_received = True
+            for i in purchase_detail:
+                # 如果有一项收货数量少与采购数量，则订单未完成
+                if i['received_qty'] < i['qty']:
+                    is_full_received = False
+                    break
+            if is_full_received:
+                purchase_order.order_status = 'FINISHED'
+                purchase_order.save()
 
         add_list = []
         purchase_detail_ids = []
@@ -149,6 +189,9 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                 purchase_detail.qty = i['qty']
                 purchase_detail.is_supply_case = i['is_supply_case']
                 purchase_detail.short_note = i['short_note']
+                purchase_detail.urgent = i['urgent']
+                purchase_detail.sent_qty = i['sent_qty']
+                purchase_detail.received_qty = i['received_qty']
                 purchase_detail.save()
 
             else:
@@ -162,6 +205,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                         qty=i['qty'],
                         is_supply_case=i['is_supply_case'],
                         stock_before=stock.qty,
+                        urgent=i['urgent'],
                         short_note=i['short_note']
                     )
                 )

@@ -52,7 +52,8 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
-        'store', 'supplier', 'user', 'paid_status', 'order_status', 'is_active', 'purchase_p_tag__tag__tag_name')  # 配置过滤字段
+        'store', 'supplier', 'user', 'paid_status', 'order_status', 'is_active',
+        'purchase_p_tag__tag__tag_name')  # 配置过滤字段
     search_fields = ('p_number',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
@@ -125,6 +126,10 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
     # 采购单修改，涉及采购商品明细的增加，删除,修改
     @action(methods=['put'], detail=False, url_path='purchase_edit')
     def bulk_edit(self, request):
+        operate = 'NO'  # 操作目的
+        if 'operate' in request.data.keys():
+            operate = request.data['operate']
+
         p_id = request.data['id']
         store_id = request.data['store']
         supplier_id = request.data['supplier']
@@ -166,18 +171,6 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                 post_info.purchase_order = purchase_order
                 post_info.save()
 
-        # 如果是部分发货或者全部发货，检查收货情况，更改订单状态
-        if order_status == 'SENT' or order_status == 'PART_SENT':
-            is_full_received = True
-            for i in purchase_detail:
-                # 如果有一项收货数量少与采购数量，则订单未完成
-                if i['received_qty'] < i['qty']:
-                    is_full_received = False
-                    break
-            if is_full_received:
-                purchase_order.order_status = 'FINISHED'
-                purchase_order.save()
-
         add_list = []
         purchase_detail_ids = []
         for i in purchase_detail:
@@ -190,8 +183,16 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
                 purchase_detail.is_supply_case = i['is_supply_case']
                 purchase_detail.short_note = i['short_note']
                 purchase_detail.urgent = i['urgent']
-                purchase_detail.sent_qty = i['sent_qty']
-                purchase_detail.received_qty = i['received_qty']
+                purchase_detail.paid_qty = i['paid_qty']
+
+                if operate == 'SEND' and purchase_detail.sent_qty < purchase_detail.qty:
+                    purchase_detail.sent_qty = i['sent_qty'] + purchase_detail.sent_qty
+                if operate == 'SEND' and i['sent_qty'] == purchase_detail.qty:
+                    purchase_detail.sent_qty = i['sent_qty']
+                if operate == 'RECEIVE' and purchase_detail.received_qty < purchase_detail.qty:
+                    purchase_detail.received_qty = i['received_qty'] + purchase_detail.received_qty
+                if operate == 'RECEIVE' and i['received_qty'] == purchase_detail.qty:
+                    purchase_detail.received_qty = i['received_qty']
                 purchase_detail.save()
 
             else:
@@ -219,6 +220,19 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
 
         if add_list:
             PurchaseDetail.objects.bulk_create(add_list)
+
+        # 如果是部分发货或者全部发货，检查收货情况，更改订单状态
+        if order_status == 'SENT' or order_status == 'PART_SENT':
+            is_full_received = True
+            for i in request.data['purchase_detail']:
+                pd = PurchaseDetail.objects.get(id=i['id'])
+                # 如果有一项收货数量少与采购数量，则订单未完成
+                if pd.received_qty < pd.qty:
+                    is_full_received = False
+                    break
+            if is_full_received:
+                purchase_order.order_status = 'FINISHED'
+                purchase_order.save()
 
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 

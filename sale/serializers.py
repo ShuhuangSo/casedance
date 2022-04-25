@@ -29,15 +29,15 @@ class CustomerDiscountSerializer(serializers.ModelSerializer):
     """
     客户专属优惠
     """
-    p_series = serializers.SerializerMethodField()
+    series_name = serializers.SerializerMethodField()
 
     # 获取系列名称
-    def get_p_series(self, obj):
+    def get_series_name(self, obj):
         return obj.p_series.name
 
     class Meta:
         model = CustomerDiscount
-        fields = ('id', 'customer', 'p_series', 'discount_type', 'discount_money', 'discount_percent', 'create_time')
+        fields = ('id', 'customer', 'series_name', 'p_series', 'discount_type', 'discount_money', 'discount_percent', 'create_time')
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -53,6 +53,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = ('id', 'company_name', 'customer_code', 'pay_way', 'address', 'contact_name', 'phone', 'qq', 'wechat',
                   'email', 'level', 'is_active', 'note', 'customer_discount', 'customer_tag', 'create_time')
+        read_only_fields = ('customer_code', )
 
 
 class OrderTagSerializer(serializers.ModelSerializer):
@@ -79,9 +80,9 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     """
     销售单明细
     """
-    product_image = serializers.SerializerMethodField()
-    product_sku = serializers.SerializerMethodField()
-    product_name = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    sku = serializers.SerializerMethodField()
+    p_name = serializers.SerializerMethodField()
     p_series = serializers.SerializerMethodField()
     is_paid = serializers.SerializerMethodField()
     stock_qty = serializers.SerializerMethodField()
@@ -89,15 +90,15 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     ave_qty = serializers.SerializerMethodField()
 
     # # 获取产品图片
-    def get_product_image(self, obj):
+    def get_image(self, obj):
         return BASE_URL + MEDIA_URL + str(obj.product.image) if obj.product.image else ''
 
     # 获取产品sku
-    def get_product_sku(self, obj):
+    def get_sku(self, obj):
         return obj.product.sku
 
     # 获取产品名称
-    def get_product_name(self, obj):
+    def get_p_name(self, obj):
         return obj.product.p_name
 
     # 获取产品系列名称
@@ -124,7 +125,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderDetail
-        fields = ('id', 'order', 'product_image', 'product_sku', 'product_name', 'p_series', 'qty', 'unit_price',
+        fields = ('id', 'order', 'image', 'sku', 'p_name', 'p_series', 'qty', 'unit_price',
                   'sold_price', 'sent_qty', 'paid_qty', 'stock_qty', 'lock_qty', 'ave_qty', 'is_paid', 'create_time')
 
 
@@ -136,6 +137,8 @@ class OrderSerializer(serializers.ModelSerializer):
     order_detail = OrderDetailSerializer(many=True, required=False, read_only=True)
     #  销售单标签
     order_tag = OrderTagSerializer(many=True, required=False, read_only=True)
+    #  客户
+    customer = CustomerSerializer(required=False, read_only=True)
 
     username = serializers.SerializerMethodField()
     store_name = serializers.SerializerMethodField()
@@ -200,7 +203,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ('id', 'order_number', 'store_name', 'mode', 'customer_name', 'username', 'logistic', 'tracking_number', 'postage',
+        fields = ('id', 'order_number', 'store', 'store_name', 'mode', 'customer', 'customer_name', 'username', 'logistic', 'tracking_number', 'postage',
                   'order_type', 'order_status', 'pay_way', 'paid_status',
                   'total_sold_price', 'total_paid', 'total_qty', 'total_sent_qty', 'total_paid_qty',
                   'address', 'contact_name', 'phone', 'note', 'order_detail', 'order_tag', 'create_time', 'is_active')

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
 
 # Create your views here.
 from product.models import Product
@@ -49,8 +50,8 @@ class CustomerViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('pay_way', 'is_active')  # 配置过滤字段
-    search_fields = ('company_name', 'customer_code', 'contact_name', 'phone')  # 配置搜索字段
+    filter_fields = ('pay_way', 'is_active', 'level', 'customer_tag__tag__tag_name')  # 配置过滤字段
+    search_fields = ('company_name', 'customer_code')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
 
@@ -128,8 +129,9 @@ class OrderViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
-        'store', 'customer', 'user', 'order_type', 'order_status', 'pay_way', 'paid_status', 'is_active')  # 配置过滤字段
-    search_fields = ('order_number', 'store', 'customer', 'user')  # 配置搜索字段
+        'store', 'mode', 'customer', 'user', 'order_type', 'order_status', 'pay_way', 'paid_status',
+        'is_active')  # 配置过滤字段
+    search_fields = ('order_number', 'store__store_name', 'customer__company_name')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
     # 重写create
@@ -197,9 +199,95 @@ class OrderViewSet(mixins.ListModelMixin,
                 )
             OrderDetail.objects.bulk_create(add_list)
             if not_enough_stock:
-                return Response({'message': '库存不足！'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        return Response({'message': '操作成功！'}, status=status.HTTP_201_CREATED)
+        # 如果订单状态是READY，将订单状态改变，触发信号里的锁定库存
+        if request.data['order_status'] == 'READY':
+            order.order_status = 'READY'
+            order.save()
+        return Response({'id': order.id}, status=status.HTTP_201_CREATED)
+
+    # 订单修改，涉及商品明细的增加，删除,修改
+    @action(methods=['put'], detail=False, url_path='order_edit')
+    def bulk_edit(self, request):
+        order_id = request.data['id']
+        store_id = request.data['store']
+        customer_id = request.data['customer']
+        mode = request.data['mode']
+        pay_way = request.data['pay_way']
+        order_status = request.data['order_status']
+        order_type = request.data['order_type']
+        order_detail = request.data['order_detail']
+        postage = request.data['postage']
+        address = request.data['address']
+        contact_name = request.data['contact_name']
+        phone = request.data['phone']
+        note = request.data['note']
+
+        store = Store.objects.get(id=store_id)
+        customer = Customer.objects.get(id=customer_id)
+        order = Order.objects.get(id=order_id)
+        order.store = store
+        order.customer = customer
+        order.mode = mode
+        order.pay_way = pay_way
+        order.order_status = order_status
+        order.order_type = order_type
+        order.postage = postage
+        order.address = address
+        order.contact_name = contact_name
+        order.phone = phone
+        order.note = note
+
+        add_list = []
+        order_detail_ids = []
+        for i in order_detail:
+            if 'id' in i.keys():
+                order_detail_ids.append(i['id'])
+                # 有id，证明是修改
+                order_detail = OrderDetail.objects.get(id=i['id'])
+                order_detail.unit_price = i['unit_price']
+                order_detail.qty = i['qty']
+                order_detail.sold_price = i['sold_price']
+                order_detail.sent_qty = i['sent_qty']
+                order_detail.paid_qty = i['paid_qty']
+                order_detail.save()
+
+            else:
+                product = Product.objects.all().get(id=i['product'])
+                add_list.append(
+                    OrderDetail(
+                        order=order,
+                        product=product,
+                        unit_price=i['unit_price'],
+                        qty=i['qty'],
+                        sold_price=i['sold_price']
+                    )
+                )
+
+        queryset = OrderDetail.objects.filter(order=order)
+        # 如果id不存在，证明已被删除
+        for i in queryset:
+            is_exist = i.id in order_detail_ids
+            if not is_exist:
+                i.delete()
+
+        if add_list:
+            OrderDetail.objects.bulk_create(add_list)
+
+        # 检查库存情况
+        new_queryset = OrderDetail.objects.filter(order=order)
+        for i in new_queryset:
+            stock = Stock.objects.filter(store=store).get(product=i.product)
+            not_enough_stock = False
+            # 检查库存是否足够
+            if (stock.qty - stock.lock_qty) < i.qty:
+                not_enough_stock = True
+            if not_enough_stock:
+                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        order.save()  # 保存订单，触发库存变化
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
 
 class OrderDetailViewSet(mixins.ListModelMixin,

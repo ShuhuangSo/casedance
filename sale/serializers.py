@@ -84,7 +84,6 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     sku = serializers.SerializerMethodField()
     p_name = serializers.SerializerMethodField()
     p_series = serializers.SerializerMethodField()
-    is_paid = serializers.SerializerMethodField()
     stock_qty = serializers.SerializerMethodField()
     lock_qty = serializers.SerializerMethodField()
     ave_qty = serializers.SerializerMethodField()
@@ -118,10 +117,6 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         qty = Stock.objects.filter(store=obj.order.store).get(product=obj.product).qty
         lock_qty = Stock.objects.filter(store=obj.order.store).get(product=obj.product).lock_qty
         return qty - lock_qty
-
-    # 如果结算数量大于等于发货数量，则将该项标为已结算(付款数量不等于0)
-    def get_is_paid(self, obj):
-        return obj.paid_qty >= obj.sent_qty if obj.paid_qty else False
 
     class Meta:
         model = OrderDetail

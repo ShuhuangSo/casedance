@@ -199,11 +199,15 @@ class OrderViewSet(mixins.ListModelMixin,
                 )
             OrderDetail.objects.bulk_create(add_list)
             if not_enough_stock:
-                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_406_NOT_ACCEPTABLE)
+                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_200_OK)
 
         # 如果订单状态是READY，将订单状态改变，触发信号里的锁定库存
         if request.data['order_status'] == 'READY':
             order.order_status = 'READY'
+            order.save()
+        # 如果订单状态是FINISH，将订单状态改变，触发信号里的扣除库存
+        if request.data['order_status'] == 'FINISHED':
+            order.order_status = 'FINISHED'
             order.save()
         return Response({'id': order.id}, status=status.HTTP_201_CREATED)
 
@@ -275,18 +279,31 @@ class OrderViewSet(mixins.ListModelMixin,
         if add_list:
             OrderDetail.objects.bulk_create(add_list)
 
-        # 检查库存情况
-        new_queryset = OrderDetail.objects.filter(order=order)
-        for i in new_queryset:
-            stock = Stock.objects.filter(store=store).get(product=i.product)
-            not_enough_stock = False
-            # 检查库存是否足够
-            if (stock.qty - stock.lock_qty) < i.qty:
-                not_enough_stock = True
-            if not_enough_stock:
-                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        if request.data['order_status'] == 'READY':
+            # 检查库存情况
+            new_queryset = OrderDetail.objects.filter(order=order)
+            for i in new_queryset:
+                stock = Stock.objects.filter(store=store).get(product=i.product)
+                not_enough_stock = False
+                # 检查库存是否足够
+                if (stock.qty - stock.lock_qty) < i.qty:
+                    not_enough_stock = True
+                if not_enough_stock:
+                    return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_200_OK)
 
         order.save()  # 保存订单，触发库存变化
+
+        # 检查结算状态
+        if request.data['order_status'] == 'FINISHED':
+            qt = OrderDetail.objects.filter(order=order)
+            all_paid = True
+            for i in qt:
+                if not i.is_paid:
+                    all_paid = False
+            if all_paid:
+                order.paid_status = 'FULL_PAID'
+                order.save()
+
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
 

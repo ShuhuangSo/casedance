@@ -419,6 +419,19 @@ def order_detail_init_signal(instance, **kwargs):
     instance.__original_paid_qty = instance.paid_qty
 
 
+# 销售单明细更新前判断结算状态
+@receiver(pre_save, sender=OrderDetail)
+def order_detail_paid_signal(sender, instance, created=False, **kwargs):
+    # 判断是否create
+    if not instance._state.adding:
+        # 如果结算数量有变动
+        if instance.__original_paid_qty != instance.paid_qty:
+            if instance.paid_qty >= instance.sent_qty and instance.paid_qty > 0:
+                instance.is_paid = True
+            else:
+                instance.is_paid = False
+
+
 # 销售单产品明细，日志记录，库存出库检测
 @receiver(post_save, sender=OrderDetail)
 def order_detail_signal(sender, instance, created, **kwargs):

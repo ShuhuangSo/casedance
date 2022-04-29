@@ -53,6 +53,43 @@ class StoreViewSet(mixins.ListModelMixin,
     search_fields = ('store_name', 'contact_name', 'phone')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
+    # 重写create
+    def create(self, request, *args, **kwargs):
+        store_name = request.data['store_name']
+        s_type = request.data['type']
+        address = request.data['address']
+        contact_name = request.data['contact_name']
+        phone = request.data['phone']
+        qq = request.data['qq']
+        wechat = request.data['wechat']
+        website = request.data['website']
+        note = request.data['note']
+
+        store = Store()
+        store.store_name = store_name
+        store.type = s_type
+        store.address = address
+        store.contact_name = contact_name
+        store.phone = phone
+        store.qq = qq
+        store.wechat = wechat
+        store.website = website
+        store.note = note
+        store.save()
+
+        queryset = Product.objects.all()
+        add_list = []
+        for i in queryset:
+            add_list.append(
+                Stock(
+                    product=i,
+                    store=store
+                )
+            )
+        Stock.objects.bulk_create(add_list)
+
+        return Response({'msg': '操作成功！'}, status=status.HTTP_200_OK)
+
 
 class StockInOutViewSet(mixins.ListModelMixin,
                         mixins.CreateModelMixin,

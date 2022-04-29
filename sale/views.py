@@ -181,13 +181,14 @@ class OrderViewSet(mixins.ListModelMixin,
         order_detail = request.data['order_detail']
         if order_detail:
             add_list = []
+            not_enough_stock = 0
             for i in order_detail:
                 product = Product.objects.all().get(id=i['product'])
                 stock = Stock.objects.filter(store=store).get(product=product)
-                not_enough_stock = False
+
                 # 检查库存是否足够
                 if (stock.qty - stock.lock_qty) < i['qty']:
-                    not_enough_stock = True
+                    not_enough_stock += 1
                 add_list.append(
                     OrderDetail(
                         order=order,
@@ -198,8 +199,9 @@ class OrderViewSet(mixins.ListModelMixin,
                     )
                 )
             OrderDetail.objects.bulk_create(add_list)
-            if not_enough_stock:
-                return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_200_OK)
+
+        if not_enough_stock:
+            return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_202_ACCEPTED)
 
         # 如果订单状态是READY，将订单状态改变，触发信号里的锁定库存
         if request.data['order_status'] == 'READY':
@@ -289,7 +291,18 @@ class OrderViewSet(mixins.ListModelMixin,
                 if (stock.qty - stock.lock_qty) < i.qty:
                     not_enough_stock = True
                 if not_enough_stock:
-                    return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_200_OK)
+                    return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_202_ACCEPTED)
+        if request.data['order_status'] == 'FINISHED' and request.data['mode'] == 'POS':
+            # 检查库存情况
+            new_queryset = OrderDetail.objects.filter(order=order)
+            for i in new_queryset:
+                stock = Stock.objects.filter(store=store).get(product=i.product)
+                not_enough_stock = False
+                # 检查库存是否足够
+                if (stock.qty - stock.lock_qty) < i.qty:
+                    not_enough_stock = True
+                if not_enough_stock:
+                    return Response({'msg': '库存不足！', 'id': order.id, 'not_enough_stock': True}, status=status.HTTP_202_ACCEPTED)
 
         order.save()  # 保存订单，触发库存变化
 

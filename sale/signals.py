@@ -322,6 +322,8 @@ def order_signal(sender, instance, created, **kwargs):
             for i in queryset:
                 stock = Stock.objects.filter(store=instance.store).get(product=i.product)
                 stock.qty -= i.qty
+                if instance.__original_order_status == 'READY':
+                    stock.lock_qty -= (i.qty - i.sent_qty)
                 stock.save()
 
                 #  产品销售出库日志记录保存

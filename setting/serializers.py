@@ -55,6 +55,39 @@ class MenuSerializer(serializers.ModelSerializer):
         fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children', 'user')
 
 
+class ALLMenuSerializer(serializers.ModelSerializer):
+    """
+    前端导航菜单
+    """
+    children = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        user = User.objects.get(username='admin')  # admin用户
+        # 返回嵌套序列化筛选数据
+        return SubMenuSerializer(obj.children.filter(user=user), many=True).data
+
+    class Meta:
+        model = Menu
+        fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children', 'user')
+
+
+class UserMenuSerializer(serializers.ModelSerializer):
+    """
+    前端导航菜单
+    """
+    children = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        id = self.context['request'].GET.get("id")
+        user = User.objects.get(id=id)
+        # 返回嵌套序列化筛选数据
+        return SubMenuSerializer(obj.children.filter(user=user), many=True).data
+
+    class Meta:
+        model = Menu
+        fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children', 'user')
+
+
 class UserSerializer(serializers.ModelSerializer):
     """
     用户信息
@@ -62,4 +95,5 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = "__all__"
+        fields = ('id', 'username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active', 'date_joined',
+                  'is_superuser', 'last_login')

@@ -85,5 +85,5 @@ class Menu(models.Model):
         ordering = ['order_num']
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 

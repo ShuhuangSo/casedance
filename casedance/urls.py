@@ -26,7 +26,7 @@ from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelVi
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
-from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet
+from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet
 
 from rest_framework.routers import DefaultRouter
 
@@ -55,8 +55,12 @@ router.register('suppliers', SupplierViewSet, basename='suppliers')
 router.register('settings/tags', TagViewSet, basename='tags')
 # 操作日志
 router.register('settings/op_logs', OperateLogViewSet, basename='op_logs')
-# 用户菜单
+# 当前用户菜单
 router.register('settings/menu', MenuViewSet, basename='menu')
+# 所有菜单
+router.register('settings/all_menu', AllMenuViewSet, basename='all_menu')
+# 指定用户菜单
+router.register('settings/user_menu', UserMenuViewSet, basename='user_menu')
 # 用户信息
 router.register('settings/users', UserViewSet, basename='users')
 

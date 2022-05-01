@@ -51,6 +51,24 @@ class TagViewSet(mixins.ListModelMixin,
     filter_fields = ('type', 'color', 'user')  # 配置过滤字段
     search_fields = ('tag_name',)  # 配置搜索字段
 
+    @action(methods=['post'], detail=False, url_path='create_tag')
+    def create_tag(self, request):
+        user = self.request.user
+        tag_name = request.data['tag_name']
+        tag_type = request.data['type']
+        color = request.data['color']
+
+        is_exist = Tag.objects.filter(user=user, type=tag_type, tag_name=tag_name).count()
+        if is_exist:
+            return Response({'msg': '标签名称已存在！'}, status=status.HTTP_202_ACCEPTED)
+        tag = Tag()
+        tag.tag_name = tag_name
+        tag.type = tag_type
+        tag.color = color
+        tag.user = user
+        tag.save()
+        return Response({'msg': '创建成功'}, status=status.HTTP_200_OK)
+
 
 class OperateLogViewSet(mixins.ListModelMixin,
                         mixins.CreateModelMixin,
@@ -138,10 +156,11 @@ class UserMenuViewSet(mixins.ListModelMixin,
         admin = User.objects.get(username='admin')
         queryset = Menu.objects.filter(user=admin)
 
-        is_exist = Menu.objects.filter(user=user).count()
+        user_count = Menu.objects.filter(user=user).count()
+        admin_count = Menu.objects.filter(user=admin).count()
         menu_set = Menu.objects.filter(user=user)
-        # 如果已存在菜单，说明是修改
-        if is_exist:
+        # 如果菜单数量与admin相同，说明是修改
+        if user_count == admin_count:
             menu_set.update(is_active=False)
             p_ids = []
             for i in menu_set:
@@ -153,6 +172,7 @@ class UserMenuViewSet(mixins.ListModelMixin,
                             if not i.id in p_ids:
                                 if i.parent:
                                     p_ids.append(i.parent.id)
+
             # 如果有子菜单，父菜单设为true
             for i in p_ids:
                 m = Menu.objects.get(id=i)
@@ -160,6 +180,14 @@ class UserMenuViewSet(mixins.ListModelMixin,
                 m.save()
 
             return Response({'msg': '修改成功'}, status=status.HTTP_200_OK)
+
+        # 如果是部分菜单新增，则先全部删除，再新增
+        if admin_count != user_count and user_count > 0:
+            us = Menu.objects.filter(user=user)
+            for i in us:
+                if i.parent:
+                    i.delete()
+            Menu.objects.filter(user=user).delete()
 
         # 先创建父菜单
         parent_add_list = []
@@ -236,3 +264,50 @@ class UserViewSet(mixins.ListModelMixin,
         info.update({'is_superuser': user.is_superuser})
 
         return Response(info, status=status.HTTP_200_OK)
+
+    # 注册用户
+    @action(methods=['post'], detail=False, url_path='create_user')
+    def create_user(self, request):
+        username = request.data['username']
+        password = request.data['password']
+        first_name = request.data['first_name']
+        last_name = request.data['last_name']
+        email = request.data['email']
+        is_superuser = request.data['is_superuser']
+
+        is_exist = User.objects.filter(username=username).count()
+        if is_exist:
+            return Response({'msg': '手机号已存在!', 'success': False}, status=status.HTTP_202_ACCEPTED)
+
+        user = User()
+        user.username = username
+        user.set_password(password)
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.is_superuser = is_superuser
+        user.save()
+
+        return Response({'msg': '创建成功!', 'success': True, 'id': user.id, 'name': user.first_name}, status=status.HTTP_200_OK)
+
+    # 修改用户资料
+    @action(methods=['put'], detail=False, url_path='edit_user')
+    def edit_user(self, request):
+        u_id = request.data['id']
+        first_name = request.data['first_name']
+        password = request.data['password']
+        last_name = request.data['last_name']
+        email = request.data['email']
+        is_superuser = request.data['is_superuser']
+        is_active = request.data['is_active']
+
+        user = User.objects.get(id=u_id)
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.is_superuser = is_superuser
+        user.is_active = is_active
+        if password:
+            user.set_password(password)
+        user.save()
+        return Response({'msg': '修改成功!'}, status=status.HTTP_200_OK)

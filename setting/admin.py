@@ -21,7 +21,7 @@ class OperateLogAdmin(admin.ModelAdmin):
 
 @admin.register(Menu)
 class MenuAdmin(admin.ModelAdmin):
-    list_display = ['parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'user']
+    list_display = ['id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'user']
     list_filter = ['is_active', 'user']
     search_fields = ['name']
 

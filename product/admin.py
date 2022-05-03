@@ -22,7 +22,7 @@ class ProductExtraInfoAdmin(admin.ModelAdmin):
 
 @admin.register(DeviceModel)
 class DeviceModelAdmin(admin.ModelAdmin):
-    list_display = ['brand', 'type', 'model']
+    list_display = ['brand', 'type', 'model', 'cp_id', 'note']
     list_filter = ['type']
     search_fields = ['model']
 

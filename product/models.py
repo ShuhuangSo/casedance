@@ -91,6 +91,8 @@ class DeviceModel(models.Model):
     brand = models.CharField(null=True, blank=True, max_length=20, verbose_name='品牌', help_text='品牌')
     type = models.CharField(null=True, blank=True, max_length=20, verbose_name='类型', help_text='类型')
     model = models.CharField(max_length=40, verbose_name='型号', help_text='型号')
+    cp_id = models.IntegerField(null=True, blank=True, verbose_name='兼容识别码', help_text='兼容识别码')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
 
     class Meta:
         verbose_name = '市面手机型号表'

@@ -22,7 +22,7 @@ class CustomerTagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomerTag
-        fields = ('id', 'customer', 'tag_name', 'color')
+        fields = ('id', 'customer', 'tag', 'tag_name', 'color')
 
 
 class CustomerDiscountSerializer(serializers.ModelSerializer):
@@ -73,7 +73,7 @@ class OrderTagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderTag
-        fields = ('id', 'order', 'tag_name', 'color')
+        fields = ('id', 'order', 'tag', 'tag_name', 'color')
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):

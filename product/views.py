@@ -337,7 +337,7 @@ class DeviceModelViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('brand', 'type',)  # 配置过滤字段
-    search_fields = ('model',)  # 配置搜索字段
+    search_fields = ('model', 'note')  # 配置搜索字段
 
 
 class CompatibleModelViewSet(mixins.ListModelMixin,

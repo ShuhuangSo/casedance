@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from casedance.settings import BASE_URL, MEDIA_URL
+from purchase.models import PurchaseOrder
 
 from sale.models import Order
 from .models import Store, Stock, StockInOut, StockInOutDetail, StockLog
@@ -117,6 +118,8 @@ class StockLogSerializer(serializers.ModelSerializer):
             number = StockInOut.objects.get(id=obj.op_origin_id).batch_number
         if obj.op_type in ['S_OUT', 'LOCK', 'UNLOCK']:
             number = Order.objects.get(id=obj.op_origin_id).order_number
+        if obj.op_type == 'B_IN':
+            number = PurchaseOrder.objects.get(id=obj.op_origin_id).p_number
         return number
 
     class Meta:

@@ -108,10 +108,22 @@ class DeviceModelSerializer(serializers.ModelSerializer):
     """
     市面手机型号表
     """
+    cp_model = serializers.SerializerMethodField()
+
+    # 获取兼容设备型号
+    def get_cp_model(self, obj):
+        if obj.cp_id:
+            add_list = []
+            queryset = DeviceModel.objects.filter(cp_id=obj.cp_id)
+            for i in queryset:
+                if i.model != obj.model:
+                    add_list.append({'model': i.model})
+            return add_list
+        return []
 
     class Meta:
         model = DeviceModel
-        fields = "__all__"
+        fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note')
 
 
 class SupplierSerializer(serializers.ModelSerializer):

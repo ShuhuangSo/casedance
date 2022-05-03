@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_init, post_delete, pre_save
 from django.dispatch import receiver
 
 from setting.models import OperateLog
-from store.models import Stock
+from store.models import Stock, StockLog
 
 import inspect
 
@@ -27,6 +27,16 @@ def purchase_detail_signal(sender, instance, created, **kwargs):
             stock = Stock.objects.filter(store=instance.purchase_order.store).get(product=instance.product)
             stock.qty += add_stock
             stock.save()
+
+            #  产品采购入库日志记录保存
+            stock_log = StockLog()
+            stock_log.qty = add_stock
+            stock_log.product = instance.product
+            stock_log.store = instance.purchase_order.store
+            stock_log.user = request.user
+            stock_log.op_type = 'B_IN'
+            stock_log.op_origin_id = instance.purchase_order.id
+            stock_log.save()
 
         # 更新采购单的结算状态
         queryset = PurchaseDetail.objects.filter(purchase_order=instance.purchase_order)

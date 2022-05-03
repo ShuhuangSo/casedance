@@ -149,6 +149,7 @@ class StockLog(models.Model):
     O_TYPE = (
         ('M_IN', '手工入库'),
         ('M_OUT', '手工出库'),
+        ('B_IN', '采购入库'),
         ('S_OUT', '销售出库'),
         ('LOCK', '锁仓'),
         ('UNLOCK', '解锁'),

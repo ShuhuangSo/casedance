@@ -22,7 +22,7 @@ class PurchaseOrderTagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseOrderTag
-        fields = ('id', 'purchase_order', 'tag_name', 'color')
+        fields = ('id', 'purchase_order', 'tag', 'tag_name', 'color')
 
 
 class PurchaseDetailSerializer(serializers.ModelSerializer):

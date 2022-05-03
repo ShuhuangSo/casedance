@@ -177,7 +177,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 stock.qty += i.qty  # 现有库存加上入库库存
                 stock.save()
 
-                #  产品入库日志记录保存
+                #  产品手工入库日志记录保存
                 stock_log = StockLog()
                 stock_log.qty = i.qty
                 stock_log.product = i.product
@@ -194,7 +194,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 stock.qty -= i.qty  # 现有库存减去出库库存
                 stock.save()
 
-                #  产品出库日志记录保存
+                #  产品手工出库日志记录保存
                 stock_log = StockLog()
                 stock_log.qty = i.qty
                 stock_log.product = i.product
@@ -214,7 +214,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 ta_stock.qty += i.qty  # 目标仓库加上入库库存
                 ta_stock.save()
 
-                #  源仓库产品出库日志记录保存
+                #  源仓库产品手工出库日志记录保存
                 or_stock_log = StockLog()
                 or_stock_log.qty = i.qty
                 or_stock_log.product = i.product
@@ -224,7 +224,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 or_stock_log.op_origin_id = stock_inout.id
                 or_stock_log.save()
 
-                #  目标仓库产品入库日志记录保存
+                #  目标仓库产品手工入库日志记录保存
                 ta_stock_log = StockLog()
                 ta_stock_log.qty = i.qty
                 ta_stock_log.product = i.product

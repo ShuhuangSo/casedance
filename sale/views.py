@@ -130,7 +130,7 @@ class OrderViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
         'store', 'mode', 'customer', 'user', 'order_type', 'order_status', 'pay_way', 'paid_status',
-        'is_active')  # 配置过滤字段
+        'is_active', 'order_tag__tag__tag_name')  # 配置过滤字段
     search_fields = ('order_number', 'store__store_name', 'customer__company_name')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 

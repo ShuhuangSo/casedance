@@ -339,6 +339,97 @@ class DeviceModelViewSet(mixins.ListModelMixin,
     filter_fields = ('brand', 'type',)  # 配置过滤字段
     search_fields = ('model', 'note')  # 配置搜索字段
 
+    # 市面手机型号excel批量上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        data = request.data
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['型号上传模板']
+
+        add_list = []
+        if sheet.max_row <= 1:
+            return Response({'msg': '表格不能为空'}, status=status.HTTP_202_ACCEPTED)
+
+        for cell_row in list(sheet)[1:]:
+            row_status = cell_row[0].value and cell_row[1].value and cell_row[2].value
+            if not row_status:
+                return Response({'msg': '必填项不能为空'}, status=status.HTTP_202_ACCEPTED)
+
+            # 检查型号是否已存在
+            is_exist = DeviceModel.objects.filter(model=cell_row[0].value.strip()).count()
+            if is_exist:
+                continue
+
+            model = cell_row[0].value.strip()
+            brand = cell_row[1].value.strip()
+            m_type = cell_row[2].value.strip()
+            note = cell_row[3].value
+
+            add_list.append(DeviceModel(
+                model=model,
+                brand=brand,
+                type=m_type,
+                note=note
+            ))
+        DeviceModel.objects.bulk_create(add_list)
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+    # 型号绑定
+    @action(methods=['post'], detail=False, url_path='cp_band')
+    def cp_band(self, request):
+        ids = request.data['ids']
+
+        exist_cp = []
+        for i in ids:
+            dm = DeviceModel.objects.get(id=i)
+            if dm.cp_id:
+                # 如果关联id不在列表中就加进去
+                if dm.cp_id not in exist_cp:
+                    exist_cp.append(dm.cp_id)
+        if len(exist_cp) > 1:
+            return Response({'msg': '兼容型号绑定冲突，请检查'}, status=status.HTTP_202_ACCEPTED)
+
+        if len(exist_cp) == 1:
+            cp_id = exist_cp[0]
+            for i in ids:
+                dm = DeviceModel.objects.get(id=i)
+                dm.cp_id = cp_id
+                dm.save()
+
+        if len(exist_cp) == 0:
+            cp_id = ids[0]
+            for i in ids:
+                dm = DeviceModel.objects.get(id=i)
+                dm.cp_id = cp_id
+                dm.save()
+
+        return Response({'msg': '成功绑定'}, status=status.HTTP_200_OK)
+
+    # 型号解绑
+    @action(methods=['post'], detail=False, url_path='cp_unband')
+    def cp_unband(self, request):
+        m_id = request.data['id']
+        dm = DeviceModel.objects.get(id=m_id)
+        delete_cp_id = dm.cp_id
+        dm.cp_id = None
+        dm.save()
+
+        rest_count = DeviceModel.objects.filter(cp_id=delete_cp_id).count()
+        # 如果只有剩下1
+        if rest_count == 1:
+            DeviceModel.objects.filter(cp_id=delete_cp_id).delete()
+
+        if rest_count > 1 and DeviceModel.objects.filter(cp_id=m_id).count():
+            new_cp = DeviceModel.objects.filter(cp_id=m_id).first()
+            new_cp_id = new_cp.id
+            qs = DeviceModel.objects.filter(cp_id=m_id)
+            for i in qs:
+                i.cp_id = new_cp_id
+                i.save()
+
+        return Response({'msg': '成功解绑'}, status=status.HTTP_200_OK)
+
 
 class CompatibleModelViewSet(mixins.ListModelMixin,
                              mixins.CreateModelMixin,

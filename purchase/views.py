@@ -123,6 +123,13 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
 
         return Response({'id': purchase_order.id}, status=status.HTTP_201_CREATED)
 
+    # test
+    @action(methods=['get'], detail=False, url_path='test')
+    def test(self, request):
+        from . import tasks
+        tasks.calc_sold_qty()
+        return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
+
     # 采购单修改，涉及采购商品明细的增加，删除,修改
     @action(methods=['put'], detail=False, url_path='purchase_edit')
     def bulk_edit(self, request):

@@ -32,7 +32,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(OrderDetail)
 class OrderDetailAdmin(admin.ModelAdmin):
-    list_display = ['order', 'product', 'qty', 'unit_price', 'sent_qty', 'paid_qty', 'is_paid']
+    list_display = ['order', 'product', 'qty', 'unit_price', 'sent_qty', 'paid_qty', 'is_paid', 'create_time']
     list_filter = ['is_paid', ]
     search_fields = ['product', ]
 

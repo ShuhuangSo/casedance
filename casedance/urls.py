@@ -23,7 +23,7 @@ from rest_framework.documentation import include_docs_urls
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet
-from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet
+from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
 from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet
@@ -79,6 +79,8 @@ router.register('purchase_orders', PurchaseOrderViewSet, basename='purchase_orde
 router.register('purchase_detail', PurchaseDetailViewSet, basename='purchase_detail')
 # 采购单标签
 router.register('purchase_order_tags', PurchaseOrderTagViewSet, basename='purchase_order_tags')
+# 采购推荐
+router.register('refill_promote', RefillPromoteViewSet, basename='refill_promote')
 
 # ---------------------------销售模块 -------------------------------------------------
 # 客户专属优惠

@@ -1,7 +1,8 @@
 from rest_framework import serializers
+from django.db.models import Sum
 
 from casedance.settings import BASE_URL, MEDIA_URL
-from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo
+from purchase.models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo, RefillPromote
 from store.models import Stock
 
 
@@ -94,14 +95,16 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseDetail
-        fields = ('id', 'urgent', 'total_qty', 'total_lock_qty', 'ava_qty', 'qty', 'unit_cost', 'received_qty', 'paid_qty',
-                  'sent_qty', 'onway_qty', 'is_supply_case', 'is_paid', 'short_note', 'stock_before', 'image', 'sku', 'p_name')
+        fields = (
+        'id', 'urgent', 'total_qty', 'total_lock_qty', 'ava_qty', 'qty', 'unit_cost', 'received_qty', 'paid_qty',
+        'sent_qty', 'onway_qty', 'is_supply_case', 'is_paid', 'short_note', 'stock_before', 'image', 'sku', 'p_name')
 
 
 class PostInfoSerializer(serializers.ModelSerializer):
     """
     采购发货物流信息
     """
+
     class Meta:
         model = PostInfo
         fields = "__all__"
@@ -128,6 +131,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     total_onway_qty = serializers.SerializerMethodField()
     total_rec_qty = serializers.SerializerMethodField()
     total_paid_qty = serializers.SerializerMethodField()
+
     # paid_status = serializers.SerializerMethodField()
 
     # 获取username
@@ -147,7 +151,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         queryset = PurchaseDetail.objects.filter(purchase_order=obj)
         total = 0.0
         for i in queryset:
-            total += i.qty*i.unit_cost
+            total += i.qty * i.unit_cost
         return total + obj.postage
 
     # 获取结算总金额
@@ -155,7 +159,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         queryset = PurchaseDetail.objects.filter(purchase_order=obj)
         total = 0.0
         for i in queryset:
-            total += i.paid_qty*i.unit_cost
+            total += i.paid_qty * i.unit_cost
         return total + obj.postage if total else total
 
     # 获取采购总数量
@@ -190,28 +194,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             total += i.paid_qty
         return total
 
-    # 获取采购单结算状态
-    # def get_paid_status(self, obj):
-    #     queryset = PurchaseDetail.objects.filter(purchase_order=obj)
-    #     count = PurchaseDetail.objects.filter(purchase_order=obj).count()
-    #     num = 0
-    #     status = 'UNPAID'
-    #     for i in queryset:
-    #         if i.paid_qty >= i.received_qty and i.paid_qty > 0:
-    #             num += 1
-    #     if num == count:
-    #         status = 'FULL_PAID'
-    #         # 将付款状态保存更新到数据库里
-    #         if obj.paid_status != 'FULL_PAID':
-    #             obj.paid_status = 'FULL_PAID'
-    #             obj.save()
-    #     elif 0 < num < count:
-    #         status = 'PART_PAID'
-    #         if obj.paid_status != 'PART_PAID':
-    #             obj.paid_status = 'PART_PAID'
-    #             obj.save()
-    #     return status
-
     class Meta:
         model = PurchaseOrder
         fields = ('id', 'p_number', 'store', 'store_name', 'supplier', 'supplier_name', 'username', 'postage',
@@ -219,3 +201,58 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                   'sup_tips', 'total_cost', 'total_paid', 'total_buy_qty', 'total_onway_qty',
                   'total_rec_qty', 'total_paid_qty', 'paid_status', 'order_status', 'note', 'purchase_detail',
                   'purchase_p_tag', 'create_time', 'is_active')
+
+
+class RefillPromoteSerializer(serializers.ModelSerializer):
+    """
+    智能补货推荐
+    """
+    sku = serializers.SerializerMethodField()
+    p_name = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    unit_cost = serializers.SerializerMethodField()
+    #  产品总库存
+    total_qty = serializers.SerializerMethodField()
+    #  产品总锁仓库存
+    total_lock_qty = serializers.SerializerMethodField()
+    #  产品7天总销量
+    total_7d_sold = serializers.SerializerMethodField()
+    #  产品30天总销量
+    total_30d_sold = serializers.SerializerMethodField()
+
+    # # 获取产品图片
+    def get_image(self, obj):
+        return BASE_URL + MEDIA_URL + str(obj.product.image) if obj.product.image else ''
+    # 计算所有仓库，门店库存之和
+    def get_total_qty(self, obj):
+        sum_stock = Stock.objects.filter(product=obj.product).aggregate(Sum('qty'))
+        return sum_stock['qty__sum']
+
+    # 计算所有仓库，门店锁仓库存之和
+    def get_total_lock_qty(self, obj):
+        sum_lock = Stock.objects.filter(product=obj.product).aggregate(Sum('lock_qty'))
+        return sum_lock['lock_qty__sum']
+
+    # 计算所有仓库，门店产品7天总销量
+    def get_total_7d_sold(self, obj):
+        sum_7d = Stock.objects.filter(product=obj.product).aggregate(Sum('recent_7d_sales'))
+        return sum_7d['recent_7d_sales__sum']
+
+    # 计算所有仓库，门店产品30天总销量
+    def get_total_30d_sold(self, obj):
+        sum_30d = Stock.objects.filter(product=obj.product).aggregate(Sum('recent_30d_sales'))
+        return sum_30d['recent_30d_sales__sum']
+
+    def get_sku(self, obj):
+        return obj.product.sku
+
+    def get_p_name(self, obj):
+        return obj.product.p_name
+
+    def get_unit_cost(self, obj):
+        return obj.product.unit_cost
+
+    class Meta:
+        model = RefillPromote
+        fields = ('id', 'qty', 'product', 'sku', 'image', 'p_name', 'unit_cost', 'total_qty', 'total_lock_qty', 'total_7d_sold',
+                  'create_time', 'total_30d_sold')

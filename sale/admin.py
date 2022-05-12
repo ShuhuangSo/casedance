@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
+from purchase.models import RefillPromote
 from sale.models import Customer, CustomerDiscount, CustomerTag, Order, OrderDetail, OrderTag
 
 
@@ -42,3 +43,9 @@ class OrderTagAdmin(admin.ModelAdmin):
     list_display = ['order', 'tag']
     list_filter = ['order', ]
     search_fields = ['order', ]
+
+
+@admin.register(RefillPromote)
+class RefillPromoteAdmin(admin.ModelAdmin):
+    list_display = ['qty', 'product', 'create_time']
+    search_fields = ['product', ]

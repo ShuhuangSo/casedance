@@ -87,3 +87,22 @@ class Menu(models.Model):
     def __str__(self):
         return str(self.id)
 
+
+class TaskLog(models.Model):
+    """
+    任务执行日志
+    task_type:
+    1：采购推荐 2:  销量计算
+    """
+
+    task_type = models.IntegerField(default=0, verbose_name='任务类型', help_text='任务类型')
+    note = models.CharField(max_length=10, verbose_name='任务注释', help_text='任务注释')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='执行时间', help_text='执行时间')
+
+    class Meta:
+        verbose_name = '任务执行日志'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.note

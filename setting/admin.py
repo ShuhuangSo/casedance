@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, OperateLog, Menu
+from .models import Tag, OperateLog, Menu, TaskLog
 
 
 # Register your models here.
@@ -25,3 +25,8 @@ class MenuAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'user']
     search_fields = ['name']
 
+
+@admin.register(TaskLog)
+class TaskLogAdmin(admin.ModelAdmin):
+    list_display = ['task_type', 'note', 'create_time']
+    list_filter = ['task_type']

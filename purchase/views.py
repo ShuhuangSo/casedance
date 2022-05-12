@@ -8,10 +8,12 @@ from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from django.db.models import Q
 
 from product.models import Product, Supplier
-from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo
-from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer, PurchaseOrderTagSerializer
+from .models import PurchaseOrder, PurchaseDetail, PurchaseOrderTag, PostInfo, RefillPromote
+from .serializers import PurchaseOrderSerializer, PurchaseDetailSerializer, PurchaseOrderTagSerializer, \
+    RefillPromoteSerializer
 from store.models import Store, Stock
 
 
@@ -293,3 +295,43 @@ class PurchaseOrderTagViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend,)  # 过滤
     filter_fields = ('purchase_order', 'tag',)  # 配置过滤字段
+
+
+class RefillPromoteViewSet(mixins.ListModelMixin,
+                           mixins.UpdateModelMixin,
+                           mixins.RetrieveModelMixin,
+                           viewsets.GenericViewSet):
+    """
+    list:
+        采购单标签,分页,过滤,搜索,排序
+    """
+    queryset = RefillPromote.objects.all()
+    serializer_class = RefillPromoteSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+
+    search_fields = ('product__sku', 'product__p_name')  # 配置搜索字段
+    ordering_fields = ('product__p_name', )  # 配置排序字段
+
+    def get_queryset(self):
+        # 返回当前推荐数量大于0的数据
+        return RefillPromote.objects.filter(qty__gt=0)
+
+    # 重新计算补货数量
+    @action(methods=['get'], detail=False, url_path='re_calc')
+    def re_calc(self, request):
+        from . import tasks
+        tasks.calc_refill()
+        return Response({'msg': '完成补货推荐计算'}, status=status.HTTP_200_OK)
+
+    # 生成采购单后重置采购数量为0
+    @action(methods=['post'], detail=False, url_path='re_set')
+    def re_set(self, request):
+        ids = request.data['ids']
+        q = Q()
+        q.connector = 'OR'
+        for i in ids:
+            q.children.append(('id', i))
+        RefillPromote.objects.filter(q).update(qty=0)
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)

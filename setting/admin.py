@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, OperateLog, Menu, TaskLog
+from .models import Tag, OperateLog, Menu, TaskLog, SysRefill
 
 
 # Register your models here.
@@ -30,3 +30,8 @@ class MenuAdmin(admin.ModelAdmin):
 class TaskLogAdmin(admin.ModelAdmin):
     list_display = ['task_type', 'note', 'create_time']
     list_filter = ['task_type']
+
+
+@admin.register(SysRefill)
+class SysRefillAdmin(admin.ModelAdmin):
+    list_display = ['sys_alert_qty', 'sys_mini_pq', 'sys_max_pq', 'sys_stock_days']

@@ -106,3 +106,22 @@ class TaskLog(models.Model):
 
     def __str__(self):
         return self.note
+
+
+class SysRefill(models.Model):
+    """
+    补货推荐设置
+    """
+
+    sys_alert_qty = models.IntegerField(default=0, verbose_name='警戒库存', help_text='警戒库存')
+    sys_mini_pq = models.IntegerField(default=0, verbose_name='最小采购量', help_text='最小采购量')
+    sys_max_pq = models.IntegerField(default=0, verbose_name='采购上限', help_text='采购上限')
+    sys_stock_days = models.IntegerField(default=0, verbose_name='备货天数', help_text='备货天数')
+
+    class Meta:
+        verbose_name = '补货推荐设置'
+        verbose_name_plural = verbose_name
+        ordering = ['sys_alert_qty']
+
+    def __str__(self):
+        return str(self.id)

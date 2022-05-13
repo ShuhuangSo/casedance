@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Tag, OperateLog, Menu
+from .models import Tag, OperateLog, Menu, SysRefill
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -97,3 +97,13 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active', 'date_joined',
                   'is_superuser', 'last_login')
+
+
+class SysRefillSerializer(serializers.ModelSerializer):
+    """
+    补货推荐设置
+    """
+
+    class Meta:
+        model = SysRefill
+        fields = "__all__"

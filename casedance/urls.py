@@ -26,7 +26,8 @@ from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelVi
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
-from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet
+from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
+    SysRefillViewSet
 
 from rest_framework.routers import DefaultRouter
 
@@ -63,6 +64,8 @@ router.register('settings/all_menu', AllMenuViewSet, basename='all_menu')
 router.register('settings/user_menu', UserMenuViewSet, basename='user_menu')
 # 用户信息
 router.register('settings/users', UserViewSet, basename='users')
+# 用户信息
+router.register('settings/sys_refill', SysRefillViewSet, basename='sys_refill')
 
 # ---------------------------仓库/商店模块 -------------------------------------------------
 # 仓库、销售门店

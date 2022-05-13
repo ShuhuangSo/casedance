@@ -6,9 +6,9 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 
-from .models import Tag, OperateLog, Menu
+from .models import Tag, OperateLog, Menu, SysRefill
 from .serializers import TagSerializer, OperateLogSerializer, MenuSerializer, UserSerializer, ALLMenuSerializer, \
-    UserMenuSerializer
+    UserMenuSerializer, SysRefillSerializer
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -288,7 +288,8 @@ class UserViewSet(mixins.ListModelMixin,
         user.is_superuser = is_superuser
         user.save()
 
-        return Response({'msg': '创建成功!', 'success': True, 'id': user.id, 'name': user.first_name}, status=status.HTTP_200_OK)
+        return Response({'msg': '创建成功!', 'success': True, 'id': user.id, 'name': user.first_name},
+                        status=status.HTTP_200_OK)
 
     # 修改用户资料
     @action(methods=['put'], detail=False, url_path='edit_user')
@@ -311,3 +312,18 @@ class UserViewSet(mixins.ListModelMixin,
             user.set_password(password)
         user.save()
         return Response({'msg': '修改成功!'}, status=status.HTTP_200_OK)
+
+
+class SysRefillViewSet(mixins.ListModelMixin,
+                       mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin,
+                       mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin,
+                       viewsets.GenericViewSet):
+    """
+    list:
+        补货推荐设置列表
+    """
+    queryset = SysRefill.objects.all()
+    serializer_class = SysRefillSerializer  # 序列化
+

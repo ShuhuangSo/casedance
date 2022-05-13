@@ -6,7 +6,7 @@ from django.db.models import Q
 
 from product.models import Product
 from purchase.models import RefillPromote, PurchaseDetail
-from setting.models import TaskLog
+from setting.models import TaskLog, SysRefill
 from store.models import Stock, StockLog
 
 
@@ -67,10 +67,11 @@ def calc_sold_qty():
 @shared_task()
 def calc_refill():
     # 通用参数
-    sys_alert_qty = 10  # 警戒库存
-    sys_mini_pq = 10  # 最小采购量
-    sys_max_pq = 50  # 采购上限
-    sys_stock_days = 7  # 备货天数
+    sys_refill = SysRefill.objects.all().first()
+    sys_alert_qty = sys_refill.sys_alert_qty  # 警戒库存
+    sys_mini_pq = sys_refill.sys_mini_pq  # 最小采购量
+    sys_max_pq = sys_refill.sys_max_pq  # 采购上限
+    sys_stock_days = sys_refill.sys_stock_days  # 备货天数
 
     # 取出产品 1.在售 2.补货推荐： 开启
     products = Product.objects.filter(status='ON_SALE', is_auto_promote=True)

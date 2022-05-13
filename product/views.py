@@ -8,7 +8,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import openpyxl
 
-from purchase.models import PurchaseDetail
+from purchase.models import PurchaseDetail, PurchaseOrder
 from sale.models import OrderDetail
 from setting.models import OperateLog, Tag
 from store.models import Store, Stock, StockInOutDetail
@@ -166,7 +166,7 @@ class ProductViewSet(mixins.ListModelMixin,
         add_list = []  # 批量新增sku
         if sheet.max_row <= 1:
             err_list.append({'msg': '表格不能为空'})
-            return Response(err_list, status=status.HTTP_406_NOT_ACCEPTABLE)
+            return Response(err_list, status=status.HTTP_202_ACCEPTED)
         for cell_row in list(sheet)[1:]:
             err_item = {}
             row_status = cell_row[0].value and cell_row[1].value and cell_row[3].value and cell_row[4].value and \
@@ -509,3 +509,15 @@ class SupplierViewSet(mixins.ListModelMixin,
     filter_fields = ('buy_way', 'is_active')  # 配置过滤字段
     search_fields = ('supplier_name', 'contact_name', 'phone', 'email')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
+
+    #  重写供应商删除
+    def destroy(self, request, *args, **kwargs):
+        supplier = self.get_object()
+        # 检查是否有采购单存在
+        is_exist = PurchaseOrder.objects.filter(supplier=supplier).count()
+
+        if is_exist:
+            return Response({'msg': '该供应商有关联数据，无法删除'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        # 如果满足条件，则可以删除该供应商
+        supplier.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

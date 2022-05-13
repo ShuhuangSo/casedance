@@ -114,7 +114,7 @@ class StockLogSerializer(serializers.ModelSerializer):
     #
     # # 获取源操作单批次号
     def get_op_batch_number(self, obj):
-        if obj.op_type in ['M_IN', 'M_OUT']:
+        if obj.op_type in ['M_IN', 'M_OUT', 'TAKING']:
             number = StockInOut.objects.get(id=obj.op_origin_id).batch_number
         if obj.op_type in ['S_OUT', 'LOCK', 'UNLOCK']:
             number = Order.objects.get(id=obj.op_origin_id).order_number

@@ -15,7 +15,7 @@ class TagAdmin(admin.ModelAdmin):
 @admin.register(OperateLog)
 class OperateLogAdmin(admin.ModelAdmin):
     list_display = ['op_type', 'op_log', 'target_id', 'user', 'create_time']
-    list_filter = ['op_type', 'target_id', 'user']
+    list_filter = ['op_type', 'user']
     search_fields = ['op_log']
 
 

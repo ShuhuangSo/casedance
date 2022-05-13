@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+import openpyxl
 
 from product.models import Product
 from .models import Store, StockInOut, StockInOutDetail, Stock, StockLog
@@ -116,7 +118,7 @@ class StockInOutViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = (
         'origin_store', 'target_store', 'user', 'type', 'reason_in', 'reason_out', 'reason_move', 'is_active')  # 配置过滤字段
-    search_fields = ('batch_number',)  # 配置搜索字段
+    search_fields = ('batch_number', 'inout_detail__product__sku')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
     # 重写create
@@ -235,6 +237,99 @@ class StockInOutViewSet(mixins.ListModelMixin,
                 ta_stock_log.save()
 
         return Response({'msg': '操作成功！'}, status=status.HTTP_200_OK)
+
+    # excel批量上传库存盘点
+    @action(methods=['post'], detail=False, url_path='stock_taking')
+    def stock_taking(self, request):
+        data = request.data
+        target_store = data['target_store']
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['盘点上传模板']
+
+        err_list = []  # 错误列表
+        add_list = []  # 盘点sku
+        if sheet.max_row <= 1:
+            err_list.append({'msg': '表格不能为空'})
+            return Response(err_list, status=status.HTTP_202_ACCEPTED)
+
+        # 获取不重复批次单号(18位：M+17位数字)
+        random_ins = Random()
+        batch_number = 'M{time_str}{userid}{ranstr}'.format(time_str=time.strftime('%Y%m%d%H%M%S'),
+                                                            userid=request.user.id,
+                                                            ranstr=random_ins.randint(10, 99))
+        store = Store.objects.filter(id=target_store).first()
+        stock_inout = StockInOut()
+        stock_inout.batch_number = batch_number
+        stock_inout.origin_store = store
+        stock_inout.target_store = store
+        stock_inout.user = request.user
+        stock_inout.type = 'TAKING'
+        stock_inout.save()
+
+        for cell_row in list(sheet)[1:]:
+            err_item = {}
+            row_status = cell_row[0].value and cell_row[2].value
+
+            if not row_status:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '数据格式错误'})
+                err_list.append(err_item)
+                continue
+            if not type(cell_row[2].value) in [int]:
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': '盘点数量格式不正确'})
+                err_list.append(err_item)
+                continue
+            # 检查sku是否存在
+            sku_is_exist = Product.objects.filter(sku=cell_row[0].value.strip()).count()
+            if not sku_is_exist:
+                err_item = {}
+                err_item.update({'row': '第 %s 行' % cell_row[0].row})
+                err_item.update({'msg': 'sku: %s 不存在' % cell_row[0].value.strip()})
+                err_list.append(err_item)
+                continue
+
+            # 创建出入口单详情对象
+            sku = cell_row[0].value.strip()
+            qty = cell_row[2].value
+            product = Product.objects.filter(sku=sku).first()
+            stock = Stock.objects.filter(store=store).get(product=product)
+            add_list.append(
+                StockInOutDetail(
+                    stock_in_out=stock_inout,
+                    product=product,
+                    qty=qty,
+                    stock_before=stock.qty
+                )
+            )
+        StockInOutDetail.objects.bulk_create(add_list)
+
+        # 库存盘点变动操作
+        for i in add_list:
+            stock = Stock.objects.filter(store=target_store).get(product=i.product)
+            stock.qty = i.qty
+            stock.save()
+
+            #  产品盘点日志记录保存
+            stock_log = StockLog()
+            stock_log.qty = i.qty - i.stock_before
+            stock_log.product = i.product
+            stock_log.store = store
+            stock_log.user = request.user
+            stock_log.op_type = 'TAKING'
+            stock_log.op_origin_id = stock_inout.id
+            stock_log.save()
+
+        success_count = len(add_list)
+        if not success_count:
+            stock_inout.delete()
+        fail_count = sheet.max_row - 1 - success_count
+        all_data = {}
+        all_data.update({'err_list': err_list})
+        all_data.update({'fail_count': fail_count})
+        all_data.update({'success_count': success_count})
+
+        return Response(all_data, status=status.HTTP_200_OK)
 
 
 class StockLogViewSet(mixins.ListModelMixin,

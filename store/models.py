@@ -73,6 +73,7 @@ class StockInOut(models.Model):
         ('IN', '入库'),
         ('OUT', '出库'),
         ('MOVE', '调拨'),
+        ('TAKING', '盘点'),
     )
     R_IN = (
         ('RETURN', '客户退货'),
@@ -153,6 +154,7 @@ class StockLog(models.Model):
         ('S_OUT', '销售出库'),
         ('LOCK', '锁仓'),
         ('UNLOCK', '解锁'),
+        ('TAKING', '库存盘点'),
     )
 
     op_type = models.CharField(max_length=10, choices=O_TYPE, default='S_OUT', verbose_name='日志类型',

@@ -56,7 +56,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
     filter_fields = (
         'store', 'supplier', 'user', 'paid_status', 'order_status', 'is_active',
         'purchase_p_tag__tag__tag_name')  # 配置过滤字段
-    search_fields = ('p_number',)  # 配置搜索字段
+    search_fields = ('p_number', 'purchase_detail__product__sku')  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
     # 重写create

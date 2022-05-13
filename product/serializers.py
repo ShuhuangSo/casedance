@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from django.db.models import Q, Sum
 
+from purchase.models import PurchaseDetail
 from store.models import Stock
 from store.serializers import StockSerializer
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
@@ -65,6 +67,50 @@ class ProductSerializer(serializers.ModelSerializer):
     total_qty = serializers.SerializerMethodField()
     #  产品总锁仓库存
     total_lock_qty = serializers.SerializerMethodField()
+    #  正在采购数量
+    purchase_qty = serializers.SerializerMethodField()
+    #  在途数量
+    on_way_qty = serializers.SerializerMethodField()
+
+    # 计算正在采购数量之和
+    def get_purchase_qty(self, obj):
+
+        q = Q()
+        q.connector = 'OR'
+        q.children.append(('purchase_order__order_status', 'WAIT_CONFIRM'))
+        q.children.append(('purchase_order__order_status', 'IN_PRODUCTION'))
+        q.children.append(('purchase_order__order_status', 'PART_SENT'))
+        q.children.append(('purchase_order__order_status', 'SENT'))
+        # 计算正在采购的数量,状态为 WAIT_CONFIRM，IN_PRODUCTION，SENT, PART_SENT采购单中的下单数量 QTY
+        sum_qty = PurchaseDetail.objects.filter(product=obj).filter(q).aggregate(Sum('qty'))
+        buy_qty = 0
+        if sum_qty['qty__sum']:
+            buy_qty = sum_qty['qty__sum']
+
+        return buy_qty
+
+    # 计算在途数量之和
+    def get_on_way_qty(self, obj):
+
+        q = Q()
+        q.connector = 'OR'
+        q.children.append(('purchase_order__order_status', 'PART_SENT'))
+        q.children.append(('purchase_order__order_status', 'SENT'))
+        # 计算正在采购的在途数量,状态为SENT, PART_SENT采购单中的发货数量 sent_qty - 收货数量received_qty
+        sum_sent = PurchaseDetail.objects.filter(product=obj).filter(q).aggregate(Sum('sent_qty'))
+        sum_rec = PurchaseDetail.objects.filter(product=obj).filter(q).aggregate(Sum('received_qty'))
+
+        if sum_sent['sent_qty__sum']:
+            rec1 = sum_sent['sent_qty__sum']
+        else:
+            rec1 = 0
+        if sum_rec['received_qty__sum']:
+            rec2 = sum_rec['received_qty__sum']
+        else:
+            rec2 = 0
+        on_way_qty = rec1 - rec2
+
+        return on_way_qty
 
     # 计算所有仓库，门店库存之和
     def get_total_qty(self, obj):
@@ -91,7 +137,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ('id', 'sku', 'p_name', 'label_name', 'image', 'status', 'brand', 'series', 'p_type', 'unit_cost', 'sale_price',
                   'length', 'width', 'heigth', 'weight', 'url', 'is_auto_promote', 'stock_strategy', 'stock_days',
                   'alert_qty', 'alert_days', 'mini_pq', 'max_pq', 'product_comp_model', 'product_p_tag', 'note',
-                  'product_stock', 'total_qty', 'total_lock_qty', 'create_time')
+                  'product_stock', 'total_qty', 'total_lock_qty', 'purchase_qty', 'on_way_qty', 'create_time')
 
 
 class ProductExtraInfoSerializer(serializers.ModelSerializer):

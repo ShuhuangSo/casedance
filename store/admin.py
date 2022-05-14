@@ -34,6 +34,6 @@ class StockInOutDetailAdmin(admin.ModelAdmin):
 
 @admin.register(StockLog)
 class StockLogAdmin(admin.ModelAdmin):
-    list_display = ['op_type', 'product', 'qty', 'op_origin_id', 'store', 'user']
+    list_display = ['op_type', 'product', 'qty', 'op_origin_id', 'store', 'user', 'create_time']
     list_filter = ['op_type', ]
     search_fields = ['product', ]

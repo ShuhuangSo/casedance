@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, OperateLog, Menu
+from .models import Tag, OperateLog, Menu, TaskLog, SysRefill
 
 
 # Register your models here.
@@ -15,7 +15,7 @@ class TagAdmin(admin.ModelAdmin):
 @admin.register(OperateLog)
 class OperateLogAdmin(admin.ModelAdmin):
     list_display = ['op_type', 'op_log', 'target_id', 'user', 'create_time']
-    list_filter = ['op_type', 'target_id', 'user']
+    list_filter = ['op_type', 'user']
     search_fields = ['op_log']
 
 
@@ -25,3 +25,13 @@ class MenuAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'user']
     search_fields = ['name']
 
+
+@admin.register(TaskLog)
+class TaskLogAdmin(admin.ModelAdmin):
+    list_display = ['task_type', 'note', 'create_time']
+    list_filter = ['task_type']
+
+
+@admin.register(SysRefill)
+class SysRefillAdmin(admin.ModelAdmin):
+    list_display = ['sys_alert_qty', 'sys_mini_pq', 'sys_max_pq', 'sys_stock_days']

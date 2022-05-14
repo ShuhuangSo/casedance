@@ -135,3 +135,23 @@ class PostInfo(models.Model):
 
     def __str__(self):
         return self.logistic
+
+
+class RefillPromote(models.Model):
+    """
+    智能补货推荐
+    """
+
+    qty = models.IntegerField(default=0, verbose_name='推荐采购数量', help_text='推荐采购数量')
+    product = models.ForeignKey(Product, related_name='product_Refill', on_delete=models.CASCADE,
+                                verbose_name='产品',
+                                help_text='产品')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '智能补货推荐'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return str(self.qty)

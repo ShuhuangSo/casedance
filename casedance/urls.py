@@ -23,10 +23,11 @@ from rest_framework.documentation import include_docs_urls
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet
-from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet
+from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
-from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet
+from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
+    SysRefillViewSet
 
 from rest_framework.routers import DefaultRouter
 
@@ -63,6 +64,8 @@ router.register('settings/all_menu', AllMenuViewSet, basename='all_menu')
 router.register('settings/user_menu', UserMenuViewSet, basename='user_menu')
 # 用户信息
 router.register('settings/users', UserViewSet, basename='users')
+# 用户信息
+router.register('settings/sys_refill', SysRefillViewSet, basename='sys_refill')
 
 # ---------------------------仓库/商店模块 -------------------------------------------------
 # 仓库、销售门店
@@ -79,6 +82,8 @@ router.register('purchase_orders', PurchaseOrderViewSet, basename='purchase_orde
 router.register('purchase_detail', PurchaseDetailViewSet, basename='purchase_detail')
 # 采购单标签
 router.register('purchase_order_tags', PurchaseOrderTagViewSet, basename='purchase_order_tags')
+# 采购推荐
+router.register('refill_promote', RefillPromoteViewSet, basename='refill_promote')
 
 # ---------------------------销售模块 -------------------------------------------------
 # 客户专属优惠

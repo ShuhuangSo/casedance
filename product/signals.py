@@ -2,6 +2,7 @@ from django.db.models.signals import post_save, post_init, post_delete
 from django.dispatch import receiver
 
 from product.models import Product, ProductTag, CompatibleModel
+from purchase.models import RefillPromote
 from setting.models import OperateLog
 from store.models import Store, Stock
 import inspect
@@ -74,6 +75,11 @@ def product_edit_signal(sender, instance, created, **kwargs):
             op.op_type = 'PRODUCT'
             op.target_id = instance.id
             op.save()
+
+        # 如果补货推荐关闭，则如存在补货推荐，就删除
+        if not instance.is_auto_promote:
+            if RefillPromote.objects.filter(product=instance).count():
+                RefillPromote.objects.filter(product=instance).delete()
 
     if created:
         # 如果是新建产品，则为所有门店创建一份产品库存记录

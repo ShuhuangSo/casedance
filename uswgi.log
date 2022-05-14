@@ -350,3 +350,150 @@ worker 2 buried after 2 seconds
 worker 3 buried after 2 seconds
 worker 4 buried after 2 seconds
 goodbye to uWSGI.
+*** Starting uWSGI 2.0.20 (64bit) on [Fri May  6 22:33:41 2022] ***
+compiled with version: 7.5.0 on 06 May 2022 05:55:25
+os: Linux-5.4.0-105-generic #119~18.04.1-Ubuntu SMP Tue Mar 8 11:21:24 UTC 2022
+nodename: ubuntu
+machine: x86_64
+clock source: unix
+detected number of CPU cores: 2
+current working directory: /home/sushuhuang/Desktop/projects/casedance
+writing pidfile to uwsgi.pid
+detected binary path: /home/sushuhuang/virtualenvs/casedance/bin/uwsgi
+!!! no internal routing support, rebuild with pcre support !!!
+chdir() to /home/sushuhuang/Desktop/projects/casedance
+your processes number limit is 7708
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 127.0.0.1:8000 fd 4
+uwsgi socket 0 bound to TCP address 127.0.0.1:38681 (port auto-assigned) fd 3
+Python version: 3.6.9 (default, Dec  8 2021, 21:08:43)  [GCC 8.4.0]
+Python main interpreter initialized at 0x5587f5b73550
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 416720 bytes (406 KB) for 8 cores
+*** Operational MODE: preforking+threaded ***
+WSGI app 0 (mountpoint='') ready in 2 seconds on interpreter 0x5587f5b73550 pid: 29488 (default app)
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 29488)
+spawned uWSGI worker 1 (pid: 29496, cores: 2)
+spawned uWSGI worker 2 (pid: 29498, cores: 2)
+spawned uWSGI worker 3 (pid: 29499, cores: 2)
+spawned uWSGI worker 4 (pid: 29501, cores: 2)
+spawned uWSGI http 1 (pid: 29503)
+Not Found: /
+[pid: 29501|app: 0|req: 1/1] 127.0.0.1 () {46 vars in 822 bytes} [Fri May  6 22:33:59 2022] GET / => generated 2511 bytes in 2948 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Unauthorized: /api/
+[pid: 29499|app: 0|req: 1/2] 127.0.0.1 () {46 vars in 830 bytes} [Fri May  6 22:34:09 2022] GET /api/ => generated 5024 bytes in 908 msecs (HTTP/1.1 401) 9 headers in 429 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/css/bootstrap.min.css
+[pid: 29499|app: 0|req: 2/3] 127.0.0.1 () {44 vars in 826 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/css/bootstrap.min.css => generated 2658 bytes in 10 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/css/bootstrap-tweaks.css
+[pid: 29501|app: 0|req: 3/4] 127.0.0.1 () {44 vars in 832 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/css/bootstrap-tweaks.css => generated 2667 bytes in 8 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/css/prettify.css
+[pid: 29501|app: 0|req: 3/5] 127.0.0.1 () {44 vars in 816 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/css/prettify.css => generated 2643 bytes in 17 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/ajax-form.js
+[pid: 29499|app: 0|req: 4/6] 127.0.0.1 () {44 vars in 800 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/ajax-form.js => generated 2640 bytes in 17 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/default.js
+Not Found: /static/rest_framework/js/jquery-3.5.1.min.js
+[pid: 29501|app: 0|req: 5/7] 127.0.0.1 () {44 vars in 814 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/jquery-3.5.1.min.js => generated 2661 bytes in 32 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/bootstrap.min.js
+[pid: 29501|app: 0|req: 5/8] 127.0.0.1 () {44 vars in 808 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/bootstrap.min.js => generated 2652 bytes in 18 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+[pid: 29499|app: 0|req: 5/9] 127.0.0.1 () {44 vars in 796 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/default.js => generated 2634 bytes in 25 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/prettify-min.js
+[pid: 29499|app: 0|req: 5/10] 127.0.0.1 () {44 vars in 806 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/prettify-min.js => generated 2649 bytes in 28 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/css/default.css
+[pid: 29496|app: 0|req: 2/11] 127.0.0.1 () {44 vars in 814 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/css/default.css => generated 2640 bytes in 803 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/csrf.js
+[pid: 29496|app: 0|req: 2/12] 127.0.0.1 () {44 vars in 790 bytes} [Fri May  6 22:34:10 2022] GET /static/rest_framework/js/csrf.js => generated 2625 bytes in 787 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/jquery-3.5.1.min.js
+[pid: 29501|app: 0|req: 6/13] 127.0.0.1 () {44 vars in 814 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/jquery-3.5.1.min.js => generated 2661 bytes in 13 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/ajax-form.js
+[pid: 29499|app: 0|req: 6/14] 127.0.0.1 () {44 vars in 800 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/ajax-form.js => generated 2640 bytes in 22 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/csrf.js
+[pid: 29501|app: 0|req: 7/15] 127.0.0.1 () {44 vars in 790 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/csrf.js => generated 2625 bytes in 42 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/bootstrap.min.js
+[pid: 29496|app: 0|req: 3/16] 127.0.0.1 () {44 vars in 808 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/bootstrap.min.js => generated 2652 bytes in 18 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/prettify-min.js
+[pid: 29501|app: 0|req: 8/17] 127.0.0.1 () {44 vars in 806 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/prettify-min.js => generated 2649 bytes in 24 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/default.js
+[pid: 29499|app: 0|req: 7/18] 127.0.0.1 () {44 vars in 796 bytes} [Fri May  6 22:34:11 2022] GET /static/rest_framework/js/default.js => generated 2634 bytes in 11 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+gateway "uWSGI http 1" has been buried (pid: 29503)
+...gracefully killing workers...
+Gracefully killing worker 1 (pid: 29496)...
+Gracefully killing worker 4 (pid: 29501)...
+Gracefully killing worker 3 (pid: 29499)...
+Gracefully killing worker 2 (pid: 29498)...
+worker 1 buried after 1 seconds
+worker 2 buried after 1 seconds
+worker 3 buried after 1 seconds
+worker 4 buried after 1 seconds
+binary reloading uWSGI...
+chdir() to /home/sushuhuang/Desktop/projects/casedance
+closing all non-uwsgi socket fds > 2 (max_fd = 1048576)...
+found fd 3 mapped to socket 0 (127.0.0.1:38681)
+running /home/sushuhuang/virtualenvs/casedance/bin/uwsgi
+[uWSGI] getting INI configuration from uwsgi.ini
+*** Starting uWSGI 2.0.20 (64bit) on [Fri May  6 22:49:14 2022] ***
+compiled with version: 7.5.0 on 06 May 2022 05:55:25
+os: Linux-5.4.0-105-generic #119~18.04.1-Ubuntu SMP Tue Mar 8 11:21:24 UTC 2022
+nodename: ubuntu
+machine: x86_64
+clock source: unix
+detected number of CPU cores: 2
+current working directory: /home/sushuhuang/Desktop/projects/casedance
+detected binary path: /home/sushuhuang/virtualenvs/casedance/bin/uwsgi
+!!! no internal routing support, rebuild with pcre support !!!
+chdir() to /home/sushuhuang/Desktop/projects/casedance
+your processes number limit is 7708
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 10.211.55.9:8000 fd 5
+uwsgi socket 0 bound to TCP address 127.0.0.1:42443 (port auto-assigned) fd 4
+Python version: 3.6.9 (default, Dec  8 2021, 21:08:43)  [GCC 8.4.0]
+Python main interpreter initialized at 0x55be73560110
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 416720 bytes (406 KB) for 8 cores
+*** Operational MODE: preforking+threaded ***
+WSGI app 0 (mountpoint='') ready in 2 seconds on interpreter 0x55be73560110 pid: 29488 (default app)
+*** uWSGI is running in multiple interpreter mode ***
+gracefully (RE)spawned uWSGI master process (pid: 29488)
+spawned uWSGI worker 1 (pid: 32443, cores: 2)
+spawned uWSGI worker 2 (pid: 32445, cores: 2)
+spawned uWSGI worker 3 (pid: 32447, cores: 2)
+spawned uWSGI worker 4 (pid: 32448, cores: 2)
+spawned uWSGI http 1 (pid: 32450)
+[pid: 32448|app: 0|req: 1/1] 10.211.55.2 () {40 vars in 855 bytes} [Fri May  6 22:49:17 2022] GET /api/ => generated 9154 bytes in 1325 msecs (HTTP/1.1 200) 8 headers in 384 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/css/bootstrap.min.css
+[pid: 32448|app: 0|req: 2/2] 10.211.55.2 () {38 vars in 794 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/css/bootstrap.min.css => generated 2660 bytes in 78 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/csrf.js
+[pid: 32448|app: 0|req: 3/3] 10.211.55.2 () {38 vars in 757 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/js/csrf.js => generated 2627 bytes in 85 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/ajax-form.js
+[pid: 32445|app: 0|req: 2/4] 10.211.55.2 () {38 vars in 767 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/js/ajax-form.js => generated 2642 bytes in 1098 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/css/prettify.css
+Not Found: /static/rest_framework/js/default.js
+[pid: 32448|app: 0|req: 4/5] 10.211.55.2 () {38 vars in 763 bytes} [Fri May  6 22:49:20 2022] GET /static/rest_framework/js/default.js => generated 2636 bytes in 15 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+[pid: 32445|app: 0|req: 2/6] 10.211.55.2 () {38 vars in 784 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/css/prettify.css => generated 2645 bytes in 1123 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/prettify-min.js
+[pid: 32445|app: 0|req: 3/7] 10.211.55.2 () {38 vars in 773 bytes} [Fri May  6 22:49:20 2022] GET /static/rest_framework/js/prettify-min.js => generated 2651 bytes in 6 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/js/bootstrap.min.js
+Not Found: /static/rest_framework/css/default.css
+[pid: 32443|app: 0|req: 2/8] 10.211.55.2 () {38 vars in 782 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/css/default.css => generated 2642 bytes in 1163 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+[pid: 32443|app: 0|req: 2/9] 10.211.55.2 () {38 vars in 775 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/js/bootstrap.min.js => generated 2654 bytes in 1004 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+Not Found: /static/rest_framework/css/bootstrap-tweaks.css
+[pid: 32447|app: 0|req: 2/10] 10.211.55.2 () {38 vars in 800 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/css/bootstrap-tweaks.css => generated 2669 bytes in 1184 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 0)
+Not Found: /static/rest_framework/js/jquery-3.5.1.min.js
+[pid: 32447|app: 0|req: 2/11] 10.211.55.2 () {38 vars in 781 bytes} [Fri May  6 22:49:19 2022] GET /static/rest_framework/js/jquery-3.5.1.min.js => generated 2663 bytes in 1182 msecs (HTTP/1.1 404) 5 headers in 159 bytes (1 switches on core 1)
+SIGINT/SIGTERM received...killing workers...
+gateway "uWSGI http 1" has been buried (pid: 32450)
+worker 1 buried after 1 seconds
+worker 2 buried after 1 seconds
+worker 3 buried after 1 seconds
+worker 4 buried after 1 seconds
+goodbye to uWSGI.

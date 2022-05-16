@@ -17,10 +17,14 @@ app.config_from_object('django.conf:settings')
 # 下面的设置就是关于调度器beat的设置,
 # 具体参考https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html
 app.conf.beat_schedule = {
-    'autosc': {  # 取个名字
-        'task': 'purchase.tasks.auto_sc',  # 设置是要将哪个任务进行定时
+    'every-one-hour': {  # 取个名字
+        'task': 'purchase.tasks.calc_sold_qty',  # 设置是要将哪个任务进行定时
         # 'schedule': crontab(), 调用crontab进行具体时间的定义
-        'schedule': timedelta(seconds=6),
+        'schedule': timedelta(hours=1),
+    },
+    'every-12-hour': {
+        'task': 'purchase.tasks.calc_refill',
+        'schedule': timedelta(hours=12),
     },
 }
 # 自动从所有已注册的django app中加载任务

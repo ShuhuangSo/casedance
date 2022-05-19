@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier, DeviceBrand
 
 
 # Register your models here.
@@ -22,8 +22,8 @@ class ProductExtraInfoAdmin(admin.ModelAdmin):
 
 @admin.register(DeviceModel)
 class DeviceModelAdmin(admin.ModelAdmin):
-    list_display = ['brand', 'type', 'model', 'cp_id', 'note']
-    list_filter = ['type']
+    list_display = ['brand', 'type', 'model', 'cp_id', 'image', 'dimensions', 'weight', 'link', 'announced', 'status', 'create_time']
+    list_filter = ['brand']
     search_fields = ['model']
 
 
@@ -42,3 +42,9 @@ class SupplierAdmin(admin.ModelAdmin):
     list_display = ['supplier_name', 'is_active']
     list_filter = ['is_active']
     search_fields = ['supplier_name']
+
+
+@admin.register(DeviceBrand)
+class DeviceBrandAdmin(admin.ModelAdmin):
+    list_display = ['brand_name', 'link']
+    search_fields = ['brand_name']

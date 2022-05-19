@@ -22,7 +22,7 @@ from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.documentation import include_docs_urls
 
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
-    ProductTagViewSet, SupplierViewSet, SimpleProductViewSet
+    ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
@@ -44,11 +44,13 @@ router.register('simple_products', SimpleProductViewSet, basename='simple_produc
 router.register('product_extra_info', ProductExtraInfoViewSet, basename='product_extra_info')
 # 市面手机型号表
 router.register('device_models', DeviceModelViewSet, basename='device_models')
+# 市面手机品牌
+router.register('device_brands', DeviceBrandViewSet, basename='device_brands')
 # 产品兼容手机型号
 router.register('comp_models', CompatibleModelViewSet, basename='comp_models')
 # 产品标签
 router.register('product_tags', ProductTagViewSet, basename='product_tags')
-# 产品标签
+# 供应商
 router.register('suppliers', SupplierViewSet, basename='suppliers')
 
 # ---------------------------系统设置-------------------------------------------------

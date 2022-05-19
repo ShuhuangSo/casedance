@@ -4,7 +4,7 @@ from django.db.models import Q, Sum
 from purchase.models import PurchaseDetail
 from store.models import Stock
 from store.serializers import StockSerializer
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier, DeviceBrand
 
 
 class ProductTagSerializer(serializers.ModelSerializer):
@@ -169,7 +169,8 @@ class DeviceModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeviceModel
-        fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note')
+        fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note', 'image', 'dimensions', 'weight', 'link',
+                  'announced', 'status', 'create_time')
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -179,4 +180,14 @@ class SupplierSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Supplier
+        fields = "__all__"
+
+
+class DeviceBrandSerializer(serializers.ModelSerializer):
+    """
+    市面手机品牌
+    """
+
+    class Meta:
+        model = DeviceBrand
         fields = "__all__"

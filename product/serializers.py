@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from django.db.models import Q, Sum
+from datetime import datetime
 
 from purchase.models import PurchaseDetail
 from store.models import Stock
 from store.serializers import StockSerializer
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier, DeviceBrand
 
 
 class ProductTagSerializer(serializers.ModelSerializer):
@@ -155,6 +156,7 @@ class DeviceModelSerializer(serializers.ModelSerializer):
     市面手机型号表
     """
     cp_model = serializers.SerializerMethodField()
+    is_new = serializers.SerializerMethodField()
 
     # 获取兼容设备型号
     def get_cp_model(self, obj):
@@ -167,9 +169,16 @@ class DeviceModelSerializer(serializers.ModelSerializer):
             return add_list
         return []
 
+    def get_is_new(self, obj):
+        d = datetime.now().date() - obj.create_time.date()
+        if d.days < 30:
+            return True
+        return False
+
     class Meta:
         model = DeviceModel
-        fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note')
+        fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note', 'image', 'dimensions', 'weight', 'link',
+                  'announced', 'status', 'create_time', 'is_new')
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -179,4 +188,14 @@ class SupplierSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Supplier
+        fields = "__all__"
+
+
+class DeviceBrandSerializer(serializers.ModelSerializer):
+    """
+    市面手机品牌
+    """
+
+    class Meta:
+        model = DeviceBrand
         fields = "__all__"

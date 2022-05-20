@@ -93,14 +93,34 @@ class DeviceModel(models.Model):
     model = models.CharField(max_length=40, verbose_name='型号', help_text='型号')
     cp_id = models.IntegerField(null=True, blank=True, verbose_name='兼容识别码', help_text='兼容识别码')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    image = models.CharField(null=True, blank=True, max_length=250, verbose_name='型号图片', help_text='型号图片')
+    dimensions = models.CharField(null=True, blank=True, max_length=50, verbose_name='尺寸', help_text='尺寸')
+    weight = models.CharField(null=True, blank=True, max_length=50, verbose_name='重量', help_text='重量')
+    link = models.CharField(null=True, blank=True, max_length=150, verbose_name='链接', help_text='链接')
+    announced = models.CharField(null=True, blank=True, max_length=50, verbose_name='发布时间', help_text='发布时间')
+    status = models.CharField(null=True, blank=True, max_length=50, verbose_name='状态', help_text='状态')
+    create_time = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:
         verbose_name = '市面手机型号表'
         verbose_name_plural = verbose_name
-        ordering = ['model']
+        ordering = ['-create_time']
 
     def __str__(self):
         return self.model
+
+
+class DeviceBrand(models.Model):
+    brand_name = models.CharField(max_length=30, verbose_name='品牌名称', help_text='品牌名称')
+    link = models.CharField(max_length=150, verbose_name='链接', help_text='链接')
+
+    class Meta:
+        verbose_name = '市面手机品牌'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.brand_name
 
 
 class CompatibleModel(models.Model):

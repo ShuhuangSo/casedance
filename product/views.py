@@ -7,14 +7,15 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import openpyxl
+from product import tasks
 
 from purchase.models import PurchaseDetail, PurchaseOrder
 from sale.models import OrderDetail
 from setting.models import OperateLog, Tag
 from store.models import Store, Stock, StockInOutDetail
-from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier
+from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier, DeviceBrand
 from .serializers import ProductSerializer, ProductExtraInfoSerializer, DeviceModelSerializer, \
-    CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer, SimpleProductSerializer
+    CompatibleModelSerializer, ProductTagSerializer, SupplierSerializer, SimpleProductSerializer, DeviceBrandSerializer
 
 
 # Create your views here.
@@ -25,7 +26,7 @@ class DefaultPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     page_query_param = 'page'
-    max_page_size = 100
+    max_page_size = 10000
 
 
 class SimpleProductViewSet(mixins.ListModelMixin,
@@ -337,7 +338,7 @@ class DeviceModelViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('brand', 'type',)  # 配置过滤字段
-    search_fields = ('model', 'note')  # 配置搜索字段
+    search_fields = ('model', 'brand', 'note')  # 配置搜索字段
 
     # 市面手机型号excel批量上传
     @action(methods=['post'], detail=False, url_path='bulk_upload')
@@ -429,6 +430,47 @@ class DeviceModelViewSet(mixins.ListModelMixin,
                 i.save()
 
         return Response({'msg': '成功解绑'}, status=status.HTTP_200_OK)
+
+    # 爬取品牌列表
+    @action(methods=['get'], detail=False, url_path='get_brands')
+    def get_brands(self, request):
+        tasks.get_brands.delay()
+        return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
+
+    # 爬取型号信息
+    @action(methods=['get'], detail=False, url_path='get_device_models')
+    def get_device_models(self, request):
+        tasks.get_device_models()
+        return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
+
+    # 爬取型号详细信息
+    @action(methods=['get'], detail=True, url_path='get_model_info')
+    def get_model_info(self, request, pk):
+        tasks.get_models_info(pk)
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+    # 获取最近更新的手机型号
+    @action(methods=['get'], detail=False, url_path='check_new_models')
+    def check_new_models(self, request):
+        tasks.check_new_models()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+    # 获取手机型号参数
+    @action(methods=['get'], detail=False, url_path='update_spec')
+    def update_spec(self, request):
+        tasks.update_spec()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+
+class DeviceBrandViewSet(mixins.ListModelMixin,
+                         viewsets.GenericViewSet):
+    """
+        list:
+            市面手机品牌
+
+        """
+    queryset = DeviceBrand.objects.all()
+    serializer_class = DeviceBrandSerializer  # 序列化
 
 
 class CompatibleModelViewSet(mixins.ListModelMixin,

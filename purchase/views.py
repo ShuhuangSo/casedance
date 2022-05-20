@@ -129,7 +129,7 @@ class PurchaseOrderViewSet(mixins.ListModelMixin,
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         from . import tasks
-        tasks.calc_sold_qty()
+        tasks.auto_sc.delay()
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 采购单修改，涉及采购商品明细的增加，删除,修改

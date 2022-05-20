@@ -18,13 +18,21 @@ app.config_from_object('django.conf:settings')
 # 具体参考https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html
 app.conf.beat_schedule = {
     'every-one-hour': {  # 取个名字
-        'task': 'purchase.tasks.calc_sold_qty',  # 设置是要将哪个任务进行定时
+        'task': 'purchase.tasks.calc_sold_qty',  # 销量计算
         # 'schedule': crontab(), 调用crontab进行具体时间的定义
         'schedule': timedelta(hours=1),
     },
     'every-12-hour': {
-        'task': 'purchase.tasks.calc_refill',
+        'task': 'purchase.tasks.calc_refill',  # 补货推荐计算
         'schedule': timedelta(hours=12),
+    },
+    'every-3-days': {
+        'task': 'product.tasks.check_new_models',  # 获取最近更新的手机型号
+        'schedule': timedelta(days=3),
+    },
+    'update_spec': {
+        'task': 'product.tasks.update_spec',  # 获取手机型号参数
+        'schedule': timedelta(minutes=30),
     },
 }
 # 自动从所有已注册的django app中加载任务

@@ -449,6 +449,18 @@ class DeviceModelViewSet(mixins.ListModelMixin,
         tasks.get_models_info(pk)
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
 
+    # 获取最近更新的手机型号
+    @action(methods=['get'], detail=False, url_path='check_new_models')
+    def check_new_models(self, request):
+        tasks.check_new_models()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+    # 获取手机型号参数
+    @action(methods=['get'], detail=False, url_path='update_spec')
+    def update_spec(self, request):
+        tasks.update_spec()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
 
 class DeviceBrandViewSet(mixins.ListModelMixin,
                          viewsets.GenericViewSet):

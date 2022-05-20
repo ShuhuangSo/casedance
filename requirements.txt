@@ -1,6 +1,8 @@
 amqp==2.6.1
 asgiref==3.4.1
+beautifulsoup4==4.11.1
 billiard==3.6.4.0
+bs4==0.0.1
 celery==4.4.2
 certifi==2021.10.8
 charset-normalizer==2.0.12
@@ -26,6 +28,7 @@ PyMySQL==1.0.2
 pytz==2022.1
 redis==3.4.1
 requests==2.27.1
+soupsieve==2.3.2.post1
 sqlparse==0.4.2
 typing_extensions==4.1.1
 uritemplate==4.1.1

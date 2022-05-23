@@ -8,11 +8,13 @@ certifi==2021.10.8
 charset-normalizer==2.0.12
 coreapi==2.3.3
 coreschema==0.0.4
+defusedxml==0.7.1
 Django==3.2.4
 django-filter==21.1
 djangorestframework==3.12.4
 djangorestframework-jwt==1.11.0
 et-xmlfile==1.1.0
+fpdf2==2.5.2
 idna==3.3
 importlib-metadata==4.8.3
 itypes==1.2.0
@@ -25,6 +27,7 @@ openpyxl==3.0.7
 Pillow==8.4.0
 PyJWT==1.7.1
 PyMySQL==1.0.2
+python-barcode==0.14.0
 pytz==2022.1
 redis==3.4.1
 requests==2.27.1

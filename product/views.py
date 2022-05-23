@@ -7,8 +7,12 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import openpyxl
+import barcode
+from barcode.writer import ImageWriter
+from fpdf import FPDF
 from product import tasks
 
+from casedance.settings import BASE_URL
 from purchase.models import PurchaseDetail, PurchaseOrder
 from sale.models import OrderDetail
 from setting.models import OperateLog, Tag
@@ -285,6 +289,50 @@ class ProductViewSet(mixins.ListModelMixin,
         all_data.update({'fail_count': fail_count})
         all_data.update({'success_count': success_count})
         return Response(all_data, status=status.HTTP_201_CREATED)
+
+    # 产品标签生成
+    @action(methods=['post'], detail=False, url_path='create_label')
+    def create_label(self, request):
+        data = request.data['products']
+
+        path = 'media/label/'
+        # pdf文件信息
+        pdf = FPDF('P', 'mm', (40, 30))
+        pdf.add_font('fireflysung', fname='media/sys/fireflysung.ttf')
+        pdf.set_font('fireflysung', size=8)
+        pdf.set_margin(0.5)
+
+        # 条码图片信息
+        options = {'module_height': 4,  # 默认值15.0，条码高度，单位为毫米
+                   'module_width': 0.13,  # 默认值0.2，每个条码宽度（？），单位为毫米
+                   'quiet_zone': 2,  # 默认值6.5，两端空白宽度，单位为毫米
+                   'font_size': 3,  # 默认值10，文本字体大小，单位为磅
+                   'text_distance': 1,  # 默认值5.0，文本和条码之间的距离，单位为毫米
+                   'dpi': 600,  # 图片分辨率
+                   }
+        if data:
+            file_name = 'product_label'
+            for item in data:
+                sku = item['sku']
+                qty = item['qty']
+                product = Product.objects.filter(sku=sku).first()
+                if len(data) == 1:
+                    file_name = sku
+
+                # 生成条码图片png
+                barcode.generate('code128', product.sku,
+                                 writer=barcode.writer.ImageWriter(),
+                                 output=path + product.sku,
+                                 writer_options=options, )
+                for i in range(qty):
+                    pdf.add_page()
+                    pdf.image("media/sys/logo.png", x=8, y=2, w=25)
+                    pdf.cell(0, 20, align='C', txt=product.label_name)
+                    pdf.image(path + product.sku + '.png', x=-1, y=12, w=44)
+            output_name = path + file_name + '.pdf'
+            pdf.output(output_name)
+            url = BASE_URL + '/' + output_name
+        return Response({'url': url}, status=status.HTTP_200_OK)
 
 
 class ProductExtraInfoViewSet(mixins.ListModelMixin,

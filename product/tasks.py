@@ -139,7 +139,7 @@ def check_new_models():
 # 获取手机型号参数
 @shared_task
 def update_spec():
-    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:10]
+    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:20]
     for d in dms:
         get_models_info(d.id)
         time.sleep(1)
@@ -157,7 +157,10 @@ def update_spec():
 def get_models_info(id):
     dm = DeviceModel.objects.get(id=id)
     # 获取型号信息详情
-    resp = requests.get(dm.link, headers=headers)
+    s = requests.session()
+    s.headers = headers
+    resp = s.get(dm.link)
+    # resp = requests.get(dm.link, headers=headers)
     resp.encoding = "utf-8"
 
     page = BeautifulSoup(resp.text, 'html.parser')

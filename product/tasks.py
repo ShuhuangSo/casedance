@@ -139,7 +139,7 @@ def check_new_models():
 # 获取手机型号参数
 @shared_task
 def update_spec():
-    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:20]
+    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:100]
     for d in dms:
         get_models_info(d.id)
         time.sleep(1)

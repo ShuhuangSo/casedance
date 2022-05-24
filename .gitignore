@@ -1,3 +1,5 @@
 __pycache__/
 uwsgi.ini
 uwsgi.pid
+uwsgi.log
+casedance/settings.py

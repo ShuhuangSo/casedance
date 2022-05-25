@@ -32,7 +32,7 @@ app.conf.beat_schedule = {
     },
     'update_spec': {
         'task': 'product.tasks.update_spec',  # 获取手机型号参数
-        'schedule': timedelta(minutes=5),
+        'schedule': timedelta(minutes=1),
     },
 }
 # 自动从所有已注册的django app中加载任务

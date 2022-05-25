@@ -161,6 +161,8 @@ def get_models_info(id):
     resp = s.get(dm.link)
     # resp = requests.get(dm.link, headers=headers)
     resp.encoding = "utf-8"
+    with open(r'HTML.html', 'w+') as f:
+        f.write(resp.text)
 
     page = BeautifulSoup(resp.text, 'html.parser')
     specs_list = page.find('div', id='specs-list')

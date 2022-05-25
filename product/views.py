@@ -467,7 +467,9 @@ class DeviceModelViewSet(mixins.ListModelMixin,
         rest_count = DeviceModel.objects.filter(cp_id=delete_cp_id).count()
         # 如果只有剩下1
         if rest_count == 1:
-            DeviceModel.objects.filter(cp_id=delete_cp_id).delete()
+            dm1 = DeviceModel.objects.get(cp_id=delete_cp_id)
+            dm1.cp_id = None
+            dm.save()
 
         if rest_count > 1 and DeviceModel.objects.filter(cp_id=m_id).count():
             new_cp = DeviceModel.objects.filter(cp_id=m_id).first()

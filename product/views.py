@@ -506,7 +506,7 @@ class DeviceModelViewSet(mixins.ListModelMixin,
     # 获取手机型号参数
     @action(methods=['get'], detail=False, url_path='update_spec')
     def update_spec(self, request):
-        tasks.update_spec.delay()
+        tasks.update_spec()
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
 
 

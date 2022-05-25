@@ -139,10 +139,10 @@ def check_new_models():
 # 获取手机型号参数
 @shared_task
 def update_spec():
-    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:100]
+    dms = DeviceModel.objects.filter(announced=None).order_by('-create_time')[:1]
     for d in dms:
         get_models_info(d.id)
-        time.sleep(1)
+        # time.sleep(1)
 
     # 记录执行日志
     task_log = TaskLog()

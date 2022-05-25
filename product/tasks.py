@@ -144,7 +144,7 @@ def update_spec():
     # for d in dms:
     #     get_models_info(d.id)
         # time.sleep(1)
-    get_models_info(dms.id)
+    get_models_info(176)
     # 记录执行日志
     task_log = TaskLog()
     task_log.task_type = 4

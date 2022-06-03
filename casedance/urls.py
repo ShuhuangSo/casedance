@@ -24,6 +24,7 @@ from rest_framework.documentation import include_docs_urls
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
+from report.views import SalesReportViewSet, StockReportViewSet, CustomerReportViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
 from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
@@ -100,6 +101,13 @@ router.register('orders', OrderViewSet, basename='orders')
 router.register('order_detail', OrderDetailViewSet, basename='order_detail')
 # 销售订单标签
 router.register('order_tags', OrderTagViewSet, basename='order_tags')
+# ---------------------------报告模块-------------------------------------------------
+# 销量统计
+router.register('sales_report', SalesReportViewSet, basename='sales_report')
+# 库存统计
+router.register('stock_report', StockReportViewSet, basename='stock_report')
+# 客户销量统计报告
+router.register('customer_report', CustomerReportViewSet, basename='customer_report')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

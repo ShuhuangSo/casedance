@@ -12,7 +12,7 @@ import openpyxl
 
 from product.models import Product
 from .models import Store, StockInOut, StockInOutDetail, Stock, StockLog
-from .serializers import StoreSerializer, StockInOutSerializer, StockLogSerializer
+from .serializers import StoreSerializer, StockInOutSerializer, StockLogSerializer, Stock2Serializer
 
 
 # Create your views here.
@@ -357,3 +357,30 @@ class StockLogViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('op_type', 'user', 'store', 'product')  # 配置过滤字段
     ordering_fields = ('create_time',)  # 配置排序字段
+
+
+class StockViewSet(mixins.ListModelMixin,
+                   mixins.CreateModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.DestroyModelMixin,
+                   mixins.RetrieveModelMixin,
+                   viewsets.GenericViewSet):
+    """
+    list:
+        库存列表,分页,过滤,搜索,排序
+    create:
+        库存新增
+    retrieve:
+        库存详情页
+    update:
+        库存修改
+    destroy:
+        库存删除
+    """
+    queryset = Stock.objects.all()
+    serializer_class = Stock2Serializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('product__series', 'store')  # 配置过滤字段
+    ordering_fields = ('qty',)  # 配置排序字段

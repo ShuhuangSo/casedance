@@ -34,6 +34,18 @@ app.conf.beat_schedule = {
         'task': 'product.tasks.update_spec',  # 获取手机型号参数
         'schedule': timedelta(days=5),
     },
+    'calc_total_sales': {
+        'task': 'report.tasks.calc_total_sale',  # 总销量计算
+        'schedule': crontab(hour='0', minute='1'),  # 每天0点1分开始计算
+    },
+    'calc_customer_sales': {
+        'task': 'report.tasks.calc_customer_report',  # 计算所有客户60天的销量数据
+        'schedule': crontab(hour='0', minute='10'),  # 每天0点10分开始计算
+    },
+    'calc_product_sales': {
+        'task': 'report.tasks.calc_customer_report',  # 计算sku产品60天每天销量
+        'schedule': crontab(hour='0', minute='30'),  # 每天0点30分开始计算
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

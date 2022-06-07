@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from report.models import SalesReport, StockReport, CustomerReport
+from report.models import SalesReport, StockReport, CustomerReport, ProductReport
 
 
 @admin.register(SalesReport)
@@ -19,3 +19,9 @@ class StockReportAdmin(admin.ModelAdmin):
 class CustomerReportAdmin(admin.ModelAdmin):
     list_display = ['qty', 'amount', 'series', 'calc_date', 'customer']
     list_filter = ['series', 'customer']
+
+
+@admin.register(ProductReport)
+class ProductReportAdmin(admin.ModelAdmin):
+    list_display = ['qty', 'amount', 'calc_date', 'product']
+    list_filter = ['product']

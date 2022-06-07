@@ -24,7 +24,7 @@ from rest_framework.documentation import include_docs_urls
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
-from report.views import SalesReportViewSet, StockReportViewSet, CustomerReportViewSet
+from report.views import SalesReportViewSet, StockReportViewSet, CustomerReportViewSet, ProductReportViewSet
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
 from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
@@ -32,7 +32,7 @@ from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSe
 
 from rest_framework.routers import DefaultRouter
 
-from store.views import StoreViewSet, StockInOutViewSet, StockLogViewSet
+from store.views import StoreViewSet, StockInOutViewSet, StockLogViewSet, StockViewSet
 
 router = DefaultRouter()
 
@@ -77,6 +77,8 @@ router.register('stores', StoreViewSet, basename='stores')
 router.register('stock_in_out', StockInOutViewSet, basename='stock_in_out')
 # 库存出入日志
 router.register('stock_log', StockLogViewSet, basename='stock_log')
+# 库存列表
+router.register('stock_list', StockViewSet, basename='stock_list')
 
 # ---------------------------采购模块 -------------------------------------------------
 # 采购单
@@ -108,6 +110,8 @@ router.register('sales_report', SalesReportViewSet, basename='sales_report')
 router.register('stock_report', StockReportViewSet, basename='stock_report')
 # 客户销量统计报告
 router.register('customer_report', CustomerReportViewSet, basename='customer_report')
+# 统计产品每天销量
+router.register('product_report', ProductReportViewSet, basename='product_report')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 
-# Create your views here.
-from product.models import ProductExtraInfo
-from report.models import SalesReport, StockReport, CustomerReport
-from report.serializers import SalesReportSerializer, StockReportSerializer, CustomerReportSerializer
+from casedance.settings import BASE_URL
+from product.models import ProductExtraInfo, Product
+from report.models import SalesReport, StockReport, CustomerReport, ProductReport
+from report.serializers import SalesReportSerializer, StockReportSerializer, CustomerReportSerializer, \
+    ProductReportSerializer
 from rest_framework import viewsets, mixins, status
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
@@ -76,37 +77,9 @@ class SalesReportViewSet(mixins.ListModelMixin,
                          }, status=status.HTTP_200_OK)
 
     # 统计过去60天销售量
-    @action(methods=['get'], detail=False, url_path='calc_60d_sales')
+    @action(methods=['get'], detail=False, url_path='calc_sales')
     def calc_sales(self, request):
-        add_list = []
-        for i in range(60):
-            date = datetime.now().date() - timedelta(days=i + 1)  # from yesterday
-
-            series_set = ProductExtraInfo.objects.filter(type='SERIES')
-            for s in series_set:
-                order_set = OrderDetail.objects.filter(order__create_time__date=date,
-                                                       order__order_status='FINISHED',
-                                                       product__series=s.name)
-                qty = 0
-                amount = 0.0
-                for item in order_set:
-                    qty += item.qty
-                    amount += item.qty * item.sold_price
-
-                sr = SalesReport.objects.filter(sale_date=date, series=s.name).first()
-                if sr:
-                    sr.qty = qty
-                    sr.amount = amount
-                    sr.save()
-                else:
-                    add_list.append(SalesReport(
-                        qty=qty,
-                        amount=amount,
-                        series=s.name,
-                        sale_date=date
-                    ))
-        if len(add_list):
-            SalesReport.objects.bulk_create(add_list)
+        tasks.calc_total_sale()
 
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
 
@@ -258,3 +231,83 @@ class CustomerReportViewSet(mixins.ListModelMixin,
     def calc_customer_report(self, request):
         tasks.calc_customer_report()
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+    # 统计客户累计销量
+    @action(methods=['post'], detail=False, url_path='calc_total')
+    def calc_total(self, request):
+        start_date = request.data['start_date']
+        end_date = request.data['end_date']
+
+        customers = Customer.objects.filter(is_active=True)
+        sale_list = []
+        for cs in customers:
+            cr = CustomerReport.objects.filter(calc_date__gte=start_date, customer=cs).filter(calc_date__lte=end_date)
+            total_qty = 0
+            total_amount = 0.0
+            for i in cr:
+                total_qty += i.qty
+                total_amount += i.amount
+            sale_list.append({
+                'name': cs.company_name,
+                'total_qty': total_qty,
+                'total_amount': total_amount
+            })
+        from operator import itemgetter
+        sale_list.sort(key=itemgetter('total_qty'), reverse=True)
+
+        return Response({'data': sale_list[:10]}, status=status.HTTP_200_OK)
+
+
+class ProductReportViewSet(mixins.ListModelMixin,
+                           viewsets.GenericViewSet):
+    """
+    list:
+        统计产品每天销量
+    """
+    queryset = ProductReport.objects.all()
+    serializer_class = ProductReportSerializer  # 序列化
+
+    filter_backends = (DjangoFilterBackend,)  # 过滤
+    filterset_fields = {
+        'calc_date': ['gte', 'lte', 'exact'],
+    }
+
+    # 统计60天产品每天销量
+    @action(methods=['get'], detail=False, url_path='calc_product_sale')
+    def calc_product_sale(self, request):
+        tasks.calc_product_sale()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+    # 统计产品累计销量
+    @action(methods=['post'], detail=False, url_path='calc_total')
+    def calc_total(self, request):
+        start_date = request.data['start_date']
+        end_date = request.data['end_date']
+
+        q = Q()
+        q.connector = 'OR'
+        q.children.append(('status', 'ON_SALE'))
+        q.children.append(('status', 'CLEAN'))
+        q.children.append(('status', 'PRIVATE'))
+        products = Product.objects.filter(q)
+
+        sale_list = []
+        for p in products:
+            pr = ProductReport.objects.filter(calc_date__gte=start_date, product=p).filter(calc_date__lte=end_date)
+            total_qty = 0
+            total_amount = 0.0
+            for i in pr:
+                total_qty += i.qty
+                total_amount += i.amount
+            sale_list.append({
+                'id': p.id,
+                'image': BASE_URL + p.image.url if p.image.url else '',
+                'sku': p.sku,
+                'name': p.p_name,
+                'total_qty': total_qty,
+                'total_amount': total_amount
+            })
+        from operator import itemgetter
+        sale_list.sort(key=itemgetter('total_qty'), reverse=True)
+
+        return Response({'data': sale_list[:20]}, status=status.HTTP_200_OK)

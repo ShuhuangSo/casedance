@@ -99,6 +99,7 @@ class DeviceModel(models.Model):
     link = models.CharField(null=True, blank=True, max_length=150, verbose_name='链接', help_text='链接')
     announced = models.CharField(null=True, blank=True, max_length=50, verbose_name='发布时间', help_text='发布时间')
     status = models.CharField(null=True, blank=True, max_length=50, verbose_name='状态', help_text='状态')
+    detail_model = models.CharField(null=True, blank=True, default='', max_length=100, verbose_name='详细型号', help_text='详细型号')
     create_time = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:

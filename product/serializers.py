@@ -171,14 +171,14 @@ class DeviceModelSerializer(serializers.ModelSerializer):
 
     def get_is_new(self, obj):
         d = datetime.now().date() - obj.create_time.date()
-        if d.days < 30:
+        if d.days < 10:
             return True
         return False
 
     class Meta:
         model = DeviceModel
         fields = ('id', 'brand', 'type', 'model', 'cp_id', 'cp_model', 'note', 'image', 'dimensions', 'weight', 'link',
-                  'announced', 'status', 'create_time', 'is_new')
+                  'announced', 'status', 'detail_model', 'create_time', 'is_new')
 
 
 class SupplierSerializer(serializers.ModelSerializer):

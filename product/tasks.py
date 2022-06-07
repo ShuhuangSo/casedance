@@ -156,10 +156,10 @@ def update_spec():
 def get_models_info(id):
     dm = DeviceModel.objects.get(id=id)
     # 获取型号信息详情
-    s = requests.session()
-    s.headers = headers
-    resp = s.get(dm.link)
-    # resp = requests.get(dm.link, headers=headers)
+    # s = requests.session()
+    # s.headers = headers
+    # resp = s.get(dm.link)
+    resp = requests.get(dm.link, headers=headers)
     resp.encoding = "utf-8"
 
     page = BeautifulSoup(resp.text, 'html.parser')
@@ -174,12 +174,15 @@ def get_models_info(id):
     dimensions = body.find('td', attrs={'data-spec': 'dimensions'}).text
     # 重量
     weight = body.find('td', attrs={'data-spec': 'weight'}).text
+    misc = specs_list.find_all('table')[12]
+    # models
+    models = misc.find('td', attrs={'data-spec': 'models'}).text
 
     dm.announced = announced
     dm.status = status
     dm.dimensions = dimensions
     dm.weight = weight
-    dm.create_time = datetime.now()
+    dm.detail_model = models
     dm.save()
 
     return 'OK'

@@ -386,7 +386,7 @@ class DeviceModelViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('brand', 'type',)  # 配置过滤字段
-    search_fields = ('model', 'brand', 'note')  # 配置搜索字段
+    search_fields = ('model', 'brand', 'note', 'detail_model')  # 配置搜索字段
 
     # 市面手机型号excel批量上传
     @action(methods=['post'], detail=False, url_path='bulk_upload')

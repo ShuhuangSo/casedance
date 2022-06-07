@@ -32,6 +32,37 @@ class StockSerializer(serializers.ModelSerializer):
                   'last_sale_time')
 
 
+class Stock2Serializer(serializers.ModelSerializer):
+    """
+    产品库存
+    """
+    p_name = serializers.SerializerMethodField()
+    sku = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    amount = serializers.SerializerMethodField()
+
+    # 获取产品名称
+    def get_p_name(self, obj):
+        return obj.product.p_name
+
+    # 获取库存占用资金
+    def get_amount(self, obj):
+        return obj.product.unit_cost * obj.qty
+
+    def get_sku(self, obj):
+        return obj.product.sku
+
+    def get_image(self, obj):
+        return BASE_URL + obj.product.image.url if obj.product.image else ''
+
+    def get_p_name(self, obj):
+        return obj.product.p_name
+
+    class Meta:
+        model = Stock
+        fields = ('id', 'qty', 'amount', 'sku', 'p_name', 'image', 'product', 'store',)
+
+
 class StockInOutDetailSerializer(serializers.ModelSerializer):
     """
     出入库产品明细
@@ -88,8 +119,10 @@ class StockInOutSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockInOut
-        fields = ('id', 'batch_number', 'origin_store', 'origin_store_name', 'target_store', 'target_store_name', 'username', 'type', 'reason_in', 'reason_out',
-                  'reason_move', 'inout_detail', 'sku_num', 'note', 'create_time', 'is_active')
+        fields = (
+        'id', 'batch_number', 'origin_store', 'origin_store_name', 'target_store', 'target_store_name', 'username',
+        'type', 'reason_in', 'reason_out',
+        'reason_move', 'inout_detail', 'sku_num', 'note', 'create_time', 'is_active')
 
 
 class StockLogSerializer(serializers.ModelSerializer):
@@ -111,6 +144,7 @@ class StockLogSerializer(serializers.ModelSerializer):
     # # 获取源仓库名称
     def get_store_name(self, obj):
         return obj.store.store_name
+
     #
     # # 获取源操作单批次号
     def get_op_batch_number(self, obj):
@@ -124,4 +158,5 @@ class StockLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockLog
-        fields = ('id', 'op_type', 'op_origin_id', 'op_batch_number', 'qty', 'username', 'store_name', 'product', 'create_time')
+        fields = (
+        'id', 'op_type', 'op_origin_id', 'op_batch_number', 'qty', 'username', 'store_name', 'product', 'create_time')

@@ -43,7 +43,7 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour='0', minute='10'),  # 每天0点10分开始计算
     },
     'calc_product_sales': {
-        'task': 'report.tasks.calc_customer_report',  # 计算sku产品60天每天销量
+        'task': 'report.tasks.calc_product_sale',  # 计算sku产品60天每天销量
         'schedule': crontab(hour='0', minute='30'),  # 每天0点30分开始计算
     },
 }

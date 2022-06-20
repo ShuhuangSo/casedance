@@ -176,7 +176,9 @@ def get_models_info(id):
     weight = body.find('td', attrs={'data-spec': 'weight'}).text
     misc = specs_list.find_all('table')[12]
     # models
-    models = misc.find('td', attrs={'data-spec': 'models'}).text
+    models = '--'
+    if misc.find('td', attrs={'data-spec': 'models'}):
+        models = misc.find('td', attrs={'data-spec': 'models'}).text
 
     dm.announced = announced
     dm.status = status

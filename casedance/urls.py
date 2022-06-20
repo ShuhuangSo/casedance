@@ -21,6 +21,8 @@ from django.conf import settings
 from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.documentation import include_docs_urls
 
+from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
+    ExchangeRateViewSet, BasicInfoViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -112,6 +114,19 @@ router.register('stock_report', StockReportViewSet, basename='stock_report')
 router.register('customer_report', CustomerReportViewSet, basename='customer_report')
 # 统计产品每天销量
 router.register('product_report', ProductReportViewSet, basename='product_report')
+# ---------------------------销售业绩app-------------------------------------------------
+# 账号销售报表
+router.register('bo_account_sales', AccountSalesViewSet, basename='bo_account_sales')
+# 提成表
+router.register('bo_account_bonus', AccountBonusViewSet, basename='bo_account_bonus')
+# 帐号
+router.register('bo_bonus_accounts', AccountsViewSet, basename='bo_bonus_accounts')
+# 统计月份
+router.register('bo_month_list', MonthListViewSet, basename='bo_month_list')
+# 汇率
+router.register('bo_exchange_rate', ExchangeRateViewSet, basename='bo_exchange_rate')
+# 基础信息
+router.register('bo_basic_info', BasicInfoViewSet, basename='bo_basic_info')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

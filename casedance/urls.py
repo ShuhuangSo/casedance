@@ -22,7 +22,7 @@ from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.documentation import include_docs_urls
 
 from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
-    ExchangeRateViewSet, BasicInfoViewSet
+    ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -127,6 +127,8 @@ router.register('bo_month_list', MonthListViewSet, basename='bo_month_list')
 router.register('bo_exchange_rate', ExchangeRateViewSet, basename='bo_exchange_rate')
 # 基础信息
 router.register('bo_basic_info', BasicInfoViewSet, basename='bo_basic_info')
+# 运营负责人
+router.register('bo_manager', ManagerViewSet, basename='bo_manager')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

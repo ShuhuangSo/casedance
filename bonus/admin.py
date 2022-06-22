@@ -12,7 +12,7 @@ class ExchangeRateAdmin(admin.ModelAdmin):
 
 @admin.register(BasicInfo)
 class BasicInfoAdmin(admin.ModelAdmin):
-    list_display = ['type', 'name']
+    list_display = ['type', 'name', 'platform']
     list_filter = ['type']
     search_fields = ['name']
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from bonus.models import AccountSales, AccountBonus, Accounts, MonthList, ExchangeRate, BasicInfo
+from bonus.models import AccountSales, AccountBonus, Accounts, MonthList, ExchangeRate, BasicInfo, Manager
 
 
 class AccountSalesSerializer(serializers.ModelSerializer):
@@ -11,7 +11,17 @@ class AccountSalesSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccountSales
         fields = "__all__"
-        depth = 2
+        depth = 1
+
+
+class AccountSalesSerializerNodepth(serializers.ModelSerializer):
+    """
+    No depth账号销售报表
+    """
+
+    class Meta:
+        model = AccountSales
+        fields = "__all__"
 
 
 class AccountBonusSerializer(serializers.ModelSerializer):
@@ -22,6 +32,7 @@ class AccountBonusSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccountBonus
         fields = "__all__"
+        depth = 1
 
 
 class AccountsSerializer(serializers.ModelSerializer):
@@ -32,7 +43,17 @@ class AccountsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accounts
         fields = "__all__"
-        depth = 2
+        depth = 1
+
+
+class AccountsSerializerNodepth(serializers.ModelSerializer):
+    """
+    no depth账号
+    """
+
+    class Meta:
+        model = Accounts
+        fields = "__all__"
 
 
 class MonthListSerializer(serializers.ModelSerializer):
@@ -62,4 +83,14 @@ class BasicInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BasicInfo
+        fields = "__all__"
+
+
+class ManagerSerializer(serializers.ModelSerializer):
+    """
+    运营负责人
+    """
+
+    class Meta:
+        model = Manager
         fields = "__all__"

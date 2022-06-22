@@ -144,7 +144,7 @@ class AccountBonus(models.Model):
     platform = models.CharField(null=True, blank=True, max_length=30, verbose_name='平台', help_text='平台')
     platform_base = models.CharField(null=True, blank=True, max_length=30, verbose_name='平台站点', help_text='平台站点')
     account_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='账号名称', help_text='账号名称')
-    manager = models.ForeignKey(Manager, related_name='manager_bonus', on_delete=models.DO_NOTHING,
+    manager = models.ForeignKey(Manager, null=True, related_name='manager_bonus', on_delete=models.DO_NOTHING,
                                 verbose_name='账号负责人', help_text='账号负责人')
     month = models.CharField(null=True, blank=True, max_length=10, verbose_name='月份', help_text='月份')
     ori_currency = models.CharField(null=True, blank=True, max_length=10, verbose_name='原始币种', help_text='原始币种')
@@ -178,4 +178,4 @@ class AccountBonus(models.Model):
         ordering = ['-month']
 
     def __str__(self):
-        return self.sale_amount
+        return self.account_name

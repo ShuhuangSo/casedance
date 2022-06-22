@@ -6,9 +6,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from bonus.models import AccountSales, AccountBonus, Accounts, MonthList, ExchangeRate, BasicInfo
+from bonus.models import AccountSales, AccountBonus, Accounts, MonthList, ExchangeRate, BasicInfo, Manager
 from bonus.serializers import AccountSalesSerializer, AccountBonusSerializer, AccountsSerializer, MonthListSerializer, \
-    ExchangeRateSerializer, BasicInfoSerializer
+    ExchangeRateSerializer, BasicInfoSerializer, ManagerSerializer, AccountsSerializerNodepth, \
+    AccountSalesSerializerNodepth
 
 
 class DefaultPagination(PageNumberPagination):
@@ -47,6 +48,24 @@ class AccountSalesViewSet(mixins.ListModelMixin,
     filter_fields = ('platform', 'platform_base', 'account_name', 'manager', 'month')  # 配置过滤字段
     search_fields = ('account_name',)  # 配置搜索字段
 
+    # 重写create，让depth序列号字段能保存数据
+    def create(self, request):
+        serialized = AccountSalesSerializerNodepth(data=request.data)
+        if serialized.is_valid():
+            serialized.save()
+            return Response(serialized.data)
+        else:
+            return Response(serialized.errors)
+
+    # 重写update，让depth序列号字段能保存数据
+    def update(self, request, pk=None):
+        serialized = AccountSalesSerializerNodepth(self.get_object(), data=request.data)
+        if serialized.is_valid():
+            serialized.save()
+            return Response(serialized.data)
+        else:
+            return Response(serialized.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class AccountBonusViewSet(mixins.ListModelMixin,
                           mixins.CreateModelMixin,
@@ -80,40 +99,13 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         month = request.data['month']
         account_sales = AccountSales.objects.filter(month=month)
         for i in account_sales:
-            account_bonus = AccountBonus.objects.filter(month=month, account_name=i.account_name, platform=i.platform).first()
-            if account_bonus:
-                account_bonus.platform_base = i.platform_base
-                account_bonus.manager = i.manager
-                account_bonus.ori_currency = i.ori_currency
-                account_bonus.currency_rate = i.currency_rate
-                account_bonus.sale_amount = i.sale_amount
-                account_bonus.sale_income = i.sale_income
-                account_bonus.receipts = i.receipts
-                account_bonus.refund = i.refund
-                account_bonus.FES = i.FES
-                account_bonus.platform_fees = i.platform_fees
-                account_bonus.platform_fees_rmb = i.platform_fees_rmb
-                account_bonus.product_cost = i.product_cost
-                account_bonus.shipping_cost = i.shipping_cost
-                account_bonus.profit = i.profit
-                account_bonus.profit_margin = i.profit_margin
-                account_bonus.month_profit = i.month_profit
-                account_bonus.orders = i.orders
-                account_bonus.CUP = i.CUP
-                account_bonus.ad_fees = i.ad_fees
-                account_bonus.ad_fees_rmb = i.ad_fees_rmb
-                account_bonus.ad_percent = i.ad_percent
-                account_bonus.cp_cgf_fees = i.cp_cgf_fees
-                account_bonus.cp_first_ship = i.cp_first_ship
-                account_bonus.bonus_rate = i.manager.bonus_rate
-                account_bonus.bonus = i.profit * i.manager.bonus_rate
-                account_bonus.save()
-            else:
+            account_bonus = AccountBonus.objects.filter(month=month, account_name=i.account_name,
+                                                        platform=i.platform).first()
+            if not account_bonus:
                 account_bonus = AccountBonus()
                 account_bonus.platform = i.platform
                 account_bonus.platform_base = i.platform_base
                 account_bonus.account_name = i.account_name
-                account_bonus.manager = i.manager
                 account_bonus.month = i.month
                 account_bonus.ori_currency = i.ori_currency
                 account_bonus.currency_rate = i.currency_rate
@@ -136,8 +128,10 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                 account_bonus.ad_percent = i.ad_percent
                 account_bonus.cp_cgf_fees = i.cp_cgf_fees
                 account_bonus.cp_first_ship = i.cp_first_ship
-                account_bonus.bonus_rate = i.manager.bonus_rate
-                account_bonus.bonus = i.profit * i.manager.bonus_rate
+                if i.manager:
+                    account_bonus.manager = i.manager
+                    account_bonus.bonus_rate = i.manager.bonus_rate
+                    account_bonus.bonus = i.profit * i.manager.bonus_rate
                 account_bonus.save()
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
@@ -167,6 +161,24 @@ class AccountsViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)  # 过滤,搜索,排序
     filter_fields = ('type',)  # 配置过滤字段
     search_fields = ('name',)  # 配置搜索字段
+
+    # 重写create，让depth序列号字段能保存数据
+    def create(self, request):
+        serialized = AccountsSerializerNodepth(data=request.data)
+        if serialized.is_valid():
+            serialized.save()
+            return Response(serialized.data)
+        else:
+            return Response(serialized.errors)
+
+    # 重写update，让depth序列号字段能保存数据
+    def update(self, request, pk=None):
+        serialized = AccountsSerializerNodepth(self.get_object(), data=request.data)
+        if serialized.is_valid():
+            serialized.save()
+            return Response(serialized.data)
+        else:
+            return Response(serialized.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MonthListViewSet(mixins.ListModelMixin,
@@ -255,3 +267,25 @@ class BasicInfoViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)  # 过滤,搜索,排序
     filter_fields = ('type', 'platform')  # 配置过滤字段
     search_fields = ('name',)  # 配置搜索字段
+
+
+class ManagerViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        运营负责人,分页,过滤,搜索,排序
+    create:
+        运营负责人新增
+    retrieve:
+        运营负责人详情页
+    update:
+        运营负责人修改
+    destroy:
+        运营负责人删除
+    """
+    queryset = Manager.objects.all()
+    serializer_class = ManagerSerializer  # 序列化

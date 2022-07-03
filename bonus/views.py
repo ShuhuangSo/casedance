@@ -135,6 +135,106 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                 account_bonus.save()
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
+    # 导出excel表
+    @action(methods=['get'], detail=False, url_path='export_bonus')
+    def export_bonus(self, request):
+        import openpyxl
+        from openpyxl.styles import Alignment, Font, Color, PatternFill
+        alignment = Alignment(horizontal='center', vertical='center')
+        title_style = Font(name='微软雅黑', sz=28, b=True)
+        title_style2 = Font(name='微软雅黑', sz=8, color='ffffff')
+
+        months = ['202206', '202301']
+        platforms = ['eBay', 'Coupang']
+        manager = '吴梓涵'
+        area = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
+        wb = openpyxl.Workbook()
+        for m in months:
+            print(m)
+            for p in platforms:
+                if p == 'eBay':
+                    # 获取当月ebay平台指定负责人的提成数据
+                    account_bonus = AccountBonus.objects.filter(month=m, platform=p, manager__name=manager)
+                    print(account_bonus)
+                    if account_bonus:
+                        f_sheet = wb.create_sheet(m + 'eBay')
+                        num = 0
+                        for ab in account_bonus:
+                            # 第一次循环
+                            if num == 0:
+                                f_sheet.merge_cells('A1:P1')
+                                f_sheet['A1'] = m + 'eBay'
+                                f_sheet.row_dimensions[1].height = 50
+                                f_sheet.row_dimensions[2].height = 30
+                                f_sheet['A1'].alignment = alignment
+                                f_sheet['A1'].font = title_style
+                                f_sheet['A1'].fill = PatternFill(patternType='solid', fgColor='65d6b4')
+                                # 第二行样式
+                                for i in area:
+                                    f_sheet[i+'2'].alignment = alignment
+                                    f_sheet[i+'2'].font = title_style2
+                                    f_sheet[i+'2'].fill = PatternFill(patternType='solid', fgColor='df8244')
+                                f_sheet['A2'] = '账号'
+                                f_sheet['B2'] = 'eBay站点'
+                                f_sheet['C2'] = '销售收入'
+                                f_sheet['D2'] = '净收款'
+                                f_sheet['E2'] = '退款'
+                                f_sheet['F2'] = '结汇收入'
+                                f_sheet['G2'] = 'eBay费用'
+                                f_sheet['H2'] = '产品成本'
+                                f_sheet['I2'] = '物流成本'
+                                f_sheet['J2'] = '毛利润'
+                                f_sheet['K2'] = '订单数'
+                                f_sheet['L2'] = '平均客单价'
+                                f_sheet['M2'] = '广告费'
+                                f_sheet['N2'] = '广告费占比'
+                                f_sheet['O2'] = '提成(' + str(ab.bonus_rate*100) + '%)'
+                                f_sheet['P2'] = '是否记入提成'
+
+                                f_sheet['A3'] = ab.account_name
+                                f_sheet['B3'] = ab.platform_base
+                                f_sheet['C3'] = ab.sale_amount
+                                f_sheet['D3'] = ab.receipts
+                                f_sheet['E3'] = ab.refund
+                                f_sheet['F3'] = ab.FES
+                                f_sheet['G3'] = ab.platform_fees
+                                f_sheet['H3'] = ab.product_cost
+                                f_sheet['I3'] = ab.shipping_cost
+                                f_sheet['J3'] = ab.profit
+                                f_sheet['K3'] = ab.orders
+                                f_sheet['L3'] = ab.CUP
+                                f_sheet['M3'] = ab.ad_fees
+                                f_sheet['N3'] = ab.ad_percent
+                                f_sheet['O3'] = ab.bonus
+                                f_sheet['P3'] = '是' if ab.bonus >= 500 else '否'
+                            elif num > 0:
+                                f_sheet['A'+str(num+3)] = ab.account_name
+                                f_sheet['B'+str(num+3)] = ab.platform_base
+                                f_sheet['C'+str(num+3)] = ab.sale_amount
+                                f_sheet['D'+str(num+3)] = ab.receipts
+                                f_sheet['E'+str(num+3)] = ab.refund
+                                f_sheet['F'+str(num+3)] = ab.FES
+                                f_sheet['G'+str(num+3)] = ab.platform_fees
+                                f_sheet['H'+str(num+3)] = ab.product_cost
+                                f_sheet['I'+str(num+3)] = ab.shipping_cost
+                                f_sheet['J'+str(num+3)] = ab.profit
+                                f_sheet['K'+str(num+3)] = ab.orders
+                                f_sheet['L'+str(num+3)] = ab.CUP
+                                f_sheet['M'+str(num+3)] = ab.ad_fees
+                                f_sheet['N'+str(num+3)] = ab.ad_percent
+                                f_sheet['O'+str(num+3)] = ab.bonus
+                                f_sheet['P'+str(num+3)] = '是' if ab.bonus >= 500 else '否'
+
+                            num += 1
+
+        # first_sheet = wb.active
+        # first_sheet.title = '2022年3月'
+        # first_sheet.merge_cells('A1:P1')
+        # first_sheet['A1'] = '2022年06月销售报表 eBay'
+        del wb['Sheet']
+        wb.save('media/export/first.xlsx')
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
 
 class AccountsViewSet(mixins.ListModelMixin,
                       mixins.CreateModelMixin,

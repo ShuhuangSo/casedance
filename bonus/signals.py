@@ -37,9 +37,10 @@ def account_sales_signal(sender, instance, created=False, **kwargs):
         instance.ad_fees_rmb = instance.ad_fees * instance.currency_rate
 
     # coupang平台计算方案
-    if instance.platform == 'coupang':
+    if instance.platform == 'Coupang':
         #  毛利润
         instance.profit = instance.FES - instance.product_cost - instance.cp_first_ship
+        instance.month_profit = instance.profit
 
 
 # 汇率变动

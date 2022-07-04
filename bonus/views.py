@@ -11,6 +11,7 @@ from bonus.models import AccountSales, AccountBonus, Accounts, MonthList, Exchan
 from bonus.serializers import AccountSalesSerializer, AccountBonusSerializer, AccountsSerializer, MonthListSerializer, \
     ExchangeRateSerializer, BasicInfoSerializer, ManagerSerializer, AccountsSerializerNodepth, \
     AccountSalesSerializerNodepth
+from casedance.settings import BASE_URL
 
 
 class DefaultPagination(PageNumberPagination):
@@ -137,7 +138,7 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
     # 导出excel表
-    @action(methods=['get'], detail=False, url_path='export_bonus')
+    @action(methods=['post'], detail=False, url_path='export_bonus')
     def export_bonus(self, request):
         import openpyxl
         from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
@@ -151,9 +152,13 @@ class AccountBonusViewSet(mixins.ListModelMixin,
             top=Side(style='thin', color='e7e6e6'),
             bottom=Side(style='thin', color='e7e6e6'))
 
-        months = ['202212', '202301']
+        all_months = request.data['months']
+        months = []
+        for a in all_months:
+            months.append(a['month'])
+
         platforms = ['eBay', 'Coupang']
-        manager = '韦泳冰'
+        manager = request.data['manager']
         area = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
         area2 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
         wb = openpyxl.Workbook()
@@ -327,7 +332,8 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         # first_sheet['A1'] = '2022年06月销售报表 eBay'
         del wb['Sheet']
         wb.save('media/export/first.xlsx')
-        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+        url = BASE_URL + '/media/export/first.xlsx'
+        return Response({'url': url}, status=status.HTTP_200_OK)
 
 
 class AccountsViewSet(mixins.ListModelMixin,

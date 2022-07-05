@@ -146,6 +146,7 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         title_style = Font(name='微软雅黑', sz=28, b=True)
         title_style2 = Font(name='微软雅黑', sz=8, color='ffffff')
         title_style3 = Font(name='微软雅黑', sz=8)
+        title_style3_red = Font(name='微软雅黑', sz=8, color='eb3223', b=True)
         border = Border(
             left=Side(border_style='thin', color='e7e6e6'),
             right=Side(border_style='thin', color='e7e6e6'),
@@ -157,25 +158,35 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         for a in all_months:
             months.append(a['month'])
 
-        platforms = ['eBay', 'Coupang']
+        platforms = ['eBay', 'Coupang', 'Aliexpress']
         manager = request.data['manager']
+        # 检查数据是否存在
+        is_exist = False
+        for m in months:
+            for p in platforms:
+                ab = AccountBonus.objects.filter(month=m, platform=p, manager__name=manager).count()
+                if ab:
+                    is_exist = True
+                    break
+        if not is_exist:
+            return Response({'msg': '无数据'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
         area = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']
         area2 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
         wb = openpyxl.Workbook()
         for m in months:
-            print(m)
             for p in platforms:
-                if p == 'eBay':
+                if p == 'eBay' or p == 'Aliexpress':
                     # 获取当月ebay平台指定负责人的提成数据
                     account_bonus = AccountBonus.objects.filter(month=m, platform=p, manager__name=manager)
                     if account_bonus:
-                        f_sheet = wb.create_sheet(m[0:4] + '年' + m[4:6] + '月' + 'eBay')
+                        f_sheet = wb.create_sheet(m[0:4] + '年' + m[4:6] + '月' + p)
                         num = 0
                         for ab in account_bonus:
                             # 第一次循环
                             if num == 0:
                                 f_sheet.merge_cells('A1:P1')
-                                f_sheet['A1'] = m[0:4] + '年' + m[4:6] + '月' + 'eBay销售报表-' + ab.manager.name
+                                f_sheet['A1'] = m[0:4] + '年' + m[4:6] + '月' + p + '销售报表-' + ab.manager.name
                                 # 第1行样式
                                 f_sheet.row_dimensions[1].height = 50
                                 f_sheet.row_dimensions[2].height = 30
@@ -191,7 +202,7 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                     f_sheet[i+'2'].fill = PatternFill(patternType='solid', fgColor='df8244')
                                     f_sheet[i+'2'].border = border
                                 f_sheet['A2'] = '账号'
-                                f_sheet['B2'] = 'eBay站点'
+                                f_sheet['B2'] = '站点'
                                 f_sheet['C2'] = '销售收入'
                                 f_sheet['D2'] = '净收款'
                                 f_sheet['E2'] = '退款'
@@ -212,6 +223,8 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                     f_sheet[i + '3'].alignment = alignment
                                     f_sheet[i + '3'].font = title_style3
                                     f_sheet[i + '3'].border = border
+                                if ab.bonus < 0:
+                                    f_sheet['J3'].font = title_style3_red
                                 f_sheet['A3'] = ab.account_name
                                 f_sheet['B3'] = ab.platform_base
                                 f_sheet['C3'] = ab.ori_currency + ' ' + xstring.dispose(ab.sale_amount).humanized_amount(compel=True)
@@ -225,8 +238,8 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['K3'] = ab.orders
                                 f_sheet['L3'] = ab.ori_currency + ' ' + xstring.dispose(ab.CUP).humanized_amount(compel=True)
                                 f_sheet['M3'] = ab.ori_currency + ' ' + xstring.dispose(ab.ad_fees).humanized_amount(compel=True)
-                                f_sheet['N3'] = ab.ad_percent
-                                f_sheet['O3'] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True)
+                                f_sheet['N3'] = xstring.dispose(ab.ad_percent).humanized_amount(compel=True) + '%'
+                                f_sheet['O3'] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True) if ab.bonus > 0 else 0
                                 f_sheet['P3'] = '是' if ab.bonus >= 500 else '否'
                             elif num > 0:
                                 # >=4行样式
@@ -234,6 +247,8 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                     f_sheet[i + str(num+3)].alignment = alignment
                                     f_sheet[i + str(num+3)].font = title_style3
                                     f_sheet[i + str(num+3)].border = border
+                                if ab.bonus < 0:
+                                    f_sheet['J3'].font = title_style3_red
                                 f_sheet['A'+str(num+3)] = ab.account_name
                                 f_sheet['B'+str(num+3)] = ab.platform_base
                                 f_sheet['C'+str(num+3)] = ab.ori_currency + ' ' + xstring.dispose(ab.sale_amount).humanized_amount(compel=True)
@@ -250,6 +265,20 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['N'+str(num+3)] = ab.ad_percent
                                 f_sheet['O'+str(num+3)] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True)
                                 f_sheet['P'+str(num+3)] = '是' if ab.bonus >= 500 else '否'
+                            num += 1
+                        f_sheet['A' + str(num + 3)] = '备注'
+                        f_sheet.merge_cells('A' + str(num + 3) + ':P' + str(num + 3))
+                        f_sheet['A' + str(num + 4)] = '1. 收入汇率和支出汇率按相同计算'
+                        f_sheet.merge_cells('A' + str(num + 4) + ':P' + str(num + 4))
+                        f_sheet['A' + str(num + 5)] = '2. 结汇RMB增加2.5%汇损'
+                        f_sheet.merge_cells('A' + str(num + 5) + ':P' + str(num + 5))
+                        f_sheet['A' + str(num + 6)] = '3. 统计时间按报表美国东部标准时间EST进行计算'
+                        f_sheet.merge_cells('A' + str(num + 6) + ':P' + str(num + 6))
+                        f_sheet['A' + str(num + 7)] = '月份基准汇率'
+                        er = ExchangeRate.objects.filter(month=m)
+                        for e in er:
+                            f_sheet['A' + str(num + 8)] = e.currency
+                            f_sheet['B' + str(num + 8)] = e.rate
                             num += 1
                 if p == 'Coupang':
                     # 获取当月Coupang平台指定负责人的提成数据
@@ -294,6 +323,8 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                     f_sheet[i + '3'].alignment = alignment
                                     f_sheet[i + '3'].font = title_style3
                                     f_sheet[i + '3'].border = border
+                                if ab.bonus < 0:
+                                    f_sheet['J3'].font = title_style3_red
                                 f_sheet['A3'] = ab.account_name
                                 f_sheet['B3'] = ab.platform_base
                                 f_sheet['C3'] = ab.ori_currency + ' ' + xstring.dispose(ab.sale_amount).humanized_amount(compel=True)
@@ -305,13 +336,15 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['I3'] = '￥' + xstring.dispose(ab.cp_first_ship).humanized_amount(compel=True)
                                 f_sheet['J3'] = '￥' + xstring.dispose(ab.profit).humanized_amount(compel=True)
                                 f_sheet['K3'] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True)
-                                f_sheet['L3'] = '是' if ab.bonus >= 500 else '否'
+                                f_sheet['L3'] = '是'
                             elif num > 0:
                                 # >=4行样式
                                 for i in area2:
                                     f_sheet[i + str(num+3)].alignment = alignment
                                     f_sheet[i + str(num+3)].font = title_style3
                                     f_sheet[i + str(num+3)].border = border
+                                if ab.bonus < 0:
+                                    f_sheet['J3'].font = title_style3_red
                                 f_sheet['A'+str(num+3)] = ab.account_name
                                 f_sheet['B'+str(num+3)] = ab.platform_base
                                 f_sheet['C'+str(num+3)] = ab.ori_currency + ' ' + xstring.dispose(ab.sale_amount).humanized_amount(compel=True)
@@ -323,16 +356,12 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['I'+str(num+3)] = '￥' + xstring.dispose(ab.cp_first_ship).humanized_amount(compel=True)
                                 f_sheet['J'+str(num+3)] = '￥' + xstring.dispose(ab.profit).humanized_amount(compel=True)
                                 f_sheet['K'+str(num+3)] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True)
-                                f_sheet['L'+str(num+3)] = '是' if ab.bonus >= 500 else '否'
+                                f_sheet['L'+str(num+3)] = '是'
                             num += 1
 
-        # first_sheet = wb.active
-        # first_sheet.title = '2022年3月'
-        # first_sheet.merge_cells('A1:P1')
-        # first_sheet['A1'] = '2022年06月销售报表 eBay'
         del wb['Sheet']
-        wb.save('media/export/first.xlsx')
-        url = BASE_URL + '/media/export/first.xlsx'
+        wb.save('media/export/销售数据-' + manager + '.xlsx')
+        url = BASE_URL + '/media/export/销售数据-' + manager + '.xlsx'
         return Response({'url': url}, status=status.HTTP_200_OK)
 
 

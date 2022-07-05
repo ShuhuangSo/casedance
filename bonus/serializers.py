@@ -60,10 +60,16 @@ class MonthListSerializer(serializers.ModelSerializer):
     """
     统计月份
     """
+    status = serializers.SerializerMethodField()
+
+    def get_status(self, obj):
+        is_exist = AccountSales.objects.filter(month=obj.month).count()
+
+        return True if is_exist else False
 
     class Meta:
         model = MonthList
-        fields = "__all__"
+        fields = ('id', 'month', 'status')
 
 
 class ExchangeRateSerializer(serializers.ModelSerializer):

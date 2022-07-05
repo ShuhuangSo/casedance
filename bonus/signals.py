@@ -15,7 +15,7 @@ def account_sales_signal(sender, instance, created=False, **kwargs):
         # 结汇收入(人民币)	：结汇扣去2.5%
         instance.FES = instance.receipts * instance.currency_rate * 0.975
 
-        #  毛利润
+        #  毛利润(提成利润)
         instance.profit = instance.FES - instance.product_cost - instance.shipping_cost
 
         # 当月毛利润
@@ -35,6 +35,33 @@ def account_sales_signal(sender, instance, created=False, **kwargs):
 
         #  广告费(rmb)
         instance.ad_fees_rmb = instance.ad_fees * instance.currency_rate
+    # Aliexpress平台计算方案
+    if instance.platform == 'Aliexpress':
+        # 销售净收入 (原始货币)：销售额-Aliexpress费用
+        instance.sale_income = instance.sale_amount - instance.platform_fees
+
+        # 结汇收入(人民币)	：结汇扣去2.5%
+        instance.FES = instance.receipts * instance.currency_rate * 0.975
+        #  广告费(rmb)
+        instance.ad_fees_rmb = instance.ad_fees * instance.currency_rate
+
+        #  毛利润(提成利润)
+        instance.profit = instance.FES - instance.product_cost - instance.shipping_cost - instance.ad_fees_rmb
+
+        # 当月毛利润
+        instance.month_profit = instance.sale_income * instance.currency_rate - instance.product_cost - instance.shipping_cost - instance.ad_fees_rmb
+
+        #  毛利率
+        instance.profit_margin = instance.month_profit / (instance.sale_amount * instance.currency_rate)
+
+        # 客单价
+        instance.CUP = instance.sale_amount / instance.orders
+
+        #  广告费占比
+        instance.ad_percent = instance.ad_fees / instance.sale_amount
+
+        #  平台费用 (rmb)
+        instance.platform_fees_rmb = instance.platform_fees * instance.currency_rate
 
     # coupang平台计算方案
     if instance.platform == 'Coupang':

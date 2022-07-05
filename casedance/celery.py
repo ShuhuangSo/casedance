@@ -46,6 +46,10 @@ app.conf.beat_schedule = {
         'task': 'report.tasks.calc_product_sale',  # 计算sku产品60天每天销量
         'schedule': crontab(hour='0', minute='30'),  # 每天0点30分开始计算
     },
+    'create_month': {
+        'task': 'bonus.tasks.create_month',  # 生成当月月份
+        'schedule': crontab(day_of_month=1),  # 每月1号执行
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

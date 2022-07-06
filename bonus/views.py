@@ -147,6 +147,9 @@ class AccountBonusViewSet(mixins.ListModelMixin,
         title_style2 = Font(name='微软雅黑', sz=8, color='ffffff')
         title_style3 = Font(name='微软雅黑', sz=8)
         title_style3_red = Font(name='微软雅黑', sz=8, color='eb3223', b=True)
+        title_style3_b = Font(name='微软雅黑', sz=8, b=True)
+        title_style_10b = Font(name='微软雅黑', sz=10, b=True)
+        title_style_8grey = Font(name='微软雅黑', sz=8, color='7f7f7f')
         border = Border(
             left=Side(border_style='thin', color='e7e6e6'),
             right=Side(border_style='thin', color='e7e6e6'),
@@ -241,6 +244,10 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['N3'] = xstring.dispose(ab.ad_percent).humanized_amount(compel=True) + '%'
                                 f_sheet['O3'] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True) if ab.bonus > 0 else 0
                                 f_sheet['P3'] = '是' if ab.bonus >= 500 else '否'
+                                if ab.bonus >= 500:
+                                    f_sheet['P3'].font = title_style3_b
+                                else:
+                                    f_sheet['P3'].font = title_style3_red
                             elif num > 0:
                                 # >=4行样式
                                 for i in area:
@@ -248,7 +255,7 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                     f_sheet[i + str(num+3)].font = title_style3
                                     f_sheet[i + str(num+3)].border = border
                                 if ab.bonus < 0:
-                                    f_sheet['J3'].font = title_style3_red
+                                    f_sheet['J' + str(num+3)].font = title_style3_red
                                 f_sheet['A'+str(num+3)] = ab.account_name
                                 f_sheet['B'+str(num+3)] = ab.platform_base
                                 f_sheet['C'+str(num+3)] = ab.ori_currency + ' ' + xstring.dispose(ab.sale_amount).humanized_amount(compel=True)
@@ -262,23 +269,34 @@ class AccountBonusViewSet(mixins.ListModelMixin,
                                 f_sheet['K'+str(num+3)] = ab.orders
                                 f_sheet['L'+str(num+3)] = ab.ori_currency + ' ' + xstring.dispose(ab.CUP).humanized_amount(compel=True)
                                 f_sheet['M'+str(num+3)] = ab.ori_currency + ' ' + xstring.dispose(ab.ad_fees).humanized_amount(compel=True)
-                                f_sheet['N'+str(num+3)] = ab.ad_percent
-                                f_sheet['O'+str(num+3)] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True)
+                                f_sheet['N'+str(num+3)] = xstring.dispose(ab.ad_percent).humanized_amount(compel=True) + '%'
+                                f_sheet['O'+str(num+3)] = '￥' + xstring.dispose(ab.bonus).humanized_amount(compel=True) if ab.bonus > 0 else 0
                                 f_sheet['P'+str(num+3)] = '是' if ab.bonus >= 500 else '否'
+                                if ab.bonus >= 500:
+                                    f_sheet['P'+str(num+3)].font = title_style3_b
+                                else:
+                                    f_sheet['P'+str(num+3)].font = title_style3_red
                             num += 1
                         f_sheet['A' + str(num + 3)] = '备注'
+                        f_sheet['A' + str(num + 3)].font = title_style_10b
                         f_sheet.merge_cells('A' + str(num + 3) + ':P' + str(num + 3))
                         f_sheet['A' + str(num + 4)] = '1. 收入汇率和支出汇率按相同计算'
+                        f_sheet['A' + str(num + 4)].font = title_style_8grey
                         f_sheet.merge_cells('A' + str(num + 4) + ':P' + str(num + 4))
                         f_sheet['A' + str(num + 5)] = '2. 结汇RMB增加2.5%汇损'
+                        f_sheet['A' + str(num + 5)].font = title_style_8grey
                         f_sheet.merge_cells('A' + str(num + 5) + ':P' + str(num + 5))
                         f_sheet['A' + str(num + 6)] = '3. 统计时间按报表美国东部标准时间EST进行计算'
+                        f_sheet['A' + str(num + 6)].font = title_style_8grey
                         f_sheet.merge_cells('A' + str(num + 6) + ':P' + str(num + 6))
                         f_sheet['A' + str(num + 7)] = '月份基准汇率'
+                        f_sheet['A' + str(num + 7)].font = title_style3
                         er = ExchangeRate.objects.filter(month=m)
                         for e in er:
                             f_sheet['A' + str(num + 8)] = e.currency
+                            f_sheet['A' + str(num + 8)].font = title_style3
                             f_sheet['B' + str(num + 8)] = e.rate
+                            f_sheet['B' + str(num + 8)].font = title_style3
                             num += 1
                 if p == 'Coupang':
                     # 获取当月Coupang平台指定负责人的提成数据

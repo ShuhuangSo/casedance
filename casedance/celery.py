@@ -50,6 +50,10 @@ app.conf.beat_schedule = {
         'task': 'bonus.tasks.create_month',  # 生成当月月份
         'schedule': crontab(day_of_month=1),  # 每月1号执行
     },
+    'track_listing': {
+        'task': 'mercado.tasks.track_listing',  # 每天更新链接信息并进行销量计算
+        'schedule': crontab(hour='0', minute='3'),  # 每天0点1分开始计算
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

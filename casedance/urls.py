@@ -23,6 +23,7 @@ from rest_framework.documentation import include_docs_urls
 
 from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
     ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
+from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -129,6 +130,13 @@ router.register('bo_exchange_rate', ExchangeRateViewSet, basename='bo_exchange_r
 router.register('bo_basic_info', BasicInfoViewSet, basename='bo_basic_info')
 # 运营负责人
 router.register('bo_manager', ManagerViewSet, basename='bo_manager')
+# ---------------------------美客多app-------------------------------------------------
+# 在线产品列表
+router.register('med_listing', ListingViewSet, basename='med_listing')
+# 商品跟踪
+router.register('med_listing_track', ListingTrackViewSet, basename='med_listing_track')
+# 站点类目列表
+router.register('med_categories', CategoriesViewSet, basename='med_categories')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

@@ -94,7 +94,7 @@ class DeviceModel(models.Model):
     cp_id = models.IntegerField(null=True, blank=True, verbose_name='兼容识别码', help_text='兼容识别码')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     image = models.CharField(null=True, blank=True, max_length=250, verbose_name='型号图片', help_text='型号图片')
-    dimensions = models.CharField(null=True, blank=True, max_length=50, verbose_name='尺寸', help_text='尺寸')
+    dimensions = models.CharField(null=True, blank=True, max_length=100, verbose_name='尺寸', help_text='尺寸')
     weight = models.CharField(null=True, blank=True, max_length=50, verbose_name='重量', help_text='重量')
     link = models.CharField(null=True, blank=True, max_length=150, verbose_name='链接', help_text='链接')
     announced = models.CharField(null=True, blank=True, max_length=50, verbose_name='发布时间', help_text='发布时间')

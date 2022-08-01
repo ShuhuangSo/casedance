@@ -6,10 +6,15 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import requests
-from datetime import datetime
+import time
+import random
+import json
+import urllib
+import hashlib
+from datetime import datetime, timedelta
 
-from mercado.models import Listing, ListingTrack, Categories, ApiSetting
-from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer
+from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller
+from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer
 from mercado import tasks
 
 
@@ -59,13 +64,15 @@ class ListingViewSet(mixins.ListModelMixin,
         # for i in li:
         #     tasks.create_listing(i)
         #     time.sleep(1)
-        tasks.update_categories('MLM')
+        # tasks.update_categories('MLM')
         # from datetime import datetime, timedelta
         # date = datetime.now() - timedelta(days=1)
         # Listing.objects.all().update(update_time=date)
 
         # ListingTrack.objects.filter(listing__item_id='MLM1354607411').update(create_time=date)
-
+        # date = datetime.now() - timedelta(days=1)
+        # Keywords.objects.filter(categ_id='MLM1182').update(update_time=date)
+        tasks.update_seller('MLM', '1094875249')
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -186,11 +193,13 @@ class CategoriesViewSet(mixins.ListModelMixin,
                         cate.has_children = False
                         cate.save()
                     for item in data['children_categories']:
+                        result = tasks.translate(item['name'])
                         add_list.append(Categories(
                             categ_id=item['id'],
                             father_id=father_id,
                             site_id=site_id,
                             name=item['name'],
+                            t_name=result if result else None,
                             path_from_root=path_from_root + item['name'],
                             total_items=item['total_items_in_this_category'],
                             update_time=datetime.now()
@@ -219,3 +228,134 @@ class CategoriesViewSet(mixins.ListModelMixin,
                 'update_time': i.update_time,
             })
         return Response(data_list, status=status.HTTP_200_OK)
+
+    # 获取热搜关键词
+    @action(methods=['get'], detail=False, url_path='get_trends')
+    def get_trends(self, request):
+        categ_id = self.request.query_params.get('categ_id')
+        site_id = self.request.query_params.get('site_id')
+        # 如果当天有数据
+        today = datetime.now().date()
+        queryset = Keywords.objects.filter(update_time__date=today, categ_id=categ_id)
+        if queryset:
+            query_list = []
+            for i in queryset:
+                query_list.append({
+                    'id': i.id,
+                    'categ_id': i.categ_id,
+                    'keyword': i.keyword,
+                    't_keyword': i.t_keyword,
+                    'url': i.url,
+                    'rank': i.rank,
+                    'status': i.status,
+                    'rank_changed': i.rank_changed,
+                    'update_time': i.update_time,
+                })
+            return Response(query_list, status=status.HTTP_200_OK)
+
+        at = ApiSetting.objects.all().first()
+        token = at.access_token
+        headers = {
+            'Authorization': 'Bearer ' + token,
+        }
+        url = 'https://api.mercadolibre.com/trends/' + site_id + '/' + categ_id
+        resp = requests.get(url, headers=headers)
+        query_list = []
+        if resp.status_code == 200:
+            data = resp.json()
+            n = 1
+            if data:
+                add_list = []
+                for i in data:
+                    kw = Keywords.objects.filter(keyword=i['keyword'], categ_id=categ_id).first()
+                    rank_status = 'NEW'
+                    rank_changed = 0
+                    if kw:
+                        if n == kw.rank:
+                            rank_status = 'EQ'
+                        elif n < kw.rank:
+                            rank_status = 'UP'
+                            rank_changed = kw.rank - n
+                        elif n > kw.rank:
+                            rank_status = 'DOWN'
+                            rank_changed = n - kw.rank
+                        else:
+                            rank_status = None
+                    add_list.append(Keywords(
+                        categ_id=categ_id,
+                        keyword=i['keyword'],
+                        url=i['url'],
+                        rank=n,
+                        status=rank_status,
+                        rank_changed=rank_changed
+                    ))
+                    n += 1
+                Keywords.objects.filter(categ_id=categ_id).delete()
+                Keywords.objects.bulk_create(add_list)
+
+                keywords_data = Keywords.objects.filter(categ_id=categ_id)
+                if keywords_data:
+                    for i in keywords_data:
+                        query_list.append({
+                            'id': i.id,
+                            'categ_id': i.categ_id,
+                            'keyword': i.keyword,
+                            't_keyword': i.t_keyword,
+                            'url': i.url,
+                            'rank': i.rank,
+                            'status': i.status,
+                            'rank_changed': i.rank_changed,
+                            'update_time': i.update_time,
+                        })
+
+        return Response(query_list, status=status.HTTP_200_OK)
+
+    # 翻译类目
+    @action(methods=['get'], detail=False, url_path='translate')
+    def translate(self, request):
+        queryset = Categories.objects.filter(t_name=None)
+        for i in queryset:
+            result = tasks.translate(i.name)
+            i.t_name = result
+            i.save()
+
+        return Response({'data': 'OK'}, status=status.HTTP_200_OK)
+
+
+class SellerViewSet(mixins.ListModelMixin,
+                    mixins.CreateModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.DestroyModelMixin,
+                    mixins.RetrieveModelMixin,
+                    viewsets.GenericViewSet):
+    """
+    list:
+        卖家列表,分页,过滤,搜索,排序
+    create:
+        卖家新增
+    retrieve:
+        卖家详情页
+    update:
+        卖家修改
+    destroy:
+        卖家删除
+    """
+    queryset = Seller.objects.all()
+    serializer_class = SellerSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('site_id', 'level_id')  # 配置过滤字段
+    search_fields = ('nickname', 'seller_id')  # 配置搜索字段
+    ordering_fields = ('registration_date', 'total')  # 配置排序字段
+
+    # 开启收藏并更新卖家详细信息
+    @action(methods=['get'], detail=False, url_path='collect_seller')
+    def collect_seller(self, request):
+        seller_id = self.request.query_params.get('seller_id')
+
+        seller = Seller.objects.filter(seller_id=seller_id).first()
+        seller.collection = True
+        seller.save()
+        tasks.update_seller(seller.site_id, seller_id)
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)

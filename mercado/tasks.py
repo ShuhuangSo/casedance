@@ -3,11 +3,14 @@ from celery import shared_task
 import requests
 import random
 import time
+import json
+import urllib
+import hashlib
 from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
 
-from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories
+from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting
 
 user_agent_list = [
 
@@ -62,6 +65,7 @@ main_headers = {
 # 商品api获取字段
 attributes = 'id,site_id,title,thumbnail,permalink,price,currency_id,start_time,status,health,shipping,tags,seller_id'
 
+
 # 添加跟踪商品
 @shared_task
 def create_listing(item_id):
@@ -108,6 +112,7 @@ def create_listing(item_id):
                 seller.nickname = seller_data['nickname']
                 seller.registration_date = dateparse.parse_datetime(seller_data['registration_date'])
                 seller.site_id = seller_data['site_id']
+                seller.link = seller_data['permalink']
                 seller.level_id = seller_data['seller_reputation']['level_id']
                 seller.total = seller_data['seller_reputation']['transactions']['total']
                 seller.canceled = seller_data['seller_reputation']['transactions']['canceled']
@@ -219,7 +224,8 @@ def get_listing_info(url):
                     listing.save()
 
             # 补充计算昨天当天销量
-            lt = ListingTrack.objects.filter(listing=listing, create_time__date=datetime.now().date() - timedelta(days=1)).first()
+            lt = ListingTrack.objects.filter(listing=listing,
+                                             create_time__date=datetime.now().date() - timedelta(days=1)).first()
             if lt:
                 lt.today_sold = listing.total_sold - lt.total_sold
                 lt.save()
@@ -235,7 +241,8 @@ def get_listing_info(url):
                     health=listing.health
                 ))
             else:
-                listing_track = ListingTrack.objects.filter(listing=listing, create_time__date=datetime.now().date()).first()
+                listing_track = ListingTrack.objects.filter(listing=listing,
+                                                            create_time__date=datetime.now().date()).first()
                 today_sold = listing.total_sold - listing_track.total_sold
                 listing_track.today_sold = today_sold
                 listing_track.reviews = listing.reviews
@@ -273,7 +280,78 @@ def update_categories(site_id):
                 cate_g.father_id = '0'
                 cate_g.site_id = site_id
                 cate_g.name = i['name']
+                t_name = translate(i['name'])
+                if t_name:
+                    cate_g.t_name = t_name
                 cate_g.path_from_root = i['name']
                 cate_g.has_children = True
                 cate_g.update_time = datetime.now()
                 cate_g.save()
+
+
+# 翻译
+def translate(q):
+    ta = TransApiSetting.objects.all().first()
+    appid = ta.appid  # 填写你的appid
+    secretKey = ta.secretKey  # 填写你的密钥
+    myurl = 'https://fanyi-api.baidu.com/api/trans/vip/translate'
+    fromLang = 'auto'  # 原文语种
+    toLang = 'zh'  # 译文语种
+    salt = random.randint(32768, 65536)
+    sign = appid + q + str(salt) + secretKey
+    sign = hashlib.md5(sign.encode()).hexdigest()
+    myurl = myurl + '?appid=' + appid + '&q=' + urllib.parse.quote(
+        q) + '&from=' + fromLang + '&to=' + toLang + '&salt=' + str(
+        salt) + '&sign=' + sign
+    resp = requests.get(myurl)
+    time.sleep(1)
+    if resp.status_code == 200:
+        resp.encoding = "utf-8"
+        result = json.loads(resp.text)
+        return result['trans_result'][0]['dst']
+    else:
+        return ''
+
+
+# 更新卖家详细信息
+def update_seller(site_id, seller_id):
+    at = ApiSetting.objects.all().first()
+    token = at.access_token
+    headers = {
+        'Authorization': 'Bearer ' + token,
+    }
+
+    url = 'https://api.mercadolibre.com/sites/' + site_id + '/search?seller_id=' + seller_id
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        data = resp.json()
+        seller = Seller.objects.filter(seller_id=seller_id).first()
+        if seller:
+            seller.level_id = data['seller']['seller_reputation']['level_id']
+            seller.total = data['seller']['seller_reputation']['transactions']['total']
+            seller.canceled = data['seller']['seller_reputation']['transactions']['canceled']
+            seller.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
+            seller.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
+            seller.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            seller.link = data['seller']['permalink']
+            seller.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            seller.total_items = data['paging']['total']
+            seller.update_time = datetime.now()
+            seller.save()
+        else:
+            seller = Seller()
+            seller.seller_id = seller_id
+            seller.site_id = site_id
+            seller.nickname = data['seller']['nickname']
+            seller.registration_date = dateparse.parse_datetime(data['seller']['registration_date'])
+            seller.level_id = data['seller']['seller_reputation']['level_id']
+            seller.total = data['seller']['seller_reputation']['transactions']['total']
+            seller.canceled = data['seller']['seller_reputation']['transactions']['canceled']
+            seller.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
+            seller.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
+            seller.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            seller.link = data['seller']['permalink']
+            seller.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            seller.total_items = data['paging']['total']
+            seller.update_time = datetime.now()
+            seller.save()

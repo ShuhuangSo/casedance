@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords
+from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, SellerTrack
 
 
 @admin.register(Listing)
@@ -28,6 +28,11 @@ class TransApiSettingAdmin(admin.ModelAdmin):
 @admin.register(Seller)
 class SellerAdmin(admin.ModelAdmin):
     list_display = ['seller_id', 'nickname', 'total', 'registration_date']
+
+
+@admin.register(SellerTrack)
+class SellerTrackAdmin(admin.ModelAdmin):
+    list_display = ['seller', 'today_sold', 'total_items', 'total', 'create_time']
 
 
 @admin.register(Categories)

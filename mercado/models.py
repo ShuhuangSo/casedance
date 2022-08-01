@@ -90,11 +90,12 @@ class Seller(models.Model):
     total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='listing数量', help_text='listing数量')
     collection = models.BooleanField(default=False, verbose_name='是否收藏', help_text='是否收藏')
     update_time = models.DateTimeField(null=True, verbose_name='更新时间', help_text='更新时间')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
 
     class Meta:
         verbose_name = '卖家'
         verbose_name_plural = verbose_name
-        ordering = ['-registration_date']
+        ordering = ['-id']
 
     def __str__(self):
         return self.nickname

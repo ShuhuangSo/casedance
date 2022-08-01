@@ -13,7 +13,7 @@ import urllib
 import hashlib
 from datetime import datetime, timedelta
 
-from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller
+from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, SellerTrack
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer
 from mercado import tasks
 
@@ -68,11 +68,10 @@ class ListingViewSet(mixins.ListModelMixin,
         # from datetime import datetime, timedelta
         # date = datetime.now() - timedelta(days=1)
         # Listing.objects.all().update(update_time=date)
-
-        # ListingTrack.objects.filter(listing__item_id='MLM1354607411').update(create_time=date)
         # date = datetime.now() - timedelta(days=1)
-        # Keywords.objects.filter(categ_id='MLM1182').update(update_time=date)
-        tasks.update_seller('MLM', '1094875249')
+        # SellerTrack.objects.all().update(create_time=date)
+
+        tasks.track_seller()
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -345,17 +344,39 @@ class SellerViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('site_id', 'level_id')  # 配置过滤字段
+    filter_fields = ('site_id', 'level_id', 'collection')  # 配置过滤字段
     search_fields = ('nickname', 'seller_id')  # 配置搜索字段
     ordering_fields = ('registration_date', 'total')  # 配置排序字段
 
-    # 开启收藏并更新卖家详细信息
-    @action(methods=['get'], detail=False, url_path='collect_seller')
-    def collect_seller(self, request):
+    # 更新卖家详细信息
+    @action(methods=['get'], detail=False, url_path='update_seller')
+    def update_seller(self, request):
         seller_id = self.request.query_params.get('seller_id')
 
         seller = Seller.objects.filter(seller_id=seller_id).first()
-        seller.collection = True
-        seller.save()
-        tasks.update_seller(seller.site_id, seller_id)
+        tasks.create_or_update_seller(seller.site_id, seller_id)
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
+    # 新增卖家，按昵称
+    @action(methods=['get'], detail=False, url_path='create_seller')
+    def create_seller(self, request):
+        seller_info = self.request.query_params.get('seller_info')
+        site_id = self.request.query_params.get('site_id')
+
+        at = ApiSetting.objects.all().first()
+        token = at.access_token
+        headers = {
+            'Authorization': 'Bearer ' + token,
+        }
+
+        url = 'https://api.mercadolibre.com/sites/' + site_id + '/search?nickname=' + seller_info
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            if 'seller' in data:
+                seller_id = str(data['seller']['id'])
+                tasks.create_or_update_seller(site_id, seller_id)
+                return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'msg': '卖家不存在，请检查卖家名称'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response({'msg': 'api操作不成功'}, status=status.HTTP_406_NOT_ACCEPTABLE)

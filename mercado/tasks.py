@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
 
-from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting
+from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack
+from setting.models import TaskLog
 
 user_agent_list = [
 
@@ -177,6 +178,12 @@ def track_listing():
         req_url = url + '&attributes=' + attributes2
         get_listing_info(req_url)
 
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 9
+    task_log.note = '美客多listing跟踪'
+    task_log.save()
+
     return 'OK'
 
 
@@ -249,7 +256,7 @@ def get_listing_info(url):
                 listing_track.rating_average = listing.rating_average
                 listing_track.health = listing.health
                 listing_track.save()
-            time.sleep(1)
+            time.sleep(0.5)
         ListingTrack.objects.bulk_create(add_list)
 
 
@@ -314,7 +321,7 @@ def translate(q):
 
 
 # 更新卖家详细信息
-def update_seller(site_id, seller_id):
+def create_or_update_seller(site_id, seller_id):
     at = ApiSetting.objects.all().first()
     token = at.access_token
     headers = {
@@ -355,3 +362,67 @@ def update_seller(site_id, seller_id):
             seller.total_items = data['paging']['total']
             seller.update_time = datetime.now()
             seller.save()
+
+
+# 跟踪卖家
+@shared_task
+def track_seller():
+    today = datetime.now().date()
+    # 跟踪所有卖家
+    queryset = Seller.objects.all()
+    at = ApiSetting.objects.all().first()
+    token = at.access_token
+    headers = {
+        'Authorization': 'Bearer ' + token,
+    }
+    url = 'https://api.mercadolibre.com/sites/'
+    for i in queryset:
+        resp = requests.get(url + i.site_id + '/search?seller_id=' + i.seller_id, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            # 更新卖家信息
+            i.level_id = data['seller']['seller_reputation']['level_id']
+            i.total = data['seller']['seller_reputation']['transactions']['total']
+            i.canceled = data['seller']['seller_reputation']['transactions']['canceled']
+            i.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
+            i.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
+            i.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            i.link = data['seller']['permalink']
+            i.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            i.total_items = data['paging']['total']
+            i.update_time = datetime.now()
+            i.save()
+
+            # 补充计算昨天当天销量
+            st = SellerTrack.objects.filter(seller=i, create_time__date=today - timedelta(days=1)).first()
+            if st:
+                st.today_sold = i.total - st.total
+                st.save()
+
+            seller_track = SellerTrack.objects.filter(seller=i, create_time__date=today).first()
+            if seller_track:
+                seller_track.today_sold = i.total - seller_track.total
+                seller_track.negative = i.negative
+                seller_track.neutral = i.neutral
+                seller_track.positive = i.positive
+                seller_track.total_items = i.total_items
+                seller_track.save()
+            else:
+                seller_track = SellerTrack()
+                seller_track.seller = i
+                seller_track.total = i.total
+                seller_track.negative = i.negative
+                seller_track.neutral = i.neutral
+                seller_track.positive = i.positive
+                seller_track.total_items = i.total_items
+                seller_track.save()
+
+        time.sleep(0.5)
+
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 1
+    task_log.note = '美客多seller跟踪'
+    task_log.save()
+
+    return 'OK'

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
 
-from mercado.models import Listing, ListingTrack, Categories, Seller
+from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -120,7 +120,16 @@ class SellerSerializer(serializers.ModelSerializer):
     """
     卖家
     """
+    yesterday_sold = serializers.SerializerMethodField()
+
+    def get_yesterday_sold(self, obj):
+        date = datetime.now().date() - timedelta(days=1)
+        st = SellerTrack.objects.filter(create_time__date=date, seller=obj).first()
+        n = st.today_sold if st else 0
+        return n
 
     class Meta:
         model = Seller
-        fields = "__all__"
+        fields = ('id', 'seller_id', 'site_id', 'nickname', 'level_id', 'total', 'canceled', 'negative', 'neutral',
+                  'positive', 'registration_date', 'link', 'sold_60d', 'total_items', 'collection', 'update_time',
+                  'note', 'yesterday_sold')

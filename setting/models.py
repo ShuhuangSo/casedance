@@ -96,7 +96,7 @@ class TaskLog(models.Model):
     """
 
     task_type = models.IntegerField(default=0, verbose_name='任务类型', help_text='任务类型')
-    note = models.CharField(max_length=10, verbose_name='任务注释', help_text='任务注释')
+    note = models.CharField(max_length=20, verbose_name='任务注释', help_text='任务注释')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='执行时间', help_text='执行时间')
 
     class Meta:

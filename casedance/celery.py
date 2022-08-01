@@ -48,7 +48,7 @@ app.conf.beat_schedule = {
     },
     'create_month': {
         'task': 'bonus.tasks.create_month',  # 生成当月月份
-        'schedule': crontab(day_of_month=1),  # 每月1号执行
+        'schedule': crontab(minute=0, hour=1, day_of_month=1),  # 每月1号执行
     },
 }
 # 自动从所有已注册的django app中加载任务

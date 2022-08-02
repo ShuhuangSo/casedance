@@ -48,7 +48,7 @@ app.conf.beat_schedule = {
     },
     'create_month': {
         'task': 'bonus.tasks.create_month',  # 生成当月月份
-        'schedule': crontab(day_of_month=1),  # 每月1号执行
+        'schedule': crontab(minute=0, hour=1, day_of_month=1),  # 每月1号执行
     },
     'track_listing': {
         'task': 'mercado.tasks.track_listing',  # 每天更新链接信息并进行销量计算

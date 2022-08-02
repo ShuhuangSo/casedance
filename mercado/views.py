@@ -14,7 +14,8 @@ import hashlib
 from datetime import datetime, timedelta
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, SellerTrack
-from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer
+from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
+    SellerTrackSerializer
 from mercado import tasks
 
 
@@ -67,11 +68,9 @@ class ListingViewSet(mixins.ListModelMixin,
         # tasks.update_categories('MLM')
         # from datetime import datetime, timedelta
         # date = datetime.now() - timedelta(days=1)
-        # Listing.objects.all().update(update_time=date)
-        # date = datetime.now() - timedelta(days=1)
-        # SellerTrack.objects.all().update(create_time=date)
+        #
+        # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
 
-        tasks.track_seller()
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -258,6 +257,9 @@ class CategoriesViewSet(mixins.ListModelMixin,
             'Authorization': 'Bearer ' + token,
         }
         url = 'https://api.mercadolibre.com/trends/' + site_id + '/' + categ_id
+        # 如果目录id是整站, 则请求整站数据
+        if categ_id in ['MLM', 'MLC', 'MLB']:
+            url = 'https://api.mercadolibre.com/trends/' + site_id
         resp = requests.get(url, headers=headers)
         query_list = []
         if resp.status_code == 200:
@@ -280,9 +282,13 @@ class CategoriesViewSet(mixins.ListModelMixin,
                             rank_changed = n - kw.rank
                         else:
                             rank_status = None
+                        t_keyword = kw.t_keyword
+                    else:
+                        t_keyword = tasks.translate(i['keyword'])
                     add_list.append(Keywords(
                         categ_id=categ_id,
                         keyword=i['keyword'],
+                        t_keyword=t_keyword,
                         url=i['url'],
                         rank=n,
                         status=rank_status,
@@ -380,3 +386,33 @@ class SellerViewSet(mixins.ListModelMixin,
             else:
                 return Response({'msg': '卖家不存在，请检查卖家名称'}, status=status.HTTP_406_NOT_ACCEPTABLE)
         return Response({'msg': 'api操作不成功'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+class SellerTrackViewSet(mixins.ListModelMixin,
+                         mixins.CreateModelMixin,
+                         mixins.UpdateModelMixin,
+                         mixins.DestroyModelMixin,
+                         mixins.RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+    """
+    list:
+        卖家跟踪列表,分页,过滤,搜索,排序
+    create:
+        卖家跟踪新增
+    retrieve:
+        卖家跟踪详情页
+    update:
+        卖家跟踪修改
+    destroy:
+        卖家跟踪删除
+    """
+    queryset = SellerTrack.objects.all()
+    serializer_class = SellerTrackSerializer  # 序列化
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    # filter_fields = ('listing__id', 'health')  # 配置过滤字段
+    filterset_fields = {
+        'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'seller__id': ['exact']
+    }
+    ordering_fields = ('create_time',)  # 配置排序字段

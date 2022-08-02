@@ -23,7 +23,7 @@ from rest_framework.documentation import include_docs_urls
 
 from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
     ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
-from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet
+from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -139,6 +139,8 @@ router.register('med_listing_track', ListingTrackViewSet, basename='med_listing_
 router.register('med_categories', CategoriesViewSet, basename='med_categories')
 # 卖家
 router.register('med_seller', SellerViewSet, basename='med_seller')
+# 卖家跟踪
+router.register('med_seller_track', SellerTrackViewSet, basename='med_seller_track')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

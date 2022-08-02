@@ -133,3 +133,14 @@ class SellerSerializer(serializers.ModelSerializer):
         fields = ('id', 'seller_id', 'site_id', 'nickname', 'level_id', 'total', 'canceled', 'negative', 'neutral',
                   'positive', 'registration_date', 'link', 'sold_60d', 'total_items', 'collection', 'update_time',
                   'note', 'yesterday_sold')
+
+
+class SellerTrackSerializer(serializers.ModelSerializer):
+    """
+    卖家跟踪
+    """
+    create_time = serializers.DateTimeField(format='%Y-%m-%d')
+
+    class Meta:
+        model = SellerTrack
+        fields = "__all__"

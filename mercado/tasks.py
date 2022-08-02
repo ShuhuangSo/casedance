@@ -311,7 +311,7 @@ def translate(q):
         q) + '&from=' + fromLang + '&to=' + toLang + '&salt=' + str(
         salt) + '&sign=' + sign
     resp = requests.get(myurl)
-    time.sleep(1)
+    time.sleep(0.01)
     if resp.status_code == 200:
         resp.encoding = "utf-8"
         result = json.loads(resp.text)

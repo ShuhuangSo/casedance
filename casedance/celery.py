@@ -55,7 +55,7 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour='0', minute='3'),  # 每天0点1分开始计算
     },
     'track_seller': {
-        'task': 'mercado.tasks.track_listing',  # 每天更新卖家信息并进行销量计算
+        'task': 'mercado.tasks.track_seller',  # 每天更新卖家信息并进行销量计算
         'schedule': crontab(hour='0', minute='30'),  # 每天0点30分开始计算
     },
 }

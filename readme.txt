@@ -25,3 +25,6 @@ v0.51
 v0.6
 修复抓取手机型号详情bug
 增加mercado app
+
+v0.61
+修复celery bug

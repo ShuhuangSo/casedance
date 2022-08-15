@@ -30,5 +30,5 @@ v0.61
 修复celery bug
 v0.62
 修复price track bug
-v0.63
+v0.63.2
 修复product model抓取bug

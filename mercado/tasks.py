@@ -242,6 +242,7 @@ def get_listing_info(url):
                 add_list.append(ListingTrack(
                     listing=listing,
                     currency=listing.currency,
+                    price=listing.price,
                     total_sold=listing.total_sold,
                     reviews=listing.reviews,
                     rating_average=listing.rating_average,
@@ -253,6 +254,7 @@ def get_listing_info(url):
                 today_sold = listing.total_sold - listing_track.total_sold
                 listing_track.today_sold = today_sold
                 listing_track.reviews = listing.reviews
+                listing_track.price = listing.price
                 listing_track.rating_average = listing.rating_average
                 listing_track.health = listing.health
                 listing_track.save()

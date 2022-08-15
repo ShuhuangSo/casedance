@@ -28,3 +28,5 @@ v0.6
 
 v0.61
 修复celery bug
+v0.62
+修复price track bug

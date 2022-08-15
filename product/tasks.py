@@ -174,7 +174,7 @@ def get_models_info(id):
     dimensions = body.find('td', attrs={'data-spec': 'dimensions'}).text
     # 重量
     weight = body.find('td', attrs={'data-spec': 'weight'}).text
-    misc = specs_list.find_all('table')[12]
+    misc = specs_list.find_all('table')[12] if specs_list.find_all('table')[12] else specs_list.find_all('table')[11]
     # models
     models = '--'
     if misc.find('td', attrs={'data-spec': 'models'}):

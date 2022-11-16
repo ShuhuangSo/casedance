@@ -2,7 +2,7 @@ from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
 
-from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack
+from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -143,4 +143,14 @@ class SellerTrackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SellerTrack
+        fields = "__all__"
+
+
+class MLProductSerializer(serializers.ModelSerializer):
+    """
+    mercado产品库
+    """
+
+    class Meta:
+        model = MLProduct
         fields = "__all__"

@@ -13,9 +13,10 @@ import urllib
 import hashlib
 from datetime import datetime, timedelta
 
-from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, SellerTrack
+from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
+    SellerTrack, MLProduct
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
-    SellerTrackSerializer
+    SellerTrackSerializer, MLProductSerializer
 from mercado import tasks
 
 
@@ -416,3 +417,31 @@ class SellerTrackViewSet(mixins.ListModelMixin,
         'seller__id': ['exact']
     }
     ordering_fields = ('create_time',)  # 配置排序字段
+
+
+class MLProductViewSet(mixins.ListModelMixin,
+                       mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin,
+                       mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin,
+                       viewsets.GenericViewSet):
+    """
+    list:
+        ML产品列表,分页,过滤,搜索,排序
+    create:
+        ML产品新增
+    retrieve:
+        ML产品详情页
+    update:
+        ML产品修改
+    destroy:
+        ML产品删除
+    """
+    queryset = MLProduct.objects.all()
+    serializer_class = MLProductSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('p_status', 'site', 'shop')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'sku', 'item_id')  # 配置排序字段

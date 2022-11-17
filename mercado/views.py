@@ -6,6 +6,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import requests
+import openpyxl
 import time
 import random
 import json
@@ -445,3 +446,96 @@ class MLProductViewSet(mixins.ListModelMixin,
     filter_fields = ('p_status', 'site', 'shop')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'sku', 'item_id')  # 配置排序字段
+
+    # ML产品批量上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        import warnings
+        warnings.filterwarnings('ignore')
+
+        data = request.data
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['上传模板']
+
+        add_list = []
+        if sheet.max_row <= 1:
+            return Response({'msg': '表格不能为空'}, status=status.HTTP_202_ACCEPTED)
+
+        for cell_row in list(sheet)[1:]:
+            row_status = cell_row[0].value and cell_row[1].value and cell_row[2].value
+            if not row_status:
+                continue
+
+            # 检查型号是否已存在
+            is_exist = MLProduct.objects.filter(sku=cell_row[0].value.strip()).count()
+            if is_exist:
+                continue
+
+            sku = cell_row[0].value
+            p_name = cell_row[1].value
+            upc = cell_row[2].value
+            item_id = cell_row[3].value
+            label_code = cell_row[4].value
+            site = cell_row[5].value
+            shop = cell_row[6].value
+            unit_cost = cell_row[7].value
+            if not type(unit_cost) in [float, int]:
+                unit_cost = 0
+            weight = cell_row[8].value
+            if not type(weight) in [float, int]:
+                weight = 0
+            length = cell_row[9].value
+            if not type(length) in [float, int]:
+                length = 0
+            width = cell_row[10].value
+            if not type(width) in [float, int]:
+                width = 0
+            heigth = cell_row[11].value
+            if not type(heigth) in [float, int]:
+                heigth = 0
+            first_ship_cost = cell_row[12].value
+            if not type(first_ship_cost) in [float, int]:
+                first_ship_cost = 0
+            custom_code = cell_row[13].value
+            cn_name = cell_row[14].value
+            en_name = cell_row[15].value
+            brand = cell_row[16].value
+            declared_value = cell_row[17].value
+            if not type(declared_value) in [float, int]:
+                declared_value = 0
+            cn_material = cell_row[18].value
+            en_material = cell_row[19].value
+            use = cell_row[20].value
+            buy_url = cell_row[21].value
+            sale_url = cell_row[22].value
+            refer_url = cell_row[23].value
+
+            add_list.append(MLProduct(
+                sku=sku,
+                p_name=p_name,
+                upc=upc,
+                item_id=item_id,
+                label_code=label_code,
+                site=site,
+                shop=shop,
+                unit_cost=unit_cost,
+                weight=weight,
+                length=length,
+                width=width,
+                heigth=heigth,
+                first_ship_cost=first_ship_cost,
+                custom_code=custom_code,
+                cn_name=cn_name,
+                en_name=en_name,
+                brand=brand,
+                declared_value=declared_value,
+                cn_material=cn_material,
+                en_material=en_material,
+                use=use,
+                buy_url=buy_url,
+                sale_url=sale_url,
+                refer_url=refer_url
+            ))
+        MLProduct.objects.bulk_create(add_list)
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)

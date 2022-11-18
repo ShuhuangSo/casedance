@@ -227,7 +227,8 @@ class MLProduct(models.Model):
     cn_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文品名', help_text='中文品名')
     en_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文品名', help_text='英文品名')
     brand = models.CharField(null=True, blank=True, max_length=20, verbose_name='品牌', help_text='品牌')
-    declared_value = models.FloatField(null=True, blank=True, max_length=30, verbose_name='申报价值USD', help_text='申报价值USD')
+    declared_value = models.FloatField(null=True, blank=True, max_length=30, verbose_name='申报价值USD',
+                                       help_text='申报价值USD')
     cn_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文材质', help_text='中文材质')
     en_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文材质', help_text='英文材质')
     use = models.CharField(null=True, blank=True, max_length=50, verbose_name='用途', help_text='用途')
@@ -248,6 +249,88 @@ class MLProduct(models.Model):
 
     class Meta:
         verbose_name = 'ML产品库'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.sku
+
+
+class Shop(models.Model):
+    """
+    FBM店铺
+    """
+
+    warehouse_type = models.CharField(max_length=30, verbose_name='仓库类型', help_text='仓库类型')
+    name = models.CharField(max_length=30, verbose_name='店铺代号', help_text='店铺代号')
+    shop_type = models.CharField(max_length=30, verbose_name='店铺类型', help_text='店铺类型')
+    seller_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺ID', help_text='店铺ID')
+    nickname = models.CharField(max_length=50, null=True, blank=True, verbose_name='店铺名称', help_text='店铺名称')
+    site = models.CharField(max_length=20, null=True, blank=True, verbose_name='站点', help_text='站点')
+    url = models.CharField(null=True, blank=True, max_length=300, verbose_name='店铺链接', help_text='店铺链接')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    is_active = models.BooleanField(default=True, verbose_name='是否启用', help_text='是否启用')
+    total_profit = models.FloatField(null=True, blank=True, verbose_name='累计利润', help_text='累计利润')
+    total_weight = models.FloatField(null=True, blank=True, verbose_name='库存总重量kg', help_text='库存总重量kg')
+    total_cbm = models.FloatField(null=True, blank=True, verbose_name='库存总体积cbm', help_text='库存总体积cbm')
+    stock_value = models.FloatField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
+    total_qty = models.IntegerField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
+
+    class Meta:
+        verbose_name = 'FBM店铺'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.name
+
+
+class ShopStock(models.Model):
+    """
+    店铺库存
+    """
+    PRODUCT_STATUS = (
+        ('NORMAL', '普通'),
+        ('HOT_SALE', '热卖'),
+        ('OFFLINE', '停售'),
+        ('CLEAN', '清仓中'),
+    )
+
+    shop = models.ForeignKey(Shop, related_name='shop_shopstock', on_delete=models.CASCADE, verbose_name='上架店铺',
+                             help_text='上架店铺')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    label_code = models.CharField(max_length=30, null=True, blank=True, verbose_name='FBM条码', help_text='FBM条码')
+    upc = models.CharField(max_length=30, null=True, blank=True, verbose_name='UPC', help_text='UPC')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
+    p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='ON_SALE', verbose_name='产品状态',
+                                help_text='产品状态')
+    qty = models.IntegerField(default=0, verbose_name='库存数量', help_text='库存数量')
+    onway_qty = models.IntegerField(default=0, verbose_name='在途数量', help_text='在途数量')
+    day15_sold = models.IntegerField(default=0, verbose_name='15天销量', help_text='15天销量')
+    day30_sold = models.IntegerField(default=0, verbose_name='30天销量', help_text='30天销量')
+    total_sold = models.IntegerField(default=0, verbose_name='累计销量', help_text='累计销量')
+    unit_cost = models.FloatField(null=True, blank=True, verbose_name='均摊成本价', help_text='均摊成本价')
+    first_ship_cost = models.FloatField(null=True, blank=True, verbose_name='均摊头程运费', help_text='均摊头程运费')
+    length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
+    width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
+    heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
+    weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
+    total_profit = models.FloatField(null=True, blank=True, verbose_name='累计利润', help_text='累计利润')
+    total_weight = models.FloatField(null=True, blank=True, verbose_name='总重量kg', help_text='总重量kg')
+    total_cbm = models.FloatField(null=True, blank=True, verbose_name='总体积cbm', help_text='总体积cbm')
+    stock_value = models.FloatField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
+    sale_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='销售链接', help_text='销售链接')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    is_active = models.BooleanField(default=True, verbose_name='是否启用', help_text='是否启用')
+    is_collect = models.BooleanField(default=True, verbose_name='是否收藏', help_text='是否收藏')
+
+    class Meta:
+        verbose_name = '店铺库存'
         verbose_name_plural = verbose_name
         ordering = ['-create_time']
 

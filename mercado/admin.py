@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, SellerTrack
+from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
+    SellerTrack, Shop, ShopStock
 
 
 @admin.register(Listing)
@@ -47,3 +48,17 @@ class KeywordsAdmin(admin.ModelAdmin):
     list_display = ['categ_id', 'keyword', 'rank', 'status', 'rank_changed', 'update_time']
     list_filter = ['categ_id']
     search_fields = ['keyword', 't_keyword']
+
+
+@admin.register(Shop)
+class ShopAdmin(admin.ModelAdmin):
+    list_display = ['name', 'nickname', 'seller_id']
+    list_filter = ['warehouse_type']
+    search_fields = ['name', 'nickname', 'seller_id']
+
+
+@admin.register(ShopStock)
+class ShopStockAdmin(admin.ModelAdmin):
+    list_display = ['sku', 'p_name', 'qty']
+    list_filter = ['p_status']
+    search_fields = ['sku', 'p_name']

@@ -539,3 +539,22 @@ class MLProductViewSet(mixins.ListModelMixin,
         MLProduct.objects.bulk_create(add_list)
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+    # ML产品图片上传
+    @action(methods=['post'], detail=False, url_path='image_upload')
+    def image_upload(self, request):
+        data = request.data
+        product = MLProduct.objects.filter(id=data['id']).first()
+        if not product:
+            return Response({'msg': '产品不存在'}, status=status.HTTP_202_ACCEPTED)
+
+        path = 'media/ml_product/' + product.sku
+        pic = data['pic']
+        content = pic.chunks()
+        with open(path, 'wb') as f:
+            for i in content:
+                f.write(i)
+        product.image = 'ml_product/' + product.sku
+        product.save()
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)

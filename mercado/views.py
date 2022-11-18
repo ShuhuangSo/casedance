@@ -15,9 +15,9 @@ import hashlib
 from datetime import datetime, timedelta
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct
+    SellerTrack, MLProduct, Shop, ShopStock
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
-    SellerTrackSerializer, MLProductSerializer
+    SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer
 from mercado import tasks
 
 
@@ -556,5 +556,75 @@ class MLProductViewSet(mixins.ListModelMixin,
                 f.write(i)
         product.image = 'ml_product/' + product.sku
         product.save()
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+
+class ShopViewSet(mixins.ListModelMixin,
+                  mixins.CreateModelMixin,
+                  mixins.UpdateModelMixin,
+                  mixins.DestroyModelMixin,
+                  mixins.RetrieveModelMixin,
+                  viewsets.GenericViewSet):
+    """
+    list:
+        FBM店铺列表,分页,过滤,搜索,排序
+    create:
+        FBM店铺新增
+    retrieve:
+        FBM店铺详情页
+    update:
+        FBM店铺修改
+    destroy:
+        FBM店铺删除
+    """
+    queryset = Shop.objects.all()
+    serializer_class = ShopSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('warehouse_type', 'shop_type', 'site', 'is_active')  # 配置过滤字段
+    search_fields = ('name', 'seller_id', 'nickname')  # 配置搜索字段
+    ordering_fields = ('create_time', 'total_profit', 'total_weight')  # 配置排序字段
+
+
+class ShopStockViewSet(mixins.ListModelMixin,
+                       mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin,
+                       mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin,
+                       viewsets.GenericViewSet):
+    """
+    list:
+        店铺库存列表,分页,过滤,搜索,排序
+    create:
+        店铺库存新增
+    retrieve:
+        店铺库存详情页
+    update:
+        店铺库存修改
+    destroy:
+        店铺库存删除
+    """
+    queryset = ShopStock.objects.all()
+    serializer_class = ShopStockSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('shop', 'p_status', 'is_active', 'is_collect')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
+                       'total_weight', 'total_cbm', 'stock_value')  # 配置排序字段
+
+    # ML test data
+    @action(methods=['get'], detail=False, url_path='test_data')
+    def test_data(self, request):
+        shop = Shop.objects.get(id=1)
+        for i in range(30):
+            stock = ShopStock()
+            stock.sku = 'MD200' + str(i)
+            stock.p_name = '华尔兹皮套' + str(i)
+            stock.shop = shop
+            stock.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)

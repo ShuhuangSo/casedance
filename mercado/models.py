@@ -263,7 +263,7 @@ class Shop(models.Model):
 
     warehouse_type = models.CharField(max_length=30, verbose_name='仓库类型', help_text='仓库类型')
     name = models.CharField(max_length=30, verbose_name='店铺代号', help_text='店铺代号')
-    shop_type = models.CharField(max_length=30, verbose_name='店铺类型', help_text='店铺类型')
+    shop_type = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺类型', help_text='店铺类型')
     seller_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺ID', help_text='店铺ID')
     nickname = models.CharField(max_length=50, null=True, blank=True, verbose_name='店铺名称', help_text='店铺名称')
     site = models.CharField(max_length=20, null=True, blank=True, verbose_name='站点', help_text='站点')

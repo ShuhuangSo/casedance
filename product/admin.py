@@ -53,5 +53,5 @@ class DeviceBrandAdmin(admin.ModelAdmin):
 
 @admin.register(MLProduct)
 class MLProductAdmin(admin.ModelAdmin):
-    list_display = ['sku', 'p_name']
+    list_display = ['id', 'sku', 'p_name']
     search_fields = ['sku', 'p_name']

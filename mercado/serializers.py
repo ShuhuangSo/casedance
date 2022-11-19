@@ -2,7 +2,8 @@ from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
 
-from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock
+from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
+    ShipDetail, ShipBox
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -173,4 +174,34 @@ class ShopStockSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShopStock
+        fields = "__all__"
+
+
+class ShipSerializer(serializers.ModelSerializer):
+    """
+    头程运单
+    """
+
+    class Meta:
+        model = Ship
+        fields = "__all__"
+
+
+class ShipDetailSerializer(serializers.ModelSerializer):
+    """
+    运单详情
+    """
+
+    class Meta:
+        model = ShipDetail
+        fields = "__all__"
+
+
+class ShipBoxSerializer(serializers.ModelSerializer):
+    """
+    包装箱
+    """
+
+    class Meta:
+        model = ShipBox
         fields = "__all__"

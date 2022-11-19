@@ -15,9 +15,10 @@ import hashlib
 from datetime import datetime, timedelta
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
-    SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer
+    SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
+    ShipDetailSerializer, ShipBoxSerializer
 from mercado import tasks
 
 
@@ -629,3 +630,118 @@ class ShopStockViewSet(mixins.ListModelMixin,
             stock.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+
+class ShipViewSet(mixins.ListModelMixin,
+                  mixins.CreateModelMixin,
+                  mixins.UpdateModelMixin,
+                  mixins.DestroyModelMixin,
+                  mixins.RetrieveModelMixin,
+                  viewsets.GenericViewSet):
+    """
+    list:
+        头程运单列表,分页,过滤,搜索,排序
+    create:
+        头程运单新增
+    retrieve:
+        头程运单详情页
+    update:
+        头程运单修改
+    destroy:
+        头程运单删除
+    """
+    queryset = Ship.objects.all()
+    serializer_class = ShipSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'target_FBM')  # 配置过滤字段
+    search_fields = ('s_number', 'batch', 'envio_number', 'note')  # 配置搜索字段
+    ordering_fields = ('create_time', 'book_date')  # 配置排序字段
+
+    # 创建运单
+    @action(methods=['post'], detail=False, url_path='create_ship')
+    def create_ship(self, request):
+        shop = request.data['shop']
+        target = request.data['target']
+        ship_type = request.data['ship_type']
+        carrier = request.data['carrier']
+        end_date = request.data['end_date']
+        ship_date = request.data['ship_date']
+        note = request.data['note']
+        ship_detail = request.data['ship_detail']
+
+        batch = 'P{time_str}'.format(time_str=time.strftime('%Y%m%d'))
+        name_count = Ship.objects.filter(batch=batch).count()
+        if name_count:
+            batch = batch + '(' + str(name_count+1) + ')'
+
+        ship = Ship()
+        ship.s_status = 'PREPARING'
+        ship.batch = batch
+        ship.shop = shop
+        ship.target = target
+        ship.ship_type = ship_type
+        ship.carrier = carrier
+        ship.end_date = end_date
+        ship.ship_date = ship_date
+        ship.note = note
+        ship.save()
+
+        return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
+
+
+class ShipDetailViewSet(mixins.ListModelMixin,
+                        mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
+    """
+    list:
+        运单详情列表,分页,过滤,搜索,排序
+    create:
+        运单详情新增
+    retrieve:
+        运单详情详情页
+    update:
+        运单详情修改
+    destroy:
+        运单详情删除
+    """
+    queryset = ShipDetail.objects.all()
+    serializer_class = ShipDetailSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('ship', 'box_number', 's_type')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'qty')  # 配置排序字段
+
+
+class ShipBoxViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        包装箱列表,分页,过滤,搜索,排序
+    create:
+        包装箱新增
+    retrieve:
+        包装箱详情页
+    update:
+        包装箱修改
+    destroy:
+        包装箱删除
+    """
+    queryset = ShipBox.objects.all()
+    serializer_class = ShipBoxSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('ship', )  # 配置过滤字段
+    search_fields = ('box_number', 'carrier_box_number')  # 配置搜索字段
+    ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段

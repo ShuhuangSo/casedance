@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
-    SellerTrack, Shop, ShopStock
+    SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox
 
 
 @admin.register(Listing)
@@ -62,3 +62,24 @@ class ShopStockAdmin(admin.ModelAdmin):
     list_display = ['sku', 'p_name', 'qty']
     list_filter = ['p_status']
     search_fields = ['sku', 'p_name']
+
+
+@admin.register(Ship)
+class ShipAdmin(admin.ModelAdmin):
+    list_display = ['batch', 'envio_number', 'shop']
+    list_filter = ['s_status']
+    search_fields = ['batch', 'envio_number']
+
+
+@admin.register(ShipDetail)
+class ShipDetailAdmin(admin.ModelAdmin):
+    list_display = ['sku', 'p_name', 'qty']
+    list_filter = ['ship']
+    search_fields = ['sku', 'p_name']
+
+
+@admin.register(ShipBox)
+class ShipBoxAdmin(admin.ModelAdmin):
+    list_display = ['box_number', 'carrier_box_number', 'item_qty']
+    list_filter = ['ship']
+    search_fields = ['box_number', 'carrier_box_number']

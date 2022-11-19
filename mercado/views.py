@@ -624,6 +624,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
             stock = ShopStock()
             stock.sku = 'MD200' + str(i)
             stock.p_name = '华尔兹皮套' + str(i)
+            stock.p_status = 'NORMAL'
             stock.shop = shop
             stock.save()
 

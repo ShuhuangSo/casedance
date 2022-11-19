@@ -310,11 +310,12 @@ class ShopStock(models.Model):
                                 help_text='产品状态')
     qty = models.IntegerField(default=0, verbose_name='库存数量', help_text='库存数量')
     onway_qty = models.IntegerField(default=0, verbose_name='在途数量', help_text='在途数量')
+    trans_qty = models.IntegerField(default=0, verbose_name='中转仓数量', help_text='中转仓数量')
     day15_sold = models.IntegerField(default=0, verbose_name='15天销量', help_text='15天销量')
     day30_sold = models.IntegerField(default=0, verbose_name='30天销量', help_text='30天销量')
     total_sold = models.IntegerField(default=0, verbose_name='累计销量', help_text='累计销量')
-    unit_cost = models.FloatField(null=True, blank=True, verbose_name='均摊成本价', help_text='均摊成本价')
-    first_ship_cost = models.FloatField(null=True, blank=True, verbose_name='均摊头程运费', help_text='均摊头程运费')
+    unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
+    first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
     length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
     width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
     heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
@@ -336,3 +337,115 @@ class ShopStock(models.Model):
 
     def __str__(self):
         return self.sku
+
+
+class Ship(models.Model):
+    """
+    头程运单
+    """
+    SHIP_STATUS = (
+        ('PREPARING', '备货中'),
+        ('SHIPPED', '已发货'),
+        ('BOOKED', '已预约'),
+        ('FINISHED', '已完成'),
+        ('ERROR', '异常'),
+    )
+
+    s_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='运单编号', help_text='运单编号')
+    batch = models.CharField(max_length=30, null=True, blank=True, verbose_name='批次号', help_text='批次号')
+    s_status = models.CharField(max_length=10, choices=SHIP_STATUS, default='PREPARING', verbose_name='产品状态',
+                                help_text='产品状态')
+    shop = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标店铺', help_text='目标店铺')
+    target = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标入仓FBM/中转仓', help_text='目标入仓FBM/中转仓')
+    envio_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='Envio号', help_text='Envio号')
+    target_FBM = models.CharField(max_length=30, null=True, blank=True, verbose_name='FBM仓库', help_text='FBM仓库')
+    ship_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='运单类型', help_text='运单类型')
+    shipping_fee = models.FloatField(null=True, default=0, verbose_name='运费', help_text='运费')
+    extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
+    carrier = models.CharField(max_length=30, null=True, blank=True, verbose_name='承运商', help_text='承运商')
+    end_date = models.DateField(null=True, verbose_name='物流截单日期', help_text='物流截单日期')
+    ship_date = models.DateField(null=True, verbose_name='航班日期', help_text='航班日期')
+    book_date = models.DateTimeField(null=True, verbose_name='FBM预约日期', help_text='FBM预约日期')
+    total_box = models.IntegerField(default=0, verbose_name='总箱数', help_text='总箱数')
+    total_qty = models.IntegerField(default=0, verbose_name='总数量', help_text='总数量')
+    weight = models.FloatField(null=True, blank=True, verbose_name='总重量kg', help_text='总重量kg')
+    cbm = models.FloatField(null=True, blank=True, verbose_name='总体积cbm', help_text='总体积cbm')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '头程运单'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.batch
+
+
+class ShipDetail(models.Model):
+    """
+    运单详情
+    """
+    ship = models.ForeignKey(Ship, related_name='ship_shipDetail', on_delete=models.CASCADE, verbose_name='所属运单',
+                             help_text='所属运单')
+    box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
+    s_type = models.CharField(max_length=10, verbose_name='发货类型', help_text='发货类型')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    label_code = models.CharField(max_length=30, null=True, blank=True, verbose_name='FBM条码', help_text='FBM条码')
+    upc = models.CharField(max_length=30, null=True, blank=True, verbose_name='UPC', help_text='UPC')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
+    custom_code = models.CharField(null=True, blank=True, max_length=20, verbose_name='海关编码', help_text='海关编码')
+    cn_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文品名', help_text='中文品名')
+    en_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文品名', help_text='英文品名')
+    brand = models.CharField(null=True, blank=True, max_length=20, verbose_name='品牌', help_text='品牌')
+    declared_value = models.FloatField(null=True, blank=True, max_length=30, verbose_name='申报价值USD',
+                                       help_text='申报价值USD')
+    cn_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文材质', help_text='中文材质')
+    en_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文材质', help_text='英文材质')
+    use = models.CharField(null=True, blank=True, max_length=50, verbose_name='用途', help_text='用途')
+    unit_cost = models.FloatField(null=True, default=0, verbose_name='成本价', help_text='成本价')
+    avg_ship_fee = models.FloatField(null=True, default=0, verbose_name='单个分摊运费', help_text='单个分摊运费')
+    qty = models.IntegerField(default=0, verbose_name='数量', help_text='数量')
+    length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
+    width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
+    heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
+    weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
+    note = models.CharField(max_length=300, null=True, blank=True, verbose_name='短备注', help_text='短备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '运单详情'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.sku
+
+
+class ShipBox(models.Model):
+    """
+    包装箱
+    """
+    ship = models.ForeignKey(Ship, related_name='ship_shipBox', on_delete=models.CASCADE, verbose_name='所属运单',
+                             help_text='所属运单')
+    box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
+    carrier_box_number = models.CharField(max_length=30, verbose_name='物流商箱唛号', help_text='物流商箱唛号')
+    item_qty = models.IntegerField(default=0, verbose_name='箱内产品数量', help_text='箱内产品数量')
+    length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
+    width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
+    heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
+    weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
+    cbm = models.FloatField(null=True, blank=True, verbose_name='体积cbm', help_text='体积cbm')
+    size_weight = models.FloatField(null=True, blank=True, verbose_name='体积重kg', help_text='体积重kg')
+    note = models.CharField(max_length=300, null=True, blank=True, verbose_name='短备注', help_text='短备注')
+
+    class Meta:
+        verbose_name = '包装箱'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.box_number

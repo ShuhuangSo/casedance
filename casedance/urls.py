@@ -24,7 +24,7 @@ from rest_framework.documentation import include_docs_urls
 from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
     ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
 from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet, \
-    MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet
+    MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -154,6 +154,8 @@ router.register('ml_ship', ShipViewSet, basename='ml_ship')
 router.register('ml_ship_detail', ShipDetailViewSet, basename='ml_ship_detail')
 # 头程包装箱列表
 router.register('ml_ship_box', ShipBoxViewSet, basename='ml_ship_box')
+# 物流商列表
+router.register('ml_carriers', CarrierViewSet, basename='ml_carriers')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

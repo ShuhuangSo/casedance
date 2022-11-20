@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
-    ShipDetail, ShipBox
+    ShipDetail, ShipBox, Carrier
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -41,7 +41,7 @@ class ListingSerializer(serializers.ModelSerializer):
         lt2 = ListingTrack.objects.filter(create_time__date=last_date, listing=obj).first()
         m = lt2.today_sold if lt2 else 0
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     # 获取上一个7天销量
@@ -53,12 +53,13 @@ class ListingSerializer(serializers.ModelSerializer):
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date, listing=obj)
+        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
+                                          listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     # 获取30天销量
@@ -79,12 +80,13 @@ class ListingSerializer(serializers.ModelSerializer):
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date, listing=obj)
+        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
+                                          listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     class Meta:
@@ -177,16 +179,6 @@ class ShopStockSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ShipSerializer(serializers.ModelSerializer):
-    """
-    头程运单
-    """
-
-    class Meta:
-        model = Ship
-        fields = "__all__"
-
-
 class ShipDetailSerializer(serializers.ModelSerializer):
     """
     运单详情
@@ -197,6 +189,22 @@ class ShipDetailSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ShipSerializer(serializers.ModelSerializer):
+    """
+    头程运单
+    """
+    # 运单详情
+    ship_shipDetail = ShipDetailSerializer(many=True, required=False, read_only=True)
+
+    class Meta:
+        model = Ship
+        fields = (
+            'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'target_FBM', 'ship_type', 'shipping_fee',
+            'extra_fee',
+            'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
+            'note', 'create_time', 'ship_shipDetail')
+
+
 class ShipBoxSerializer(serializers.ModelSerializer):
     """
     包装箱
@@ -204,4 +212,14 @@ class ShipBoxSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShipBox
+        fields = "__all__"
+
+
+class CarrierSerializer(serializers.ModelSerializer):
+    """
+    物流商
+    """
+
+    class Meta:
+        model = Carrier
         fields = "__all__"

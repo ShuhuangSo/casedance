@@ -363,9 +363,9 @@ class Ship(models.Model):
     shipping_fee = models.FloatField(null=True, default=0, verbose_name='运费', help_text='运费')
     extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
     carrier = models.CharField(max_length=30, null=True, blank=True, verbose_name='承运商', help_text='承运商')
-    end_date = models.DateField(null=True, verbose_name='物流截单日期', help_text='物流截单日期')
-    ship_date = models.DateField(null=True, verbose_name='航班日期', help_text='航班日期')
-    book_date = models.DateTimeField(null=True, verbose_name='FBM预约日期', help_text='FBM预约日期')
+    end_date = models.DateField(null=True, blank=True, verbose_name='物流截单日期', help_text='物流截单日期')
+    ship_date = models.DateField(null=True, blank=True, verbose_name='航班日期', help_text='航班日期')
+    book_date = models.DateField(null=True, blank=True, verbose_name='FBM预约日期', help_text='FBM预约日期')
     total_box = models.IntegerField(default=0, verbose_name='总箱数', help_text='总箱数')
     total_qty = models.IntegerField(default=0, verbose_name='总数量', help_text='总数量')
     weight = models.FloatField(null=True, blank=True, verbose_name='总重量kg', help_text='总重量kg')
@@ -449,3 +449,20 @@ class ShipBox(models.Model):
 
     def __str__(self):
         return self.box_number
+
+
+class Carrier(models.Model):
+    """
+    物流商
+    """
+
+    od_num = models.IntegerField(default=1, verbose_name='排序号', help_text='排序号')
+    name = models.CharField(max_length=30, verbose_name='物流名称', help_text='物流名称')
+
+    class Meta:
+        verbose_name = '物流商'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.name

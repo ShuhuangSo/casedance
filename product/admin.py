@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mercado.models import MLProduct
+from mercado.models import MLProduct, Carrier
 from .models import Product, ProductExtraInfo, DeviceModel, CompatibleModel, ProductTag, Supplier, DeviceBrand
 
 
@@ -55,3 +55,9 @@ class DeviceBrandAdmin(admin.ModelAdmin):
 class MLProductAdmin(admin.ModelAdmin):
     list_display = ['id', 'sku', 'p_name']
     search_fields = ['sku', 'p_name']
+
+
+@admin.register(Carrier)
+class CarrierAdmin(admin.ModelAdmin):
+    list_display = ['od_num', 'name']
+    search_fields = ['name']

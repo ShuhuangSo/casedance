@@ -15,10 +15,10 @@ import hashlib
 from datetime import datetime, timedelta
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
-    ShipDetailSerializer, ShipBoxSerializer
+    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer
 from mercado import tasks
 
 
@@ -671,10 +671,7 @@ class ShipViewSet(mixins.ListModelMixin,
         note = request.data['note']
         ship_detail = request.data['ship_detail']
 
-        batch = 'P{time_str}'.format(time_str=time.strftime('%Y%m%d'))
-        name_count = Ship.objects.filter(batch=batch).count()
-        if name_count:
-            batch = batch + '(' + str(name_count+1) + ')'
+        batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
 
         ship = Ship()
         ship.s_status = 'PREPARING'
@@ -687,6 +684,36 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.ship_date = ship_date
         ship.note = note
         ship.save()
+
+        # 创建运单详情
+        for i in ship_detail:
+            product = MLProduct.objects.filter(sku=i['sku']).first()
+            if product:
+                sd = ShipDetail()
+                sd.ship = ship
+                sd.s_type = i['s_type']
+                sd.qty = i['qty']
+                sd.note = i['note']
+                sd.sku = i['sku']
+                sd.p_name = product.p_name
+                sd.label_code = product.label_code
+                sd.upc = product.upc
+                sd.item_id = product.item_id
+                sd.custom_code = product.custom_code
+                sd.cn_name = product.cn_name
+                sd.en_name = product.en_name
+                sd.brand = product.brand
+                sd.declared_value = product.declared_value
+                sd.cn_material = product.cn_material
+                sd.en_material = product.en_material
+                sd.use = product.use
+                sd.image = product.image
+                sd.unit_cost = product.unit_cost
+                sd.weight = product.weight
+                sd.length = product.length
+                sd.width = product.width
+                sd.heigth = product.heigth
+                sd.save()
 
         return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
 
@@ -745,3 +772,31 @@ class ShipBoxViewSet(mixins.ListModelMixin,
     filter_fields = ('ship', )  # 配置过滤字段
     search_fields = ('box_number', 'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段
+
+
+class CarrierViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        物流商列表,分页,过滤,搜索,排序
+    create:
+        物流商新增
+    retrieve:
+        物流商详情页
+    update:
+        物流商修改
+    destroy:
+        物流商删除
+    """
+    queryset = Carrier.objects.all()
+    serializer_class = CarrierSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('name', )  # 配置过滤字段
+    search_fields = ('name', )  # 配置搜索字段
+    ordering_fields = ('od_num', 'id')  # 配置排序字段

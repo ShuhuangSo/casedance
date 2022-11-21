@@ -432,7 +432,7 @@ class ShipBox(models.Model):
     ship = models.ForeignKey(Ship, related_name='ship_shipBox', on_delete=models.CASCADE, verbose_name='所属运单',
                              help_text='所属运单')
     box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
-    carrier_box_number = models.CharField(max_length=30, verbose_name='物流商箱唛号', help_text='物流商箱唛号')
+    carrier_box_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='物流商箱唛号', help_text='物流商箱唛号')
     item_qty = models.IntegerField(default=0, verbose_name='箱内产品数量', help_text='箱内产品数量')
     length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
     width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')

@@ -680,8 +680,10 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.target = target
         ship.ship_type = ship_type
         ship.carrier = carrier
-        ship.end_date = end_date
-        ship.ship_date = ship_date
+        if end_date:
+            ship.end_date = end_date
+        if ship_date:
+            ship.ship_date = ship_date
         ship.note = note
         ship.save()
 

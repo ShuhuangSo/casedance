@@ -753,9 +753,21 @@ class ShipViewSet(mixins.ListModelMixin,
         result = ShipDetail.objects.filter(ship=ship).aggregate(Sum('qty'))
         ship.total_qty = result['qty__sum']
 
+        # 总体积cbm
+        sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
+        ship.cbm = sum_cbm['cbm__sum']
+
         ship.save()
 
         return Response({'msg': '成功发货!'}, status=status.HTTP_200_OK)
+
+    # 计算运单数量
+    @action(methods=['get'], detail=False, url_path='calc_ships')
+    def calc_ships(self, request):
+        pre_qty = Ship.objects.filter(s_status='PREPARING').count()
+        shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
+        booked_qty = Ship.objects.filter(s_status='BOOKED').count()
+        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty}, status=status.HTTP_200_OK)
 
 
 class ShipDetailViewSet(mixins.ListModelMixin,
@@ -811,8 +823,67 @@ class ShipBoxViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('ship', )  # 配置过滤字段
     search_fields = ('box_number', 'carrier_box_number')  # 配置搜索字段
-    ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段
+    ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段# 创建运单
 
+    # add box
+    @action(methods=['post'], detail=False, url_path='add_shipbox')
+    def add_shipbox(self, request):
+        ship_id = request.data['ship']
+        box_number = request.data['box_number']
+        length = float(request.data['length'])
+        width = float(request.data['width'])
+        heigth = float(request.data['heigth'])
+        weight = request.data['weight']
+        carrier_box_number = request.data['carrier_box_number']
+        note = request.data['note']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        if ship:
+            box = ShipBox()
+            box.ship = ship
+            box.box_number = box_number
+            box.length = length
+            box.width = width
+            box.heigth = heigth
+            box.weight = weight
+            box.carrier_box_number = carrier_box_number
+            box.note = note
+
+            cbm = length * width * heigth / 1000000
+            box.cbm = cbm
+            size_weight = length * width * heigth / 6000
+            box.size_weight = size_weight
+            box.save()
+        return Response({'msg': '成功新增包装箱!'}, status=status.HTTP_200_OK)
+
+    # edit box
+    @action(methods=['put'], detail=False, url_path='update_shipbox')
+    def update_shipbox(self, request):
+        box_id = request.data['id']
+        box_number = request.data['box_number']
+        length = float(request.data['length'])
+        width = float(request.data['width'])
+        heigth = float(request.data['heigth'])
+        weight = request.data['weight']
+        carrier_box_number = request.data['carrier_box_number']
+        note = request.data['note']
+
+        box = ShipBox.objects.filter(id=box_id).first()
+        box.box_number = box_number
+        box.length = length
+        box.width = width
+        box.heigth = heigth
+        box.weight = weight
+        box.carrier_box_number = carrier_box_number
+        box.note = note
+
+        cbm = length * width * heigth / 1000000
+        box.cbm = cbm
+        size_weight = length * width * heigth / 6000
+        box.size_weight = size_weight
+        box.save()
+
+        return Response({'msg': '包装箱已更新!'}, status=status.HTTP_200_OK)
 
 class CarrierViewSet(mixins.ListModelMixin,
                      mixins.CreateModelMixin,

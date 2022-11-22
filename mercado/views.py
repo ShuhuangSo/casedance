@@ -13,6 +13,7 @@ import json
 import urllib
 import hashlib
 from datetime import datetime, timedelta
+from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier
@@ -718,6 +719,43 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.save()
 
         return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
+
+    # 运单发货
+    @action(methods=['post'], detail=False, url_path='send_ship')
+    def send_ship(self, request):
+        ship_id = request.data['id']
+        ship_note = request.data['note']
+        ship_detail = request.data['ship_shipDetail']
+
+        for i in ship_detail:
+            if not i['qty']:
+                # 发货数量为0的删除
+                ShipDetail.objects.filter(id=i['id']).delete()
+                continue
+            sd = ShipDetail.objects.filter(id=i['id']).first()
+            sd.qty = i['qty']
+            sd.box_number = i['box_number']
+            sd.note = i['note']
+            sd.save()
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        if ship_note:
+            ship.note = ship_note
+        ship.s_status = 'SHIPPED'
+        # 总箱数
+        box_qty = ShipBox.objects.filter(ship=ship).count()
+        ship.total_box = box_qty
+
+        sum_weight = ShipBox.objects.filter(ship=ship).aggregate(Sum('weight'))
+        ship.weight = sum_weight['weight__sum']
+
+        # 总数量
+        result = ShipDetail.objects.filter(ship=ship).aggregate(Sum('qty'))
+        ship.total_qty = result['qty__sum']
+
+        ship.save()
+
+        return Response({'msg': '成功发货!'}, status=status.HTTP_200_OK)
 
 
 class ShipDetailViewSet(mixins.ListModelMixin,

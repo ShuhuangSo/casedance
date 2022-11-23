@@ -306,7 +306,7 @@ class ShopStock(models.Model):
     item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
     image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
                               help_text='产品图片')
-    p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='ON_SALE', verbose_name='产品状态',
+    p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='NORMAL', verbose_name='产品状态',
                                 help_text='产品状态')
     qty = models.IntegerField(default=0, verbose_name='库存数量', help_text='库存数量')
     onway_qty = models.IntegerField(default=0, verbose_name='在途数量', help_text='在途数量')

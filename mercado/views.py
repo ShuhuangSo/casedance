@@ -761,6 +761,96 @@ class ShipViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功发货!'}, status=status.HTTP_200_OK)
 
+    # 添加运费
+    @action(methods=['post'], detail=False, url_path='postage')
+    def postage(self, request):
+        ship_id = request.data['id']
+        shipping_fee = request.data['shipping_fee']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship.shipping_fee = shipping_fee
+        ship.save()
+
+        all_fee = ship.shipping_fee + ship.extra_fee
+
+        queryset = ShipDetail.objects.filter(ship=ship)
+        total_weight = 0
+        total_cbm = 0
+
+        if ship.ship_type == '空运':
+            for i in queryset:
+                total_weight += (i.weight * i.qty)
+            for i in queryset:
+                percent = (i.weight * i.qty) / total_weight
+                avg_ship_fee = percent * all_fee / i.qty
+                i.avg_ship_fee = avg_ship_fee
+                i.save()
+
+        if ship.ship_type == '海运':
+            for i in queryset:
+                cbm = i.length * i.width * i.heigth / 1000000
+                total_cbm += (cbm * i.qty)
+            for i in queryset:
+                cbm = i.length * i.width * i.heigth / 1000000
+                percent = cbm / total_cbm
+                avg_ship_fee = percent * all_fee
+                i.avg_ship_fee = avg_ship_fee
+                i.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 入仓
+    @action(methods=['post'], detail=False, url_path='in_warehouse')
+    def in_warehouse(self, request):
+        ship_id = request.data['id']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship_detail = ShipDetail.objects.filter(ship=ship)
+        for i in ship_detail:
+            shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
+            # 如果是补货产品
+            if shop_stock:
+                shop_stock.qty += i.qty
+
+                value1 = shop_stock.unit_cost * shop_stock.qty
+                value2 = i.unit_cost * i.qty
+                avg = (value1 + value2) / (shop_stock.qty + i.qty)
+                shop_stock.unit_cost = avg
+
+                ex_value1 = shop_stock.first_ship_cost * shop_stock.qty
+                ex_value2 = i.avg_ship_fee * i.qty
+                ex_avg = (ex_value1 + ex_value2) / (shop_stock.qty + i.qty)
+                shop_stock.first_ship_cost = ex_avg
+
+                shop_stock.weight = i.weight
+                shop_stock.length = i.length
+                shop_stock.width = i.width
+                shop_stock.heigth = i.heigth
+                shop_stock.save()
+            else:
+                shop_stock = ShopStock()
+                shop = Shop.objects.filter(name=ship.shop).first()
+                shop_stock.shop = shop
+                shop_stock.sku = i.sku
+                shop_stock.p_name = i.p_name
+                shop_stock.label_code = i.label_code
+                shop_stock.upc = i.upc
+                shop_stock.item_id = i.item_id
+                shop_stock.image = i.image
+                shop_stock.qty = i.qty
+                shop_stock.weight = i.weight
+                shop_stock.length = i.length
+                shop_stock.width = i.width
+                shop_stock.heigth = i.heigth
+                shop_stock.unit_cost = i.unit_cost
+                shop_stock.first_ship_cost = i.avg_ship_fee
+                shop_stock.save()
+
+        ship.s_status = 'FINISHED'
+        ship.save()
+
+        return Response({'msg': '入仓成功!'}, status=status.HTTP_200_OK)
+
     # 计算运单数量
     @action(methods=['get'], detail=False, url_path='calc_ships')
     def calc_ships(self, request):

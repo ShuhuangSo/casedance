@@ -16,10 +16,10 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
-    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer
+    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer
 from mercado import tasks
 
 
@@ -781,7 +781,10 @@ class ShipViewSet(mixins.ListModelMixin,
             for i in queryset:
                 total_weight += (i.weight * i.qty)
             for i in queryset:
-                percent = (i.weight * i.qty) / total_weight
+                if total_weight:
+                    percent = (i.weight * i.qty) / total_weight
+                else:
+                    percent = 0
                 avg_ship_fee = percent * all_fee / i.qty
                 i.avg_ship_fee = avg_ship_fee
                 i.save()
@@ -805,46 +808,78 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_id = request.data['id']
 
         ship = Ship.objects.filter(id=ship_id).first()
-        ship_detail = ShipDetail.objects.filter(ship=ship)
-        for i in ship_detail:
-            shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
-            # 如果是补货产品
-            if shop_stock:
-                shop_stock.qty += i.qty
 
-                value1 = shop_stock.unit_cost * shop_stock.qty
-                value2 = i.unit_cost * i.qty
-                avg = (value1 + value2) / (shop_stock.qty + i.qty)
-                shop_stock.unit_cost = avg
+        if ship.target == 'FBM':
+            ship_detail = ShipDetail.objects.filter(ship=ship)
+            for i in ship_detail:
+                shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
+                # 如果是补货产品
+                if shop_stock:
+                    shop_stock.qty += i.qty
 
-                ex_value1 = shop_stock.first_ship_cost * shop_stock.qty
-                ex_value2 = i.avg_ship_fee * i.qty
-                ex_avg = (ex_value1 + ex_value2) / (shop_stock.qty + i.qty)
-                shop_stock.first_ship_cost = ex_avg
+                    value1 = shop_stock.unit_cost * shop_stock.qty
+                    value2 = i.unit_cost * i.qty
+                    avg = (value1 + value2) / (shop_stock.qty + i.qty)
+                    shop_stock.unit_cost = avg
 
-                shop_stock.weight = i.weight
-                shop_stock.length = i.length
-                shop_stock.width = i.width
-                shop_stock.heigth = i.heigth
-                shop_stock.save()
-            else:
-                shop_stock = ShopStock()
+                    ex_value1 = shop_stock.first_ship_cost * shop_stock.qty
+                    ex_value2 = i.avg_ship_fee * i.qty
+                    ex_avg = (ex_value1 + ex_value2) / (shop_stock.qty + i.qty)
+                    shop_stock.first_ship_cost = ex_avg
+
+                    shop_stock.weight = i.weight
+                    shop_stock.length = i.length
+                    shop_stock.width = i.width
+                    shop_stock.heigth = i.heigth
+                    shop_stock.save()
+                else:
+                    shop_stock = ShopStock()
+                    shop = Shop.objects.filter(name=ship.shop).first()
+                    shop_stock.shop = shop
+                    shop_stock.sku = i.sku
+                    shop_stock.p_name = i.p_name
+                    shop_stock.label_code = i.label_code
+                    shop_stock.upc = i.upc
+                    shop_stock.item_id = i.item_id
+                    shop_stock.image = i.image
+                    shop_stock.qty = i.qty
+                    shop_stock.weight = i.weight
+                    shop_stock.length = i.length
+                    shop_stock.width = i.width
+                    shop_stock.heigth = i.heigth
+                    shop_stock.unit_cost = i.unit_cost
+                    shop_stock.first_ship_cost = i.avg_ship_fee
+                    shop_stock.save()
+        else:
+            # 入仓中转仓
+            ship_detail = ShipDetail.objects.filter(ship=ship)
+            for i in ship_detail:
+                trans_stock = TransStock()
                 shop = Shop.objects.filter(name=ship.shop).first()
-                shop_stock.shop = shop
-                shop_stock.sku = i.sku
-                shop_stock.p_name = i.p_name
-                shop_stock.label_code = i.label_code
-                shop_stock.upc = i.upc
-                shop_stock.item_id = i.item_id
-                shop_stock.image = i.image
-                shop_stock.qty = i.qty
-                shop_stock.weight = i.weight
-                shop_stock.length = i.length
-                shop_stock.width = i.width
-                shop_stock.heigth = i.heigth
-                shop_stock.unit_cost = i.unit_cost
-                shop_stock.first_ship_cost = i.avg_ship_fee
-                shop_stock.save()
+                trans_stock.shop = shop
+                trans_stock.listing_shop = ship.shop
+                trans_stock.sku = i.sku
+                trans_stock.p_name = i.p_name
+                trans_stock.label_code = i.label_code
+                trans_stock.upc = i.upc
+                trans_stock.item_id = i.item_id
+                trans_stock.image = i.image
+                trans_stock.qty = i.qty
+                trans_stock.unit_cost = i.unit_cost
+                trans_stock.first_ship_cost = i.avg_ship_fee
+                trans_stock.s_number = ship.s_number
+                trans_stock.batch = ship.batch
+                trans_stock.box_number = i.box_number
+                box = ShipBox.objects.filter(ship=ship, box_number=i.box_number).first()
+                trans_stock.carrier_box_number = box.carrier_box_number
+                trans_stock.box_weight = box.weight
+                trans_stock.box_length = box.length
+                trans_stock.box_width = box.width
+                trans_stock.box_heigth = box.heigth
+                trans_stock.box_cbm = box.cbm
+                trans_stock.note = box.note
+                trans_stock.arrived_date = time.strftime('%Y-%m-%d')
+                trans_stock.save()
 
         ship.s_status = 'FINISHED'
         ship.save()
@@ -857,7 +892,8 @@ class ShipViewSet(mixins.ListModelMixin,
         pre_qty = Ship.objects.filter(s_status='PREPARING').count()
         shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
         booked_qty = Ship.objects.filter(s_status='BOOKED').count()
-        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty}, status=status.HTTP_200_OK)
+        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
+                        status=status.HTTP_200_OK)
 
 
 class ShipDetailViewSet(mixins.ListModelMixin,
@@ -911,7 +947,7 @@ class ShipBoxViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('ship', )  # 配置过滤字段
+    filter_fields = ('ship',)  # 配置过滤字段
     search_fields = ('box_number', 'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段# 创建运单
 
@@ -975,6 +1011,7 @@ class ShipBoxViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '包装箱已更新!'}, status=status.HTTP_200_OK)
 
+
 class CarrierViewSet(mixins.ListModelMixin,
                      mixins.CreateModelMixin,
                      mixins.UpdateModelMixin,
@@ -998,6 +1035,34 @@ class CarrierViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('name', )  # 配置过滤字段
-    search_fields = ('name', )  # 配置搜索字段
+    filter_fields = ('name',)  # 配置过滤字段
+    search_fields = ('name',)  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
+
+
+class TransStockViewSet(mixins.ListModelMixin,
+                        mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
+    """
+    list:
+        中转仓库存列表,分页,过滤,搜索,排序
+    create:
+        中转仓库存新增
+    retrieve:
+        中转仓库存详情页
+    update:
+        中转仓库存修改
+    destroy:
+        中转仓库存删除
+    """
+    queryset = TransStock.objects.all()
+    serializer_class = TransStockSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('listing_shop', 'shop', 'is_out')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number', 'carrier_box_number')  # 配置搜索字段
+    ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days')  # 配置排序字段

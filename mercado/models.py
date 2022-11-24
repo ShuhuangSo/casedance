@@ -339,6 +339,47 @@ class ShopStock(models.Model):
         return self.sku
 
 
+class TransStock(models.Model):
+    """
+    中转仓库存
+    """
+    shop = models.ForeignKey(Shop, related_name='shop_trans_stock', on_delete=models.CASCADE, verbose_name='所属中转仓',
+                             help_text='所属中转仓')
+    listing_shop = models.CharField(max_length=60, null=True, blank=True, verbose_name='上架店铺', help_text='上架店铺')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    label_code = models.CharField(max_length=30, null=True, blank=True, verbose_name='FBM条码', help_text='FBM条码')
+    upc = models.CharField(max_length=30, null=True, blank=True, verbose_name='UPC', help_text='UPC')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
+    qty = models.IntegerField(default=0, verbose_name='库存数量', help_text='库存数量')
+    unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
+    first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
+    s_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='运单编号', help_text='运单编号')
+    batch = models.CharField(max_length=30, null=True, blank=True, verbose_name='批次号', help_text='批次号')
+    box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
+    carrier_box_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='物流商箱唛号',
+                                          help_text='物流商箱唛号')
+    box_length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
+    box_width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
+    box_heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
+    box_weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
+    box_cbm = models.FloatField(null=True, blank=True, verbose_name='体积cbm', help_text='体积cbm')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    arrived_date = models.DateField(null=True, blank=True, verbose_name='到仓日期', help_text='到仓日期')
+    stock_days = models.IntegerField(default=0, verbose_name='库龄', help_text='库龄')
+    is_out = models.BooleanField(default=False, verbose_name='是否已出仓', help_text='是否已出仓')
+
+    class Meta:
+        verbose_name = '中转仓库存'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.sku
+
+
 class Ship(models.Model):
     """
     头程运单
@@ -432,7 +473,8 @@ class ShipBox(models.Model):
     ship = models.ForeignKey(Ship, related_name='ship_shipBox', on_delete=models.CASCADE, verbose_name='所属运单',
                              help_text='所属运单')
     box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
-    carrier_box_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='物流商箱唛号', help_text='物流商箱唛号')
+    carrier_box_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='物流商箱唛号',
+                                          help_text='物流商箱唛号')
     item_qty = models.IntegerField(default=0, verbose_name='箱内产品数量', help_text='箱内产品数量')
     length = models.FloatField(null=True, blank=True, verbose_name='长cm', help_text='长cm')
     width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')

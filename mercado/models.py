@@ -399,7 +399,7 @@ class Ship(models.Model):
     shop = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标店铺', help_text='目标店铺')
     target = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标入仓FBM/中转仓', help_text='目标入仓FBM/中转仓')
     envio_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='Envio号', help_text='Envio号')
-    target_FBM = models.CharField(max_length=30, null=True, blank=True, verbose_name='FBM仓库', help_text='FBM仓库')
+    send_from = models.CharField(max_length=30, null=True, blank=True, verbose_name='从哪发', help_text='从哪发')
     ship_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='运单类型', help_text='运单类型')
     shipping_fee = models.FloatField(null=True, default=0, verbose_name='运费', help_text='运费')
     extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
@@ -429,6 +429,7 @@ class ShipDetail(models.Model):
     """
     ship = models.ForeignKey(Ship, related_name='ship_shipDetail', on_delete=models.CASCADE, verbose_name='所属运单',
                              help_text='所属运单')
+    target_FBM = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标FBM仓库', help_text='目标FBM仓库')
     box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
     s_type = models.CharField(max_length=10, verbose_name='发货类型', help_text='发货类型')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')

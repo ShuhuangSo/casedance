@@ -656,7 +656,7 @@ class ShipViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'target_FBM')  # 配置过滤字段
+    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier')  # 配置过滤字段
     search_fields = ('s_number', 'batch', 'envio_number', 'note')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段
 
@@ -676,6 +676,7 @@ class ShipViewSet(mixins.ListModelMixin,
 
         ship = Ship()
         ship.s_status = 'PREPARING'
+        ship.send_from = 'CN'
         ship.batch = batch
         ship.shop = shop
         ship.target = target
@@ -698,6 +699,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.qty = i['qty']
                 sd.note = i['note']
                 sd.sku = i['sku']
+                sd.target_FBM = product.shop
                 sd.p_name = product.p_name
                 sd.label_code = product.label_code
                 sd.upc = product.upc
@@ -857,7 +859,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock = TransStock()
                 shop = Shop.objects.filter(name=ship.shop).first()
                 trans_stock.shop = shop
-                trans_stock.listing_shop = ship.shop
+                trans_stock.listing_shop = i.target_FBM
                 trans_stock.sku = i.sku
                 trans_stock.p_name = i.p_name
                 trans_stock.label_code = i.label_code
@@ -1066,3 +1068,82 @@ class TransStockViewSet(mixins.ListModelMixin,
     filter_fields = ('listing_shop', 'shop', 'is_out')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number', 'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days')  # 配置排序字段
+
+    # fbm发仓
+    @action(methods=['post'], detail=False, url_path='send_fbm')
+    def send_fbm(self, request):
+        data = request.data
+        shop = data[0]['listing_shop']
+
+        batch = 'Z{time_str}'.format(time_str=time.strftime('%m%d'))
+
+        ship = Ship()
+        ship.s_status = 'SHIPPED'
+        ship.send_from = 'LOCAL'
+        ship.batch = batch
+        ship.shop = shop
+        ship.target = 'FBM'
+        ship.save()
+
+        total_box = 0  # 总箱数
+        total_qty = 0  # 总数量
+        total_weight = 0  # 总重量
+        total_cbm = 0  # 总体积
+
+        for i in data:
+            # 创建产品
+            product = MLProduct.objects.filter(sku=i['sku']).first()
+            sd = ShipDetail()
+            sd.ship = ship
+            sd.s_type = 'REFILL'
+            sd.qty = i['qty']
+            sd.sku = i['sku']
+            sd.target_FBM = product.shop
+            sd.p_name = product.p_name
+            sd.label_code = product.label_code
+            sd.upc = product.upc
+            sd.item_id = product.item_id
+            sd.custom_code = product.custom_code
+            sd.cn_name = product.cn_name
+            sd.en_name = product.en_name
+            sd.brand = product.brand
+            sd.declared_value = product.declared_value
+            sd.cn_material = product.cn_material
+            sd.en_material = product.en_material
+            sd.use = product.use
+            sd.image = product.image
+            sd.unit_cost = i['unit_cost']
+            sd.avg_ship_fee = i['first_ship_cost']
+            sd.box_number = i['box_number']
+            sd.weight = product.weight
+            sd.length = product.length
+            sd.width = product.width
+            sd.heigth = product.heigth
+            sd.save()
+
+            # 创建包装箱
+            box = ShipBox()
+            box.ship = ship
+            box.box_number = i['box_number']
+            box.length = i['box_length']
+            box.width = i['box_width']
+            box.heigth = i['box_heigth']
+            box.weight = i['box_weight']
+            box.carrier_box_number = i['carrier_box_number']
+            box.note = i['note']
+            cbm = i['box_cbm']
+            box.cbm = cbm
+            box.save()
+
+            total_box += 1
+            total_qty += i['qty']
+            total_weight += i['box_weight']
+            total_cbm += i['box_cbm']
+
+            TransStock.objects.filter(id=i['id']).delete()
+        ship.total_box = total_box
+        ship.total_qty = total_qty
+        ship.weight = total_weight
+        ship.cbm = total_cbm
+        ship.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)

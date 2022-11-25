@@ -199,7 +199,7 @@ class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = (
-            'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'target_FBM', 'ship_type', 'shipping_fee',
+            'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'ship_type', 'shipping_fee',
             'extra_fee',
             'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'ship_shipDetail')

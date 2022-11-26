@@ -509,3 +509,21 @@ class Carrier(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class MLSite(models.Model):
+    """
+    站点
+    """
+
+    od_num = models.IntegerField(default=1, verbose_name='排序号', help_text='排序号')
+    site_code = models.CharField(max_length=30, verbose_name='站点编号', help_text='站点编号')
+    name = models.CharField(max_length=30, verbose_name='站点名称', help_text='站点名称')
+
+    class Meta:
+        verbose_name = '站点'
+        verbose_name_plural = verbose_name
+        ordering = ['od_num']
+
+    def __str__(self):
+        return self.name

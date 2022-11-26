@@ -16,10 +16,10 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
-    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer
+    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer
 from mercado import tasks
 
 
@@ -689,6 +689,10 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.note = note
         ship.save()
 
+        total_qty = 0  # 总数量
+        total_weight = 0  # 总重量
+        total_cbm = 0  # 总体积
+
         # 创建运单详情
         for i in ship_detail:
             product = MLProduct.objects.filter(sku=i['sku']).first()
@@ -720,7 +724,108 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.heigth = product.heigth
                 sd.save()
 
+                total_qty += i['qty']
+                total_weight += product.weight * i['qty']
+                cbm = product.length * product.width * product.heigth / 1000000
+                total_cbm += cbm
+
+        ship.total_qty = total_qty
+        ship.weight = total_weight
+        ship.cbm = total_cbm
+        ship.save()
+
         return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
+
+    # 编辑运单
+    @action(methods=['post'], detail=False, url_path='edit_ship')
+    def edit_ship(self, request):
+        id = request.data['id']
+        shop = request.data['shop']
+        target = request.data['target']
+        ship_type = request.data['ship_type']
+        carrier = request.data['carrier']
+        end_date = request.data['end_date']
+        ship_date = request.data['ship_date']
+        note = request.data['note']
+        s_number = request.data['s_number']
+        envio_number = request.data['envio_number']
+        ship_detail = request.data['ship_shipDetail']
+
+        ship = Ship.objects.filter(id=id).first()
+        if not ship:
+            return Response({'msg': '数据错误'}, status=status.HTTP_202_ACCEPTED)
+        ship.shop = shop
+        ship.target = target
+        ship.ship_type = ship_type
+        ship.carrier = carrier
+        if end_date:
+            ship.end_date = end_date
+        if ship_date:
+            ship.ship_date = ship_date
+        ship.note = note
+        ship.s_number = s_number
+        ship.envio_number = envio_number
+
+
+        # 需要更新的sku列表
+        sku_list = []
+        for i in ship_detail:
+            sku_list.append(i['sku'])
+
+        # 移除不需要的产品
+        queryset = ShipDetail.objects.filter(ship=ship)
+        for i in queryset:
+            if i.sku not in sku_list:
+                i.delete()
+
+        total_qty = 0  # 总数量
+        total_weight = 0  # 总重量
+        total_cbm = 0  # 总体积
+
+        # 更新运单详情
+        for i in ship_detail:
+            product = MLProduct.objects.filter(sku=i['sku']).first()
+            if product:
+                if 'id' in i.keys():
+                    sd = ShipDetail.objects.filter(id=i['id']).first()
+                else:
+                    sd = ShipDetail()
+                sd.ship = ship
+                sd.s_type = i['s_type']
+                sd.qty = i['qty']
+                sd.note = i['note']
+                sd.sku = i['sku']
+                sd.target_FBM = product.shop
+                sd.p_name = product.p_name
+                sd.label_code = product.label_code
+                sd.upc = product.upc
+                sd.item_id = product.item_id
+                sd.custom_code = product.custom_code
+                sd.cn_name = product.cn_name
+                sd.en_name = product.en_name
+                sd.brand = product.brand
+                sd.declared_value = product.declared_value
+                sd.cn_material = product.cn_material
+                sd.en_material = product.en_material
+                sd.use = product.use
+                sd.image = product.image
+                sd.unit_cost = product.unit_cost
+                sd.weight = product.weight
+                sd.length = product.length
+                sd.width = product.width
+                sd.heigth = product.heigth
+                sd.save()
+
+                total_qty += i['qty']
+                total_weight += product.weight * i['qty']
+                cbm = product.length * product.width * product.heigth / 1000000
+                total_cbm += cbm
+
+        ship.total_qty = total_qty
+        ship.weight = total_weight
+        ship.cbm = total_cbm
+        ship.save()
+        return Response({'msg': '成功更新运单'}, status=status.HTTP_200_OK)
 
     # 运单发货
     @action(methods=['post'], detail=False, url_path='send_ship')
@@ -1066,7 +1171,8 @@ class TransStockViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('listing_shop', 'shop', 'is_out')  # 配置过滤字段
-    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number', 'carrier_box_number')  # 配置搜索字段
+    search_fields = (
+    'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number', 'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days')  # 配置排序字段
 
     # fbm发仓
@@ -1147,3 +1253,31 @@ class TransStockViewSet(mixins.ListModelMixin,
         ship.cbm = total_cbm
         ship.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+
+class MLSiteViewSet(mixins.ListModelMixin,
+                    mixins.CreateModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.DestroyModelMixin,
+                    mixins.RetrieveModelMixin,
+                    viewsets.GenericViewSet):
+    """
+    list:
+        站点列表,分页,过滤,搜索,排序
+    create:
+        站点新增
+    retrieve:
+        站点详情页
+    update:
+        站点修改
+    destroy:
+        站点删除
+    """
+    queryset = MLSite.objects.all()
+    serializer_class = MLSiteSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('name',)  # 配置过滤字段
+    search_fields = ('name',)  # 配置搜索字段
+    ordering_fields = ('od_num', 'id')  # 配置排序字段

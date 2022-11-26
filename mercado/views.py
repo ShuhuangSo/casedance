@@ -866,6 +866,15 @@ class ShipViewSet(mixins.ListModelMixin,
 
         ship.save()
 
+        # 添加fbm库存在途数量
+        if ship.target == 'FBM':
+            queryset = ShipDetail.objects.filter(ship=ship)
+            for i in queryset:
+                shop_stock = ShopStock.objects.filter(sku=i.sku, shop__name=ship.shop).first()
+                if shop_stock:
+                    shop_stock.onway_qty += i.qty
+                    shop_stock.save()
+
         return Response({'msg': '成功发货!'}, status=status.HTTP_200_OK)
 
     # 添加运费
@@ -923,6 +932,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 # 如果是补货产品
                 if shop_stock:
                     shop_stock.qty += i.qty
+                    shop_stock.onway_qty -= i.qty  # 减去在途库存
 
                     value1 = shop_stock.unit_cost * shop_stock.qty
                     value2 = i.unit_cost * i.qty
@@ -987,6 +997,11 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock.note = box.note
                 trans_stock.arrived_date = time.strftime('%Y-%m-%d')
                 trans_stock.save()
+
+                # 增加fbm库存中转仓数量
+                shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
+                shop_stock.trans_qty += i.qty
+                shop_stock.save()
 
         ship.s_status = 'FINISHED'
         ship.save()
@@ -1245,6 +1260,13 @@ class TransStockViewSet(mixins.ListModelMixin,
             total_qty += i['qty']
             total_weight += i['box_weight']
             total_cbm += i['box_cbm']
+
+            # 减去fbm库存 中转仓数量
+            shop_stock = ShopStock.objects.filter(sku=sd.sku, item_id=sd.item_id).first()
+            if shop_stock:
+                shop_stock.onway_qty += sd.qty  # 增加在途数量
+                shop_stock.trans_qty -= sd.qty  # 减去中转仓数量
+                shop_stock.save()
 
             TransStock.objects.filter(id=i['id']).delete()
         ship.total_box = total_box

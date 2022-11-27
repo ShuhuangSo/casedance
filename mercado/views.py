@@ -550,13 +550,13 @@ class MLProductViewSet(mixins.ListModelMixin,
         if not product:
             return Response({'msg': '产品不存在'}, status=status.HTTP_202_ACCEPTED)
 
-        path = 'media/ml_product/' + product.sku
+        path = 'media/ml_product/' + product.sku + '.jpg'
         pic = data['pic']
         content = pic.chunks()
         with open(path, 'wb') as f:
             for i in content:
                 f.write(i)
-        product.image = 'ml_product/' + product.sku
+        product.image = 'ml_product/' + product.sku + '.jpg'
         product.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
@@ -618,17 +618,43 @@ class ShopStockViewSet(mixins.ListModelMixin,
     ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
                        'total_weight', 'total_cbm', 'stock_value')  # 配置排序字段
 
-    # ML test data
-    @action(methods=['get'], detail=False, url_path='test_data')
-    def test_data(self, request):
-        shop = Shop.objects.get(id=1)
-        for i in range(30):
-            stock = ShopStock()
-            stock.sku = 'MD200' + str(i)
-            stock.p_name = '华尔兹皮套' + str(i)
-            stock.p_status = 'NORMAL'
-            stock.shop = shop
-            stock.save()
+    # FBM库存上传
+    @action(methods=['post'], detail=False, url_path='fbm_upload')
+    def fbm_upload(self, request):
+        data = request.data
+        shop_id = data['id']
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['Reporte general de stock']
+
+        for cell_row in list(sheet)[5:]:
+            sku = cell_row[1].value
+            item_id = cell_row[3].value
+            qty = cell_row[16].value
+
+            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id).first()
+            if shop_stock:
+                shop_stock.qty = qty
+                shop_stock.save()
+            else:
+                ml_product = MLProduct.objects.filter(sku=sku, item_id=item_id).first()
+                if ml_product:
+                    shop_stock = ShopStock()
+                    shop = Shop.objects.filter(id=shop_id).first()
+                    shop_stock.shop = shop
+                    shop_stock.sku = ml_product.sku
+                    shop_stock.p_name = ml_product.p_name
+                    shop_stock.label_code = ml_product.label_code
+                    shop_stock.upc = ml_product.upc
+                    shop_stock.item_id = ml_product.item_id
+                    shop_stock.image = ml_product.image
+                    shop_stock.qty = qty
+                    shop_stock.weight = ml_product.weight
+                    shop_stock.length = ml_product.length
+                    shop_stock.width = ml_product.width
+                    shop_stock.heigth = ml_product.heigth
+                    shop_stock.unit_cost = ml_product.unit_cost
+                    shop_stock.first_ship_cost = ml_product.first_ship_cost
+                    shop_stock.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 

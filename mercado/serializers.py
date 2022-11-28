@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
-    ShipDetail, ShipBox, Carrier, TransStock, MLSite
+    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -196,11 +196,26 @@ class ShipSerializer(serializers.ModelSerializer):
     # 运单详情
     ship_shipDetail = ShipDetailSerializer(many=True, required=False, read_only=True)
 
+    fbm_name = serializers.SerializerMethodField()
+    fbm_address = serializers.SerializerMethodField()
+
+    def get_fbm_name(self, obj):
+        fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
+        if fbm:
+            return fbm.name
+        return ''
+
+    def get_fbm_address(self, obj):
+        fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
+        if fbm:
+            return fbm.address
+        return ''
+
     class Meta:
         model = Ship
         fields = (
             'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'ship_type', 'shipping_fee',
-            'extra_fee',
+            'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address',
             'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'ship_shipDetail')
 
@@ -242,4 +257,14 @@ class MLSiteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MLSite
+        fields = "__all__"
+
+
+class FBMWarehouseSerializer(serializers.ModelSerializer):
+    """
+    FBM仓库
+    """
+
+    class Meta:
+        model = FBMWarehouse
         fields = "__all__"

@@ -398,6 +398,7 @@ class Ship(models.Model):
                                 help_text='产品状态')
     shop = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标店铺', help_text='目标店铺')
     target = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标入仓FBM/中转仓', help_text='目标入仓FBM/中转仓')
+    fbm_warehouse = models.CharField(max_length=30, null=True, blank=True, verbose_name='fbm仓库', help_text='fbm仓库')
     envio_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='Envio号', help_text='Envio号')
     send_from = models.CharField(max_length=30, null=True, blank=True, verbose_name='从哪发', help_text='从哪发')
     ship_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='运单类型', help_text='运单类型')
@@ -527,3 +528,25 @@ class MLSite(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class FBMWarehouse(models.Model):
+    """
+    FBM仓库
+    """
+
+    country = models.CharField(max_length=30, null=True, blank=True, verbose_name='国家', help_text='国家')
+    w_code = models.CharField(max_length=30, verbose_name='仓库代码', help_text='仓库代码')
+    name = models.CharField(max_length=100, null=True, blank=True, verbose_name='仓库名称', help_text='仓库名称')
+    address = models.CharField(max_length=300, null=True, blank=True, verbose_name='仓库地址', help_text='仓库地址')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    is_active = models.BooleanField(default=True, verbose_name='是否启用', help_text='是否启用')
+
+    class Meta:
+        verbose_name = 'FBM仓库'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return self.w_code

@@ -16,10 +16,11 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
-    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer
+    ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
+    FBMWarehouseSerializer
 from mercado import tasks
 
 
@@ -511,6 +512,7 @@ class MLProductViewSet(mixins.ListModelMixin,
             buy_url = cell_row[21].value
             sale_url = cell_row[22].value
             refer_url = cell_row[23].value
+            image = cell_row[24].value
 
             add_list.append(MLProduct(
                 sku=sku,
@@ -536,7 +538,8 @@ class MLProductViewSet(mixins.ListModelMixin,
                 use=use,
                 buy_url=buy_url,
                 sale_url=sale_url,
-                refer_url=refer_url
+                refer_url=refer_url,
+                image=image
             ))
         MLProduct.objects.bulk_create(add_list)
 
@@ -613,10 +616,22 @@ class ShopStockViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('shop', 'p_status', 'is_active', 'is_collect')  # 配置过滤字段
+    # filter_fields = ('shop', 'p_status', 'is_active', 'is_collect')  # 配置过滤字段
+    filterset_fields = {
+        'qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'onway_qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'trans_qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'day15_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'day30_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'total_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'shop': ['exact'],
+        'p_status': ['exact'],
+        'is_active': ['exact'],
+        'is_collect': ['exact'],
+    }
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
-                       'total_weight', 'total_cbm', 'stock_value')  # 配置排序字段
+                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty')  # 配置排序字段
 
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')
@@ -683,7 +698,7 @@ class ShipViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier')  # 配置过滤字段
-    search_fields = ('s_number', 'batch', 'envio_number', 'note')  # 配置搜索字段
+    search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段
 
     # 创建运单
@@ -768,6 +783,7 @@ class ShipViewSet(mixins.ListModelMixin,
         id = request.data['id']
         shop = request.data['shop']
         target = request.data['target']
+        fbm_warehouse = request.data['fbm_warehouse']
         ship_type = request.data['ship_type']
         carrier = request.data['carrier']
         end_date = request.data['end_date']
@@ -782,6 +798,7 @@ class ShipViewSet(mixins.ListModelMixin,
             return Response({'msg': '数据错误'}, status=status.HTTP_202_ACCEPTED)
         ship.shop = shop
         ship.target = target
+        ship.fbm_warehouse = fbm_warehouse
         ship.ship_type = ship_type
         ship.carrier = carrier
         if end_date:
@@ -791,7 +808,6 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.note = note
         ship.s_number = s_number
         ship.envio_number = envio_number
-
 
         # 需要更新的sku列表
         sku_list = []
@@ -1213,7 +1229,8 @@ class TransStockViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('listing_shop', 'shop', 'is_out')  # 配置过滤字段
     search_fields = (
-    'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number', 'carrier_box_number')  # 配置搜索字段
+        'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number',
+        'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days')  # 配置排序字段
 
     # fbm发仓
@@ -1329,3 +1346,31 @@ class MLSiteViewSet(mixins.ListModelMixin,
     filter_fields = ('name',)  # 配置过滤字段
     search_fields = ('name',)  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
+
+
+class FBMWarehouseViewSet(mixins.ListModelMixin,
+                          mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin,
+                          mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin,
+                          viewsets.GenericViewSet):
+    """
+    list:
+        FBM仓库列表,分页,过滤,搜索,排序
+    create:
+        FBM仓库新增
+    retrieve:
+        FBM仓库详情页
+    update:
+        FBM仓库修改
+    destroy:
+        FBM仓库删除
+    """
+    queryset = FBMWarehouse.objects.all()
+    serializer_class = FBMWarehouseSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('country', 'is_active')  # 配置过滤字段
+    search_fields = ('w_code', 'name', 'address')  # 配置搜索字段
+    ordering_fields = ('create_time', 'id')  # 配置排序字段

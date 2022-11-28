@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
-    SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite
+    SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse
 
 
 @admin.register(Listing)
@@ -95,3 +95,9 @@ class TransStockAdmin(admin.ModelAdmin):
 class TransStockAdmin(admin.ModelAdmin):
     list_display = ['od_num', 'site_code', 'name']
     search_fields = ['name', 'site_code']
+
+
+@admin.register(FBMWarehouse)
+class FBMWarehouseStockAdmin(admin.ModelAdmin):
+    list_display = ['w_code', 'name', 'country']
+    search_fields = ['name', 'w_code']

@@ -215,7 +215,7 @@ class ShipSerializer(serializers.ModelSerializer):
         model = Ship
         fields = (
             'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'ship_type', 'shipping_fee',
-            'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address',
+            'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from',
             'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'ship_shipDetail')
 

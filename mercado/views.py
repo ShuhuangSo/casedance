@@ -16,11 +16,12 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
-    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse
+    SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
+    MLOrder
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
-    FBMWarehouseSerializer
+    FBMWarehouseSerializer, MLOrderSerializer
 from mercado import tasks
 
 
@@ -636,6 +637,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')
     def fbm_upload(self, request):
+        import warnings
+        warnings.filterwarnings('ignore')
+        
         data = request.data
         shop_id = data['id']
         wb = openpyxl.load_workbook(data['excel'])
@@ -672,6 +676,29 @@ class ShopStockViewSet(mixins.ListModelMixin,
                     shop_stock.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=False, url_path='test')
+    def test(self, request):
+        t = '29 de noviembre de 2022 02:28 hs.'
+        month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+                      'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
+                      'diciembre': '12'}
+        import re
+        de_locate = [m.start() for m in re.finditer('de', t)]
+        day = t[:de_locate[0] - 1]
+        if int(day) < 10:
+            day = '0' + day
+        month = t[de_locate[0] + 3:de_locate[1] - 1]
+        year = t[de_locate[1] + 3:de_locate[1] + 7]
+        hour = t[de_locate[1] + 8:de_locate[1] + 10]
+        min = t[de_locate[1] + 11:de_locate[1] + 13]
+        dt = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
+
+        bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+        bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+        return Response({'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
+                        status=status.HTTP_200_OK)
 
 
 class ShipViewSet(mixins.ListModelMixin,
@@ -1374,3 +1401,127 @@ class FBMWarehouseViewSet(mixins.ListModelMixin,
     filter_fields = ('country', 'is_active')  # 配置过滤字段
     search_fields = ('w_code', 'name', 'address')  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段
+
+
+class MLOrderViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        销售订单列表,分页,过滤,搜索,排序
+    create:
+        销售订单增
+    retrieve:
+        销售订单详情页
+    update:
+        销售订单改
+    destroy:
+        销售订单删除
+    """
+    queryset = MLOrder.objects.all()
+    serializer_class = MLOrderSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('shop', 'is_ad', 'order_status')  # 配置过滤字段
+    search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price', 'profit')  # 配置排序字段
+
+    # ML订单批量上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        import warnings
+        import re
+        warnings.filterwarnings('ignore')
+
+        data = request.data
+        shop_id = data['id']
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb.active
+
+        month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+                      'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
+                      'diciembre': '12'}
+
+        shop = Shop.objects.filter(id=shop_id).first()
+
+        add_list = []
+        for cell_row in list(sheet)[3:]:
+            qty = cell_row[5].value
+            if not qty:
+                continue
+            sku = cell_row[13].value
+            item_id = cell_row[14].value[3:]
+            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id).first()
+            if not shop_stock:
+                continue
+
+            order_number = cell_row[0].value
+
+            t = cell_row[1].value
+            de_locate = [m.start() for m in re.finditer('de', t)]
+            day = t[:de_locate[0] - 1]
+            if int(day) < 10:
+                day = '0' + day
+            month = t[de_locate[0] + 3:de_locate[1] - 1]
+            year = t[de_locate[1] + 3:de_locate[1] + 7]
+            hour = t[de_locate[1] + 8:de_locate[1] + 10]
+            min = t[de_locate[1] + 11:de_locate[1] + 13]
+            order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
+
+            bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+            order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+            price = cell_row[6].value
+            fees = cell_row[8].value
+            postage = cell_row[9].value
+            receive_fund = cell_row[11].value
+            is_ad = True if cell_row[12].value == 'Sí' else False
+
+            buyer_name = cell_row[25].value
+            buyer_address = cell_row[27].value
+            buyer_city = cell_row[28].value
+            buyer_state = cell_row[29].value
+            buyer_postcode = cell_row[30].value
+            buyer_country = cell_row[31].value
+
+            ex_rate = 0.35
+            profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost - shop_stock.first_ship_cost
+
+            is_exist = MLOrder.objects.filter(order_number=order_number).count()
+            if not is_exist:
+                add_list.append(MLOrder(
+                    shop=shop,
+                    order_number=order_number,
+                    order_status='FINISHED',
+                    order_time=order_time,
+                    order_time_bj=order_time_bj,
+                    qty=qty,
+                    currency=shop.currency,
+                    ex_rate=ex_rate,
+                    price=price,
+                    fees=fees,
+                    postage=postage,
+                    receive_fund=receive_fund,
+                    is_ad=is_ad,
+                    sku=sku,
+                    p_name=shop_stock.p_name,
+                    item_id=item_id,
+                    image=shop_stock.image,
+                    unit_cost=shop_stock.unit_cost,
+                    first_ship_cost=shop_stock.first_ship_cost,
+                    profit=profit,
+                    buyer_name=buyer_name,
+                    buyer_address=buyer_address,
+                    buyer_city=buyer_city,
+                    buyer_state=buyer_state,
+                    buyer_postcode=buyer_postcode,
+                    buyer_country=buyer_country,
+                ))
+        if len(add_list):
+            MLOrder.objects.bulk_create(add_list)
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)

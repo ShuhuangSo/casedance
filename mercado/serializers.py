@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
-    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse
+    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -267,4 +267,14 @@ class FBMWarehouseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FBMWarehouse
+        fields = "__all__"
+
+
+class MLOrderSerializer(serializers.ModelSerializer):
+    """
+    销售订单
+    """
+
+    class Meta:
+        model = MLOrder
         fields = "__all__"

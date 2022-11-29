@@ -267,6 +267,7 @@ class Shop(models.Model):
     seller_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺ID', help_text='店铺ID')
     nickname = models.CharField(max_length=50, null=True, blank=True, verbose_name='店铺名称', help_text='店铺名称')
     site = models.CharField(max_length=20, null=True, blank=True, verbose_name='站点', help_text='站点')
+    currency = models.CharField(max_length=10, null=True, blank=True, verbose_name='币种', help_text='币种')
     url = models.CharField(null=True, blank=True, max_length=300, verbose_name='店铺链接', help_text='店铺链接')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
@@ -550,3 +551,47 @@ class FBMWarehouse(models.Model):
 
     def __str__(self):
         return self.w_code
+
+
+class MLOrder(models.Model):
+    """
+    销售订单
+    """
+
+    shop = models.ForeignKey(Shop, related_name='shop_order', on_delete=models.CASCADE, verbose_name='所属店铺',
+                             help_text='所属店铺')
+    order_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='订单编号', help_text='订单编号')
+    order_status = models.CharField(max_length=10, null=True, blank=True, verbose_name='订单状态', help_text='订单状态')
+    order_time = models.DateTimeField(null=True, blank=True, verbose_name='订单时间', help_text='订单时间')
+    order_time_bj = models.DateTimeField(null=True, blank=True, verbose_name='订单北京时间', help_text='订单北京时间')
+    qty = models.IntegerField(default=0, verbose_name='数量', help_text='数量')
+    currency = models.CharField(max_length=5, null=True, blank=True, verbose_name='币种', help_text='币种')
+    ex_rate = models.FloatField(default=0, null=True, blank=True, verbose_name='汇率', help_text='汇率')
+    price = models.FloatField(default=0, null=True, blank=True, verbose_name='销售价', help_text='销售价')
+    fees = models.FloatField(default=0, null=True, blank=True, verbose_name='佣金', help_text='佣金')
+    postage = models.FloatField(default=0, null=True, blank=True, verbose_name='邮费', help_text='邮费')
+    receive_fund = models.FloatField(default=0, null=True, blank=True, verbose_name='收入资金', help_text='收入资金')
+    profit = models.FloatField(default=0, null=True, blank=True, verbose_name='利润rmb', help_text='利润rmb')
+    is_ad = models.BooleanField(default=False, verbose_name='是否广告卖出', help_text='是否广告卖出')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
+    unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
+    first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
+    buyer_name = models.CharField(max_length=30, null=True, blank=True, verbose_name='买家姓名', help_text='买家姓名')
+    buyer_address = models.CharField(max_length=500, null=True, blank=True, verbose_name='买家街道', help_text='买家街道')
+    buyer_city = models.CharField(max_length=50, null=True, blank=True, verbose_name='买家城市', help_text='买家城市')
+    buyer_state = models.CharField(max_length=30, null=True, blank=True, verbose_name='买家州', help_text='买家州')
+    buyer_postcode = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家邮编', help_text='买家邮编')
+    buyer_country = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家国家', help_text='买家国家')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '销售订单'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return self.order_number

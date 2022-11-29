@@ -369,7 +369,6 @@ class TransStock(models.Model):
     box_cbm = models.FloatField(null=True, blank=True, verbose_name='体积cbm', help_text='体积cbm')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     arrived_date = models.DateField(null=True, blank=True, verbose_name='到仓日期', help_text='到仓日期')
-    stock_days = models.IntegerField(default=0, verbose_name='库龄', help_text='库龄')
     is_out = models.BooleanField(default=False, verbose_name='是否已出仓', help_text='是否已出仓')
 
     class Meta:
@@ -531,6 +530,24 @@ class MLSite(models.Model):
         return self.name
 
 
+class ExRate(models.Model):
+    """
+    汇率
+    """
+
+    currency = models.CharField(max_length=10, verbose_name='币种', help_text='币种')
+    value = models.FloatField(null=True, blank=True, default=0, verbose_name='汇率', help_text='汇率')
+    update_time = models.DateTimeField(null=True, blank=True, verbose_name='更新时间', help_text='更新时间')
+
+    class Meta:
+        verbose_name = '汇率'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.currency
+
+
 class FBMWarehouse(models.Model):
     """
     FBM仓库
@@ -580,7 +597,7 @@ class MLOrder(models.Model):
                               help_text='产品图片')
     unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
     first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
-    buyer_name = models.CharField(max_length=30, null=True, blank=True, verbose_name='买家姓名', help_text='买家姓名')
+    buyer_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='买家姓名', help_text='买家姓名')
     buyer_address = models.CharField(max_length=500, null=True, blank=True, verbose_name='买家街道', help_text='买家街道')
     buyer_city = models.CharField(max_length=50, null=True, blank=True, verbose_name='买家城市', help_text='买家城市')
     buyer_state = models.CharField(max_length=30, null=True, blank=True, verbose_name='买家州', help_text='买家州')

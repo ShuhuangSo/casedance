@@ -17,7 +17,7 @@ from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder
+    MLOrder, ExRate
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
@@ -696,6 +696,11 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+        d = '2022-11-20'
+        dd = datetime.strptime(d, '%Y-%m-%d')
+        delta = datetime.now() - dd
+        print(delta.days)
 
         return Response({'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
                         status=status.HTTP_200_OK)
@@ -1447,6 +1452,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
                       'diciembre': '12'}
 
         shop = Shop.objects.filter(id=shop_id).first()
+        er = ExRate.objects.filter(currency=shop.currency).first()
+        ex_rate = er.value
 
         add_list = []
         for cell_row in list(sheet)[3:]:
@@ -1475,10 +1482,10 @@ class MLOrderViewSet(mixins.ListModelMixin,
             bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
             order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-            price = cell_row[6].value
-            fees = cell_row[8].value
-            postage = cell_row[9].value
-            receive_fund = cell_row[11].value
+            price = cell_row[18].value if cell_row[18].value else 0
+            fees = cell_row[8].value if cell_row[8].value else 0
+            postage = cell_row[9].value if cell_row[9].value else 0
+            receive_fund = cell_row[11].value if cell_row[11].value else 0
             is_ad = True if cell_row[12].value == 'Sí' else False
 
             buyer_name = cell_row[25].value
@@ -1488,15 +1495,26 @@ class MLOrderViewSet(mixins.ListModelMixin,
             buyer_postcode = cell_row[30].value
             buyer_country = cell_row[31].value
 
-            ex_rate = 0.35
             profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost - shop_stock.first_ship_cost
+
+            order_status = 'FINISHED'
+            if cell_row[2].value == 'Cancelada por el comprador':
+                order_status = 'CANCEL'
+            if cell_row[2].value == 'Paquete cancelado por Mercado Libre':
+                order_status = 'CANCEL'
+            if cell_row[2].value == 'Devolución en camino':
+                order_status = 'RETURN'
+            if cell_row[2].value == 'Reclamo cerrado con reembolso al comprador':
+                order_status = 'CASE'
+            if cell_row[2].value[:8] == 'Devuelto':
+                order_status = 'RETURN'
 
             is_exist = MLOrder.objects.filter(order_number=order_number).count()
             if not is_exist:
                 add_list.append(MLOrder(
                     shop=shop,
                     order_number=order_number,
-                    order_status='FINISHED',
+                    order_status=order_status,
                     order_time=order_time,
                     order_time_bj=order_time_bj,
                     qty=qty,
@@ -1521,6 +1539,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     buyer_postcode=buyer_postcode,
                     buyer_country=buyer_country,
                 ))
+                shop_stock.qty -= qty
+                shop_stock.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 

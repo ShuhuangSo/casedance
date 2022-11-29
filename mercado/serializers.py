@@ -244,10 +244,24 @@ class TransStockSerializer(serializers.ModelSerializer):
     """
     中转仓库存
     """
+    stock_days = serializers.SerializerMethodField()
+
+    def get_stock_days(self, obj):
+        if obj.arrived_date:
+            ad = str(obj.arrived_date)
+            dd = datetime.strptime(ad, '%Y-%m-%d')
+            delta = datetime.now() - dd
+            return delta.days
+        else:
+            return 0
 
     class Meta:
         model = TransStock
-        fields = "__all__"
+        fields = (
+            'id', 'listing_shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
+            'unit_cost', 'first_ship_cost', 's_number', 'batch',
+            'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
+            'arrived_date', 'is_out', 'shop', 'stock_days')
 
 
 class MLSiteSerializer(serializers.ModelSerializer):

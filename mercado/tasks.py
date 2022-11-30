@@ -480,10 +480,25 @@ def calc_product_sales():
                                                    item_id=st.item_id, ).aggregate(Avg('profit_rate'))
             avg_profit_rate = a_profit_rate['profit_rate__avg']
 
+            from django.db.models import Q
+            # 退款率
+            refund_count = MLOrder.objects.filter(shop=s,
+                                                  sku=st.sku,
+                                                  item_id=st.item_id, ).filter(
+                Q(order_status='RETURN') | Q(order_status='CASE')).count()
+            total_count = MLOrder.objects.filter(shop=s,
+                                                 sku=st.sku,
+                                                 item_id=st.item_id, ).count()
+            if total_count:
+                refund_rate = refund_count / total_count
+            else:
+                refund_rate = 0
+
             st.day15_sold = day15_sold if day15_sold else 0
             st.day30_sold = day30_sold if day30_sold else 0
             st.total_sold = total_sold if total_sold else 0
             st.total_profit = total_profit if sum_profit else 0
             st.avg_profit = avg_profit if avg_profit else 0
             st.avg_profit_rate = avg_profit_rate if avg_profit_rate else 0
+            st.refund_rate = refund_rate
             st.save()

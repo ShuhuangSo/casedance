@@ -415,6 +415,8 @@ class Ship(models.Model):
     total_qty = models.IntegerField(default=0, verbose_name='总数量', help_text='总数量')
     weight = models.FloatField(null=True, blank=True, verbose_name='总重量kg', help_text='总重量kg')
     cbm = models.FloatField(null=True, blank=True, verbose_name='总体积cbm', help_text='总体积cbm')
+    tag_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='标签名称', help_text='标签名称')
+    tag_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='标签颜色', help_text='标签颜色')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 

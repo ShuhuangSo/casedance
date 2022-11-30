@@ -625,6 +625,13 @@ class ShopStockViewSet(mixins.ListModelMixin,
         'day15_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'day30_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'total_sold': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'total_profit': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'total_weight': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'total_cbm': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'stock_value': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'refund_rate': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'avg_profit': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'avg_profit_rate': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'shop': ['exact'],
         'p_status': ['exact'],
         'is_active': ['exact'],
@@ -632,7 +639,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
     }
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
-                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty')  # 配置排序字段
+                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty', 'refund_rate', 'avg_profit', 'avg_profit_rate')  # 配置排序字段
 
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')

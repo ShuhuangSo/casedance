@@ -677,6 +677,26 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
+    @action(methods=['post'], detail=False, url_path='calc_stock')
+    def calc_stock(self, request):
+        shop_id = request.data['id']
+        queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id)
+        total_amount = 0
+        total_qty = 0
+        for i in queryset:
+            total_qty += i.qty
+            total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+        date = datetime.now().date() - timedelta(days=30)
+        sum_qty = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('qty'))
+        sold_qty = sum_qty['qty__sum']
+        sum_amount = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('price'))
+        sold_amount = sum_amount['price__sum']
+        sum_profit = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('profit'))
+        sold_profit = sum_profit['profit__sum']
+
+        return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty, 'sold_amount': sold_amount, 'sold_profit': sold_profit}, status=status.HTTP_200_OK)
+
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         t = '29 de noviembre de 2022 02:28 hs.'
@@ -697,10 +717,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        d = '2022-11-20'
-        dd = datetime.strptime(d, '%Y-%m-%d')
-        delta = datetime.now() - dd
-        print(delta.days)
+        tasks.calc_product_sales()
 
         return Response({'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
                         status=status.HTTP_200_OK)
@@ -1496,6 +1513,9 @@ class MLOrderViewSet(mixins.ListModelMixin,
             buyer_country = cell_row[31].value
 
             profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost - shop_stock.first_ship_cost
+            profit_rate = profit / (price * ex_rate)
+            if profit_rate < 0:
+                profit_rate = 0
 
             order_status = 'FINISHED'
             if cell_row[2].value == 'Cancelada por el comprador':
@@ -1509,8 +1529,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
             if cell_row[2].value[:8] == 'Devuelto':
                 order_status = 'RETURN'
 
-            is_exist = MLOrder.objects.filter(order_number=order_number).count()
-            if not is_exist:
+            ml_order = MLOrder.objects.filter(order_number=order_number).first()
+            if not ml_order:
                 add_list.append(MLOrder(
                     shop=shop,
                     order_number=order_number,
@@ -1532,6 +1552,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     unit_cost=shop_stock.unit_cost,
                     first_ship_cost=shop_stock.first_ship_cost,
                     profit=profit,
+                    profit_rate=profit_rate,
                     buyer_name=buyer_name,
                     buyer_address=buyer_address,
                     buyer_city=buyer_city,
@@ -1541,6 +1562,12 @@ class MLOrderViewSet(mixins.ListModelMixin,
                 ))
                 shop_stock.qty -= qty
                 shop_stock.save()
+            else:
+                if ml_order.order_status != order_status:
+                    ml_order.order_status = order_status
+                    ml_order.receive_fund = receive_fund
+                    ml_order.profit = profit
+                    ml_order.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 

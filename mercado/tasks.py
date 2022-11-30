@@ -9,8 +9,10 @@ import hashlib
 from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
+from django.db.models import Sum, Avg
 
-from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack
+from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
+    MLOrder, ShopStock
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -426,3 +428,62 @@ def track_seller():
     task_log.save()
 
     return 'OK'
+
+
+# 计算mercado产品销量
+@shared_task
+def calc_product_sales():
+    shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
+    for s in shops:
+        is_exist = MLOrder.objects.filter(shop=s).count()
+        if not is_exist:
+            continue
+        shop_stocks = ShopStock.objects.filter(shop=s, is_active=True)
+        for st in shop_stocks:
+            # 15天销量
+            day15 = datetime.now().date() - timedelta(days=15)
+            sum_day15 = MLOrder.objects.filter(shop=s,
+                                               sku=st.sku,
+                                               item_id=st.item_id,
+                                               order_time_bj__gte=day15).aggregate(Sum('qty'))
+            day15_sold = sum_day15['qty__sum']
+
+            # 30天销量
+            day30 = datetime.now().date() - timedelta(days=30)
+            sum_day30 = MLOrder.objects.filter(shop=s,
+                                               sku=st.sku,
+                                               item_id=st.item_id,
+                                               order_time_bj__gte=day30).aggregate(Sum('qty'))
+            day30_sold = sum_day30['qty__sum']
+
+            # 累计销量
+            sum_total = MLOrder.objects.filter(shop=s,
+                                               sku=st.sku,
+                                               item_id=st.item_id, ).aggregate(Sum('qty'))
+            total_sold = sum_total['qty__sum']
+
+            # 累计利润
+            sum_profit = MLOrder.objects.filter(shop=s,
+                                                sku=st.sku,
+                                                item_id=st.item_id, ).aggregate(Sum('profit'))
+            total_profit = sum_profit['profit__sum']
+
+            # 平均毛利润
+            avg_profit = MLOrder.objects.filter(shop=s,
+                                                sku=st.sku,
+                                                item_id=st.item_id, ).aggregate(Avg('profit'))
+            avg_profit = avg_profit['profit__avg']
+
+            # 平均毛利率
+            a_profit_rate = MLOrder.objects.filter(shop=s,
+                                                   sku=st.sku,
+                                                   item_id=st.item_id, ).aggregate(Avg('profit_rate'))
+            avg_profit_rate = a_profit_rate['profit_rate__avg']
+
+            st.day15_sold = day15_sold if day15_sold else 0
+            st.day30_sold = day30_sold if day30_sold else 0
+            st.total_sold = total_sold if total_sold else 0
+            st.total_profit = total_profit if sum_profit else 0
+            st.avg_profit = avg_profit if avg_profit else 0
+            st.avg_profit_rate = avg_profit_rate if avg_profit_rate else 0
+            st.save()

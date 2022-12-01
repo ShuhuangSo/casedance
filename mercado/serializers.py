@@ -2,7 +2,8 @@ from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
 
-from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack
+from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
+    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -40,7 +41,7 @@ class ListingSerializer(serializers.ModelSerializer):
         lt2 = ListingTrack.objects.filter(create_time__date=last_date, listing=obj).first()
         m = lt2.today_sold if lt2 else 0
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     # 获取上一个7天销量
@@ -52,12 +53,13 @@ class ListingSerializer(serializers.ModelSerializer):
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date, listing=obj)
+        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
+                                          listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     # 获取30天销量
@@ -78,12 +80,13 @@ class ListingSerializer(serializers.ModelSerializer):
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date, listing=obj)
+        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
+                                          listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
 
-        p = n * 100 if m == 0 else int((n - m)/m * 100)
+        p = n * 100 if m == 0 else int((n - m) / m * 100)
         return p
 
     class Meta:
@@ -143,4 +146,159 @@ class SellerTrackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SellerTrack
+        fields = "__all__"
+
+
+class MLProductSerializer(serializers.ModelSerializer):
+    """
+    mercado产品库
+    """
+
+    class Meta:
+        model = MLProduct
+        fields = "__all__"
+
+
+class ShopSerializer(serializers.ModelSerializer):
+    """
+    FBM店铺
+    """
+
+    class Meta:
+        model = Shop
+        fields = "__all__"
+
+
+class ShopStockSerializer(serializers.ModelSerializer):
+    """
+    店铺库存
+    """
+
+    class Meta:
+        model = ShopStock
+        fields = "__all__"
+
+
+class ShipDetailSerializer(serializers.ModelSerializer):
+    """
+    运单详情
+    """
+
+    class Meta:
+        model = ShipDetail
+        fields = "__all__"
+
+
+class ShipSerializer(serializers.ModelSerializer):
+    """
+    头程运单
+    """
+    # 运单详情
+    ship_shipDetail = ShipDetailSerializer(many=True, required=False, read_only=True)
+
+    fbm_name = serializers.SerializerMethodField()
+    fbm_address = serializers.SerializerMethodField()
+
+    def get_fbm_name(self, obj):
+        fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
+        if fbm:
+            return fbm.name
+        return ''
+
+    def get_fbm_address(self, obj):
+        fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
+        if fbm:
+            return fbm.address
+        return ''
+
+    class Meta:
+        model = Ship
+        fields = (
+            'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'ship_type', 'shipping_fee',
+            'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
+            'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
+            'note', 'create_time', 'ship_shipDetail')
+
+
+class ShipBoxSerializer(serializers.ModelSerializer):
+    """
+    包装箱
+    """
+
+    class Meta:
+        model = ShipBox
+        fields = "__all__"
+
+
+class CarrierSerializer(serializers.ModelSerializer):
+    """
+    物流商
+    """
+
+    class Meta:
+        model = Carrier
+        fields = "__all__"
+
+
+class TransStockSerializer(serializers.ModelSerializer):
+    """
+    中转仓库存
+    """
+    stock_days = serializers.SerializerMethodField()
+
+    def get_stock_days(self, obj):
+        if obj.arrived_date:
+            ad = str(obj.arrived_date)
+            dd = datetime.strptime(ad, '%Y-%m-%d')
+            delta = datetime.now() - dd
+            return delta.days
+        else:
+            return 0
+
+    class Meta:
+        model = TransStock
+        fields = (
+            'id', 'listing_shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
+            'unit_cost', 'first_ship_cost', 's_number', 'batch',
+            'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
+            'arrived_date', 'is_out', 'shop', 'stock_days')
+
+
+class MLSiteSerializer(serializers.ModelSerializer):
+    """
+    站点
+    """
+
+    class Meta:
+        model = MLSite
+        fields = "__all__"
+
+
+class FBMWarehouseSerializer(serializers.ModelSerializer):
+    """
+    FBM仓库
+    """
+
+    class Meta:
+        model = FBMWarehouse
+        fields = "__all__"
+
+
+class MLOrderSerializer(serializers.ModelSerializer):
+    """
+    销售订单
+    """
+
+    class Meta:
+        model = MLOrder
+        fields = "__all__"
+
+
+class FinanceSerializer(serializers.ModelSerializer):
+    """
+    财务管理
+    """
+
+    class Meta:
+        model = Finance
         fields = "__all__"

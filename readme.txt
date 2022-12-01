@@ -24,7 +24,6 @@ v0.51
 
 v0.6
 修复抓取手机型号详情bug
-增加mercado app
 
 v0.61
 修复celery bug
@@ -32,3 +31,7 @@ v0.62
 修复price track bug
 v0.63.2
 修复product model抓取bug
+
+v0.7
+增加fbm管理app
+

@@ -58,6 +58,14 @@ app.conf.beat_schedule = {
         'task': 'mercado.tasks.track_seller',  # 每天更新卖家信息并进行销量计算
         'schedule': crontab(hour='0', minute='30'),  # 每天0点30分开始计算
     },
+    'delete_logs': {
+        'task': 'product.tasks.delete_logs',  # 删除1个月前任务执行日志
+        'schedule': crontab(minute=0, hour=2, day_of_month=1),  # 每月1号执行
+    },
+    'fbm_product_sales': {
+        'task': 'mercado.tasks.calc_product_sales',  # 每天更新fbm产品销量信息计算
+        'schedule': crontab(hour='0', minute='40'),  # 每天0点40分开始计算
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

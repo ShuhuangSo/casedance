@@ -23,7 +23,9 @@ from rest_framework.documentation import include_docs_urls
 
 from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSet, MonthListViewSet, \
     ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
-from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet
+from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet, \
+    MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
+    TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -141,6 +143,30 @@ router.register('med_categories', CategoriesViewSet, basename='med_categories')
 router.register('med_seller', SellerViewSet, basename='med_seller')
 # 卖家跟踪
 router.register('med_seller_track', SellerTrackViewSet, basename='med_seller_track')
+# ML产品列表
+router.register('ml_products', MLProductViewSet, basename='ml_products')
+# FBM店铺列表
+router.register('ml_shops', ShopViewSet, basename='ml_shops')
+# 店铺库存列表
+router.register('ml_shopstock', ShopStockViewSet, basename='ml_shopstock')
+# 头程运单列表
+router.register('ml_ship', ShipViewSet, basename='ml_ship')
+# 头程运单详情列表
+router.register('ml_ship_detail', ShipDetailViewSet, basename='ml_ship_detail')
+# 头程包装箱列表
+router.register('ml_ship_box', ShipBoxViewSet, basename='ml_ship_box')
+# 物流商列表
+router.register('ml_carriers', CarrierViewSet, basename='ml_carriers')
+# 中转仓库存列表,
+router.register('ml_trans_stock', TransStockViewSet, basename='ml_trans_stock')
+# 站点列表,
+router.register('ml_site', MLSiteViewSet, basename='ml_site')
+# FBM仓库列表,
+router.register('ml_fbm_warehouse', FBMWarehouseViewSet, basename='ml_fbm_warehouse')
+# FBM销售订单列表,
+router.register('ml_orders', MLOrderViewSet, basename='ml_orders')
+# 财务管理列表,
+router.register('ml_finance', FinanceViewSet, basename='ml_finance')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

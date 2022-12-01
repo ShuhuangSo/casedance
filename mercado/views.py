@@ -17,11 +17,11 @@ from django.db.models import Sum
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate
+    MLOrder, ExRate, Finance
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
-    FBMWarehouseSerializer, MLOrderSerializer
+    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer
 from mercado import tasks
 
 
@@ -639,14 +639,15 @@ class ShopStockViewSet(mixins.ListModelMixin,
     }
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
-                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty', 'refund_rate', 'avg_profit', 'avg_profit_rate')  # 配置排序字段
+                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty', 'refund_rate', 'avg_profit',
+                       'avg_profit_rate')  # 配置排序字段
 
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')
     def fbm_upload(self, request):
         import warnings
         warnings.filterwarnings('ignore')
-        
+
         data = request.data
         shop_id = data['id']
         wb = openpyxl.load_workbook(data['excel'])
@@ -684,9 +685,14 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
+    # 统计店铺数据
     @action(methods=['post'], detail=False, url_path='calc_stock')
     def calc_stock(self, request):
         shop_id = request.data['id']
+        shop = Shop.objects.filter(id=shop_id).first()
+        ex = ExRate.objects.filter(currency=shop.currency).first()
+        ex_rate = ex.value if ex else 0
+
         queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id)
         total_amount = 0
         total_qty = 0
@@ -702,7 +708,35 @@ class ShopStockViewSet(mixins.ListModelMixin,
         sum_profit = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('profit'))
         sold_profit = sum_profit['profit__sum']
 
-        return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty, 'sold_amount': sold_amount, 'sold_profit': sold_profit}, status=status.HTTP_200_OK)
+        sum_unit_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('unit_cost'))
+        total_unit_cost = sum_unit_cost['unit_cost__sum']
+        if not total_unit_cost:
+            total_unit_cost = 0
+
+        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('first_ship_cost'))
+        total_first_ship_cost = sum_first_ship_cost['first_ship_cost__sum']
+        if not total_first_ship_cost:
+            total_first_ship_cost = 0
+        total_cost = total_unit_cost + total_first_ship_cost
+
+        # 店铺剩余外汇
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD', rec_date__gte=date).aggregate(
+            Sum('income'))
+        income_fund = sum_income_fund['income__sum']
+        if not income_fund:
+            income_fund = 0
+
+        # 店铺结汇资金
+        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC', exc_date__gte=date).aggregate(Sum('income_rmb'))
+        income_rmb = sum_income_rmb['income_rmb__sum']
+        if not income_rmb:
+            income_rmb = 0
+        total_fund = income_fund * ex_rate + income_rmb
+
+        real_profit = total_fund - total_cost
+
+        return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty,
+                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit}, status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
@@ -726,8 +760,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         tasks.calc_product_sales()
 
-        return Response({'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
+            status=status.HTTP_200_OK)
 
 
 class ShipViewSet(mixins.ListModelMixin,
@@ -1432,6 +1467,124 @@ class FBMWarehouseViewSet(mixins.ListModelMixin,
     ordering_fields = ('create_time', 'id')  # 配置排序字段
 
 
+class FinanceViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        财务管理列表,分页,过滤,搜索,排序
+    create:
+        财务管理新增
+    retrieve:
+        财务管理详情页
+    update:
+        财务管理修改
+    destroy:
+        财务管理删除
+    """
+    queryset = Finance.objects.all()
+    serializer_class = FinanceSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    # filter_fields = ('country', 'is_active')  # 配置过滤字段
+    filterset_fields = {
+        'income': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'wd_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'rec_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'exchange': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'income_rmb': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'exc_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'shop': ['exact'],
+        'is_received': ['exact'],
+        'f_type': ['exact'],
+    }
+    search_fields = ('income', )  # 配置搜索字段
+    ordering_fields = ('wd_date', 'rec_date', 'exc_date', 'income_rmb', 'income', 'create_time')  # 配置排序字段
+
+    # ML创建店铺提现
+    @action(methods=['post'], detail=False, url_path='create_wd')
+    def create_wd(self, request):
+        data = request.data
+        shop_id = data['shop']
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        finance = Finance()
+        finance.shop = shop
+        finance.currency = shop.currency
+        finance.income = data['income']
+        finance.wd_date = data['wd_date']
+        finance.f_type = 'WD'
+        finance.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # ML创建结汇
+    @action(methods=['post'], detail=False, url_path='create_exc')
+    def create_exc(self, request):
+        data = request.data
+        shop_id = data['shop']
+
+        # 店铺提现外汇
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
+            Sum('income'))
+        income_fund = sum_income_fund['income__sum']
+        if not income_fund:
+            income_fund = 0
+        if float(data['exchange']) > income_fund:
+            return Response({'msg': '结汇金额超过账号资金'}, status=status.HTTP_202_ACCEPTED)
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        finance = Finance()
+        finance.shop = shop
+        finance.currency = shop.currency
+        finance.exchange = data['exchange']
+        finance.income_rmb = data['income_rmb']
+        finance.exc_date = data['exc_date']
+        finance.f_type = 'EXC'
+        finance.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 统计资金
+    @action(methods=['post'], detail=False, url_path='calc_fund')
+    def calc_fund(self, request):
+        data = request.data
+        shop_id = data['shop']
+
+        # 在途外汇
+        sum_onway_fund = Finance.objects.filter(shop__id=shop_id, is_received=False, f_type='WD').aggregate(Sum('income'))
+        onway_fund = sum_onway_fund['income__sum']
+        if not onway_fund:
+            onway_fund = 0
+
+        # 结汇资金
+        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('income_rmb'))
+        income_rmb = sum_income_rmb['income_rmb__sum']
+        if not income_rmb:
+            income_rmb = 0
+
+        # 结汇外汇
+        sum_exchange = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('exchange'))
+        exchange_fund = sum_exchange['exchange__sum']
+        if not exchange_fund:
+            exchange_fund = 0
+
+        # 店铺提现外汇
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
+            Sum('income'))
+        income_fund = sum_income_fund['income__sum']
+        if not income_fund:
+            income_fund = 0
+
+        rest_income = income_fund - exchange_fund
+
+        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income}, status=status.HTTP_200_OK)
+
+
 class MLOrderViewSet(mixins.ListModelMixin,
                      mixins.CreateModelMixin,
                      mixins.UpdateModelMixin,
@@ -1489,6 +1642,9 @@ class MLOrderViewSet(mixins.ListModelMixin,
             shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id).first()
             if not shop_stock:
                 continue
+            first_ship_cost = shop_stock.first_ship_cost
+            if not first_ship_cost:
+                first_ship_cost = 0
 
             order_number = cell_row[0].value
 
@@ -1556,8 +1712,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     p_name=shop_stock.p_name,
                     item_id=item_id,
                     image=shop_stock.image,
-                    unit_cost=shop_stock.unit_cost,
-                    first_ship_cost=shop_stock.first_ship_cost,
+                    unit_cost=shop_stock.unit_cost * qty,
+                    first_ship_cost=first_ship_cost * qty,
                     profit=profit,
                     profit_rate=profit_rate,
                     buyer_name=buyer_name,

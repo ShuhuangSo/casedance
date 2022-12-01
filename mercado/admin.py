@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
-    SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate
+    SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance
 
 
 @admin.register(Listing)
@@ -112,3 +112,8 @@ class MLOrderAdmin(admin.ModelAdmin):
 @admin.register(ExRate)
 class ExRateAdmin(admin.ModelAdmin):
     list_display = ['currency', 'value', 'update_time']
+
+
+@admin.register(Finance)
+class FinanceAdmin(admin.ModelAdmin):
+    list_display = ['currency', 'income', 'is_received']

@@ -25,7 +25,7 @@ from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSe
     ExchangeRateViewSet, BasicInfoViewSet, ManagerViewSet
 from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet, \
     MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
-    TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet
+    TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -165,6 +165,8 @@ router.register('ml_site', MLSiteViewSet, basename='ml_site')
 router.register('ml_fbm_warehouse', FBMWarehouseViewSet, basename='ml_fbm_warehouse')
 # FBM销售订单列表,
 router.register('ml_orders', MLOrderViewSet, basename='ml_orders')
+# 财务管理列表,
+router.register('ml_finance', FinanceViewSet, basename='ml_finance')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

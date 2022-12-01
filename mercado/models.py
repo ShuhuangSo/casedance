@@ -618,3 +618,30 @@ class MLOrder(models.Model):
 
     def __str__(self):
         return self.order_number
+
+
+class Finance(models.Model):
+    """
+    财务管理
+    """
+
+    shop = models.ForeignKey(Shop, related_name='shop_finance', on_delete=models.CASCADE, verbose_name='所属店铺',
+                             help_text='所属店铺')
+    currency = models.CharField(max_length=10, null=True, blank=True, verbose_name='币种', help_text='币种')
+    income = models.FloatField(null=True, default=0, verbose_name='外汇收入金额', help_text='外汇收入金额')
+    wd_date = models.DateField(null=True, blank=True, verbose_name='提现日期', help_text='提现日期')
+    rec_date = models.DateField(null=True, blank=True, verbose_name='提现到账日期', help_text='提现到账日期')
+    exchange = models.FloatField(null=True, default=0, verbose_name='结汇金额', help_text='结汇金额')
+    income_rmb = models.FloatField(null=True, default=0, verbose_name='结汇rmb', help_text='结汇rmb')
+    exc_date = models.DateField(null=True, blank=True, verbose_name='结汇日期', help_text='结汇日期')
+    f_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='资金类型', help_text='资金类型')
+    is_received = models.BooleanField(default=False, verbose_name='外汇是否收到', help_text='外汇是否收到')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '财务管理'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return str(self.shop)

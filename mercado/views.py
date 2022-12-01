@@ -758,7 +758,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        tasks.calc_product_sales()
+        # tasks.calc_product_sales()
 
         return Response(
             {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},

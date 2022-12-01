@@ -502,3 +502,11 @@ def calc_product_sales():
             st.avg_profit_rate = avg_profit_rate if avg_profit_rate else 0
             st.refund_rate = refund_rate
             st.save()
+
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 11
+    task_log.note = 'FBM销量计算'
+    task_log.save()
+
+    return 'OK'

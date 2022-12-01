@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from celery import shared_task
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import random
 from bs4 import BeautifulSoup
@@ -213,3 +213,18 @@ def get_list_models(brand_name, url):
             ))
     if len(add_list):
         DeviceModel.objects.bulk_create(add_list)
+
+
+# 删除1个月前任务执行日志
+@shared_task
+def delete_logs():
+    date = datetime.now().date() - timedelta(days=30)
+    TaskLog.objects.filter(create_time__lt=date).delete()
+
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 12
+    task_log.note = '清除日志'
+    task_log.save()
+
+    return 'OK'

@@ -1675,7 +1675,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
             buyer_postcode = cell_row[30].value
             buyer_country = cell_row[31].value
 
-            profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost - shop_stock.first_ship_cost
+            profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
             profit_rate = profit / (price * ex_rate)
             if profit_rate < 0:
                 profit_rate = 0

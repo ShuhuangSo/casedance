@@ -719,19 +719,28 @@ class ShopStockViewSet(mixins.ListModelMixin,
             total_first_ship_cost = 0
         total_cost = total_unit_cost + total_first_ship_cost
 
-        # 店铺剩余外汇
-        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD', rec_date__gte=date).aggregate(
+        # 结汇外汇
+        sum_exchange = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('exchange'))
+        exchange_fund = sum_exchange['exchange__sum']
+        if not exchange_fund:
+            exchange_fund = 0
+
+        # 店铺提现外汇
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
             Sum('income'))
         income_fund = sum_income_fund['income__sum']
         if not income_fund:
             income_fund = 0
+
+        # 店铺剩余外汇
+        rest_income = income_fund - exchange_fund
 
         # 店铺结汇资金
         sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC', exc_date__gte=date).aggregate(Sum('income_rmb'))
         income_rmb = sum_income_rmb['income_rmb__sum']
         if not income_rmb:
             income_rmb = 0
-        total_fund = income_fund * ex_rate + income_rmb
+        total_fund = rest_income * ex_rate + income_rmb
 
         real_profit = total_fund - total_cost
 
@@ -758,7 +767,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        # tasks.calc_product_sales()
+        tasks.calc_product_sales.delay()
 
         return Response(
             {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
@@ -1099,6 +1108,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     shop_stock.heigth = i.heigth
                     shop_stock.unit_cost = i.unit_cost
                     shop_stock.first_ship_cost = i.avg_ship_fee
+                    shop_stock.sale_url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
                     shop_stock.save()
         else:
             # 入仓中转仓
@@ -1733,5 +1743,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     ml_order.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
+
+        # 计算产品销量
+        tasks.calc_product_sales.delay()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)

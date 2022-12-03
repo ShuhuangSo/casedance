@@ -14,6 +14,7 @@ import urllib
 import hashlib
 from datetime import datetime, timedelta
 from django.db.models import Sum
+from django.db.models import Q
 
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
@@ -747,6 +748,38 @@ class ShopStockViewSet(mixins.ListModelMixin,
         return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty,
                          'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit}, status=status.HTTP_200_OK)
 
+    # 查询库存在途情况
+    @action(methods=['post'], detail=False, url_path='get_stock_detail')
+    def get_stock_detail(self, request):
+        sku = request.data['sku']
+        op_type = request.data['op_type']
+
+        data = []
+        if op_type == 'ONWAY':
+            querySet = ShipDetail.objects.filter(sku=sku).filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            if querySet:
+                for i in querySet:
+                    data.append({
+                        'qty': i.qty,
+                        "s_status": i.ship.s_status,
+                        "book_date": i.ship.book_date,
+                        "tag_name": i.ship.tag_name,
+                        "tag_color": i.ship.tag_color,
+                        "batch": i.ship.batch,
+                    })
+        if op_type == 'TRANS':
+            ts = TransStock.objects.filter(sku=sku)
+            if ts:
+                for i in ts:
+                    data.append({
+                        'qty': i.qty,
+                        'arrived_date': i.arrived_date,
+                        'batch': i.batch,
+                        'warehouse': i.shop.name,
+                    })
+
+        return Response(data, status=status.HTTP_200_OK)
+
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         t = '29 de noviembre de 2022 02:28 hs.'
@@ -767,7 +800,12 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        tasks.calc_product_sales.delay()
+        # tasks.calc_product_sales.delay()
+        stocks = ShopStock.objects.all()
+        for i in stocks:
+            link = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
+            i.sale_url = link
+            i.save()
 
         return Response(
             {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
@@ -798,7 +836,8 @@ class ShipViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier')  # 配置过滤字段
-    search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku')  # 配置搜索字段
+    search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
+                     'ship_shipDetail__p_name')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段
 
     # 创建运单

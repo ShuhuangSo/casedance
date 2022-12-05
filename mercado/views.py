@@ -801,22 +801,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        from openpyxl.drawing.image import Image
-        wb = openpyxl.Workbook()
-        sh = wb.active
-
-        sh.column_dimensions['A'].width = 20
-        sh.row_dimensions[1].height = 140
-
-        img = Image('media/ml_product/MD2096.jpg')
-        img.width, img.height = 140, 140
-        sh.add_image(img, 'A1')
-
-        wb.save('media/export/test.xlsx')
-        url = BASE_URL + '/media/export/test.xlsx'
-
         return Response(
-            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time, 'url': url},
+            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
             status=status.HTTP_200_OK)
 
 

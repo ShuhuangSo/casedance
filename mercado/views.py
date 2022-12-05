@@ -923,6 +923,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_date = request.data['ship_date']
         note = request.data['note']
         s_number = request.data['s_number']
+        batch = request.data['batch']
         envio_number = request.data['envio_number']
         ship_detail = request.data['ship_shipDetail']
 
@@ -934,6 +935,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.fbm_warehouse = fbm_warehouse
         ship.ship_type = ship_type
         ship.carrier = carrier
+        ship.batch = batch
         if end_date:
             ship.end_date = end_date
         if ship_date:
@@ -1008,6 +1010,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_id = request.data['id']
         ship_note = request.data['note']
         ship_detail = request.data['ship_shipDetail']
+        ship_action = request.data['action']
 
         for i in ship_detail:
             if not i['qty']:
@@ -1023,7 +1026,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship = Ship.objects.filter(id=ship_id).first()
         if ship_note:
             ship.note = ship_note
-        ship.s_status = 'SHIPPED'
+        ship.s_status = ship_action
         # 总箱数
         box_qty = ShipBox.objects.filter(ship=ship).count()
         ship.total_box = box_qty
@@ -1050,7 +1053,11 @@ class ShipViewSet(mixins.ListModelMixin,
                     shop_stock.onway_qty += i.qty
                     shop_stock.save()
 
-        return Response({'msg': '成功发货!'}, status=status.HTTP_200_OK)
+        if ship_action == 'SHIPPED':
+            msg = '成功发货!'
+        else:
+            msg = '保存成功!'
+        return Response({'msg': msg}, status=status.HTTP_200_OK)
 
     # 添加运费
     @action(methods=['post'], detail=False, url_path='postage')

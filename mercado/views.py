@@ -1210,6 +1210,7 @@ class ShipViewSet(mixins.ListModelMixin,
         if logistic_name == 'SHENGDE':
             wb = openpyxl.Workbook()
             sh = wb.active
+            sh.title = 'Sheet1'
             sh.column_dimensions['AA'].width = 15
             sh['A1'] = '货箱编号'
             sh['B1'] = '件数'
@@ -1285,6 +1286,61 @@ class ShipViewSet(mixins.ListModelMixin,
             ship = Ship.objects.filter(id=ship_id).first()
             wb.save('media/export/盛德物流申报-' + ship.shop + '.xlsx')
             url = BASE_URL + '/media/export/盛德物流申报-' + ship.shop + '.xlsx'
+
+        return Response({'url': url}, status=status.HTTP_200_OK)
+
+    # 导出采购单
+    @action(methods=['post'], detail=False, url_path='export_purchase')
+    def export_purchase(self, request):
+        from openpyxl.drawing.image import Image
+
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.title = 'FBM发仓列表（' + ship.shop + '）'
+        sh.column_dimensions['C'].width = 15
+        sh.column_dimensions['D'].width = 15
+        sh.column_dimensions['E'].width = 50
+        sh.column_dimensions['F'].width = 15
+        sh.column_dimensions['L'].width = 50
+        sh['A1'] = '类型'
+        sh['B1'] = 'SKU'
+        sh['C1'] = 'UPC'
+        sh['D1'] = 'MLM'
+        sh['E1'] = '名称'
+        sh['F1'] = '图片'
+        sh['G1'] = '数量'
+        sh['H1'] = '单重kg'
+        sh['I1'] = '总重kg'
+        sh['J1'] = '单价'
+        sh['K1'] = '小计'
+        sh['L1'] = '备注'
+
+        ship_detail = ShipDetail.objects.filter(ship=ship)
+        num = 0
+        for i in ship_detail:
+            sh['A' + str(num + 2)] = '新入仓' if i.s_type == 'NEW' else '补仓'
+            sh['B' + str(num + 2)] = i.sku
+            sh['C' + str(num + 2)] = i.upc
+            sh['D' + str(num + 2)] = i.item_id
+            sh['E' + str(num + 2)] = i.p_name
+
+            sh.row_dimensions[num + 2].height = 100
+            img = Image('media/ml_product/' + i.sku + '.jpg')
+            img.width, img.height = 100, 100
+            sh.add_image(img, 'F' + str(num + 2))
+
+            sh['G' + str(num + 2)] = i.qty
+            sh['H' + str(num + 2)] = i.weight
+            sh['I' + str(num + 2)] = i.weight * i.qty
+            sh['J' + str(num + 2)] = i.unit_cost
+            sh['K' + str(num + 2)] = i.unit_cost * i.qty
+            sh['L' + str(num + 2)] = ''
+
+            num += 1
+        wb.save('media/export/美客多采购单' + ship.batch + '-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/美客多采购单' + ship.batch + '-' + ship.shop + '.xlsx'
 
         return Response({'url': url}, status=status.HTTP_200_OK)
 

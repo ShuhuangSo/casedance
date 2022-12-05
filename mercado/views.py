@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.db.models import Q
 
+from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance
@@ -800,15 +801,22 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        # tasks.calc_product_sales.delay()
-        stocks = ShopStock.objects.all()
-        for i in stocks:
-            link = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
-            i.sale_url = link
-            i.save()
+        from openpyxl.drawing.image import Image
+        wb = openpyxl.Workbook()
+        sh = wb.active
+
+        sh.column_dimensions['A'].width = 20
+        sh.row_dimensions[1].height = 140
+
+        img = Image('media/ml_product/MD2096.jpg')
+        img.width, img.height = 140, 140
+        sh.add_image(img, 'A1')
+
+        wb.save('media/export/test.xlsx')
+        url = BASE_URL + '/media/export/test.xlsx'
 
         return Response(
-            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
+            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time, 'url': url},
             status=status.HTTP_200_OK)
 
 
@@ -1198,6 +1206,94 @@ class ShipViewSet(mixins.ListModelMixin,
         booked_qty = Ship.objects.filter(s_status='BOOKED').count()
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
                         status=status.HTTP_200_OK)
+
+    # 导出物流申报单
+    @action(methods=['post'], detail=False, url_path='export_logistic_decl')
+    def export_logistic_decl(self, request):
+        ship_id = request.data['id']
+        logistic_name = request.data['name']
+        from openpyxl.drawing.image import Image
+
+        if logistic_name == 'SHENGDE':
+            wb = openpyxl.Workbook()
+            sh = wb.active
+            sh.column_dimensions['AA'].width = 15
+            sh['A1'] = '货箱编号'
+            sh['B1'] = '件数'
+            sh['C1'] = '型号'
+            sh['D1'] = '品牌'
+            sh['E1'] = '英文品名'
+            sh['F1'] = '中文品名'
+            sh['G1'] = '单个产品申报价值(usd)'
+            sh['H1'] = '单箱申报数量'
+            sh['I1'] = '单箱申报总金额'
+            sh['J1'] = '英文材质'
+            sh['K1'] = '材质'
+            sh['L1'] = '用途'
+            sh['M1'] = '海关编码'
+            sh['N1'] = '亚马逊内部编码ID'
+            sh['O1'] = '销售网址'
+            sh['P1'] = '销售价格'
+            sh['Q1'] = '产品重量(kg)'
+            sh['R1'] = '产品尺寸(长*宽*高cm)'
+            sh['S1'] = '是否带电'
+            sh['T1'] = '是否带磁'
+            sh['U1'] = 'ASIN'
+            sh['V1'] = 'FNSKU'
+            sh['W1'] = '货箱重量(kg)'
+            sh['X1'] = '货箱长度(cm)'
+            sh['Y1'] = '货箱宽度(cm)'
+            sh['Z1'] = '货箱高度(cm)'
+            sh['AA1'] = '图片(不能超出单元格)'
+
+            boxes = ShipBox.objects.filter(ship__id=ship_id)
+            box_num = 0
+            num = 0
+            for b in boxes:
+                ship_detail = ShipDetail.objects.filter(ship__id=ship_id, box_number=b.box_number)
+
+                box_tag = 1
+                for i in ship_detail:
+                    sh.row_dimensions[num+2].height = 100
+                    sh['A'+str(num+2)] = i.ship.batch + '/' + str(box_num+1)
+                    sh['B'+str(num+2)] = box_tag
+                    sh['C'+str(num+2)] = i.sku
+                    sh['D'+str(num+2)] = i.brand
+                    sh['E'+str(num+2)] = i.en_name
+                    sh['F'+str(num+2)] = i.cn_name
+                    sh['G'+str(num+2)] = i.declared_value
+                    sh['H'+str(num+2)] = i.qty
+                    sh['I'+str(num+2)] = i.declared_value * i.qty
+                    sh['J'+str(num+2)] = i.en_material
+                    sh['K'+str(num+2)] = i.cn_material
+                    sh['L'+str(num+2)] = i.use
+                    sh['M'+str(num+2)] = i.custom_code
+                    sh['N'+str(num+2)] = ''
+                    sh['O'+str(num+2)] = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
+                    sh['P'+str(num+2)] = ''
+                    sh['Q'+str(num+2)] = ''
+                    sh['R'+str(num+2)] = ''
+                    sh['S'+str(num+2)] = '否'
+                    sh['T'+str(num+2)] = '否'
+                    sh['U'+str(num+2)] = ''
+                    sh['V'+str(num+2)] = ''
+                    sh['W'+str(num+2)] = ''
+                    sh['X'+str(num+2)] = ''
+                    sh['Y'+str(num+2)] = ''
+                    sh['Z'+str(num+2)] = ''
+
+                    img = Image('media/ml_product/' + i.sku + '.jpg')
+                    img.width, img.height = 80, 80
+                    sh.add_image(img, 'AA'+str(num+2))
+
+                    box_tag = 0
+                    num += 1
+                box_num += 1
+            ship = Ship.objects.filter(id=ship_id).first()
+            wb.save('media/export/盛德物流申报-' + ship.shop + '.xlsx')
+            url = BASE_URL + '/media/export/盛德物流申报-' + ship.shop + '.xlsx'
+
+        return Response({'url': url}, status=status.HTTP_200_OK)
 
 
 class ShipDetailViewSet(mixins.ListModelMixin,

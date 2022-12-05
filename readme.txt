@@ -40,4 +40,6 @@ v0.72
 添加在途库存查询
 v0.73
 export shengde,编辑批次号，保存打包运单
+v0.74
+export purchase
 

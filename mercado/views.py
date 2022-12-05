@@ -1339,8 +1339,8 @@ class ShipViewSet(mixins.ListModelMixin,
             sh['L' + str(num + 2)] = ''
 
             num += 1
-        wb.save('media/export/美客多采购单' + ship.batch + '-' + ship.shop + '.xlsx')
-        url = BASE_URL + '/media/export/美客多采购单' + ship.batch + '-' + ship.shop + '.xlsx'
+        wb.save('media/export/美客多采购单-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/美客多采购单-' + ship.shop + '.xlsx'
 
         return Response({'url': url}, status=status.HTTP_200_OK)
 

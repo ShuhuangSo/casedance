@@ -44,4 +44,6 @@ v0.74
 export purchase
 v0.75
 packing manage
+v0.76
+product image
 

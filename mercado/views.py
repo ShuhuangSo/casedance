@@ -515,7 +515,6 @@ class MLProductViewSet(mixins.ListModelMixin,
             buy_url = cell_row[21].value
             sale_url = cell_row[22].value
             refer_url = cell_row[23].value
-            image = cell_row[24].value
 
             add_list.append(MLProduct(
                 sku=sku,
@@ -542,7 +541,6 @@ class MLProductViewSet(mixins.ListModelMixin,
                 buy_url=buy_url,
                 sale_url=sale_url,
                 refer_url=refer_url,
-                image=image
             ))
         MLProduct.objects.bulk_create(add_list)
 
@@ -551,6 +549,7 @@ class MLProductViewSet(mixins.ListModelMixin,
     # ML产品图片上传
     @action(methods=['post'], detail=False, url_path='image_upload')
     def image_upload(self, request):
+        from PIL import Image
         data = request.data
         product = MLProduct.objects.filter(id=data['id']).first()
         if not product:
@@ -564,6 +563,10 @@ class MLProductViewSet(mixins.ListModelMixin,
                 f.write(i)
         product.image = 'ml_product/' + product.sku + '.jpg'
         product.save()
+
+        pic_org = Image.open(path)
+        pic_new = pic_org.resize((100, 100), Image.ANTIALIAS)
+        pic_new.save('media/ml_product/' + product.sku + '_100x100.jpg')
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
@@ -832,6 +835,14 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+        from PIL import Image
+        products = MLProduct.objects.all()
+        for i in products:
+            if i.image:
+                pic_org = Image.open('media/ml_product/' + i.sku + '.jpg')
+                pic_new = pic_org.resize((100, 100), Image.ANTIALIAS)
+                pic_new.save('media/ml_product/' + i.sku + '_100x100.jpg')
 
         return Response(
             {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},

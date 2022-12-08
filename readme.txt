@@ -42,4 +42,6 @@ v0.73
 export shengde,编辑批次号，保存打包运单
 v0.74
 export purchase
+v0.75
+packing manage
 

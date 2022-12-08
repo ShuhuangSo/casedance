@@ -19,11 +19,11 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance
+    MLOrder, ExRate, Finance, Packing
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
-    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer
+    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer
 from mercado import tasks
 
 
@@ -568,6 +568,34 @@ class MLProductViewSet(mixins.ListModelMixin,
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
 
+class PackingViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
+    """
+    list:
+        包材管理列表,分页,过滤,搜索,排序
+    create:
+        包材管理新增
+    retrieve:
+        包材管理详情页
+    update:
+        包材管理修改
+    destroy:
+        包材管理删除
+    """
+    queryset = Packing.objects.all()
+    serializer_class = PackingSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('name', 'size')  # 配置过滤字段
+    search_fields = ('name', )  # 配置搜索字段
+    ordering_fields = ('create_time', )  # 配置排序字段
+
+
 class ShopViewSet(mixins.ListModelMixin,
                   mixins.CreateModelMixin,
                   mixins.UpdateModelMixin,
@@ -715,7 +743,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         if not total_unit_cost:
             total_unit_cost = 0
 
-        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('first_ship_cost'))
+        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(
+            Sum('first_ship_cost'))
         total_first_ship_cost = sum_first_ship_cost['first_ship_cost__sum']
         if not total_first_ship_cost:
             total_first_ship_cost = 0
@@ -738,7 +767,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         rest_income = income_fund - exchange_fund
 
         # 店铺结汇资金
-        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC', exc_date__gte=date).aggregate(Sum('income_rmb'))
+        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC', exc_date__gte=date).aggregate(
+            Sum('income_rmb'))
         income_rmb = sum_income_rmb['income_rmb__sum']
         if not income_rmb:
             income_rmb = 0
@@ -747,7 +777,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         real_profit = total_fund - total_cost
 
         return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty,
-                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit}, status=status.HTTP_200_OK)
+                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit},
+                        status=status.HTTP_200_OK)
 
     # 查询库存在途情况
     @action(methods=['post'], detail=False, url_path='get_stock_detail')
@@ -757,7 +788,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         data = []
         if op_type == 'ONWAY':
-            querySet = ShipDetail.objects.filter(sku=sku).filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            querySet = ShipDetail.objects.filter(sku=sku).filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             if querySet:
                 for i in querySet:
                     data.append({
@@ -896,6 +928,11 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.length = product.length
                 sd.width = product.width
                 sd.heigth = product.heigth
+
+                packing = Packing.objects.filter(id=product.packing_id).first()
+                if packing:
+                    sd.packing_name = packing.name
+                    sd.packing_size = packing.size
                 sd.save()
 
                 total_qty += i['qty']
@@ -1248,37 +1285,37 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 box_tag = 1
                 for i in ship_detail:
-                    sh.row_dimensions[num+2].height = 100
-                    sh['A'+str(num+2)] = i.ship.batch + '/' + str(box_num+1)
-                    sh['B'+str(num+2)] = box_tag
-                    sh['C'+str(num+2)] = i.sku
-                    sh['D'+str(num+2)] = i.brand
-                    sh['E'+str(num+2)] = i.en_name
-                    sh['F'+str(num+2)] = i.cn_name
-                    sh['G'+str(num+2)] = i.declared_value
-                    sh['H'+str(num+2)] = i.qty
-                    sh['I'+str(num+2)] = i.declared_value * i.qty
-                    sh['J'+str(num+2)] = i.en_material
-                    sh['K'+str(num+2)] = i.cn_material
-                    sh['L'+str(num+2)] = i.use
-                    sh['M'+str(num+2)] = i.custom_code
-                    sh['N'+str(num+2)] = ''
-                    sh['O'+str(num+2)] = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
-                    sh['P'+str(num+2)] = ''
-                    sh['Q'+str(num+2)] = ''
-                    sh['R'+str(num+2)] = ''
-                    sh['S'+str(num+2)] = '否'
-                    sh['T'+str(num+2)] = '否'
-                    sh['U'+str(num+2)] = ''
-                    sh['V'+str(num+2)] = ''
-                    sh['W'+str(num+2)] = ''
-                    sh['X'+str(num+2)] = ''
-                    sh['Y'+str(num+2)] = ''
-                    sh['Z'+str(num+2)] = ''
+                    sh.row_dimensions[num + 2].height = 100
+                    sh['A' + str(num + 2)] = i.ship.batch + '/' + str(box_num + 1)
+                    sh['B' + str(num + 2)] = box_tag
+                    sh['C' + str(num + 2)] = i.sku
+                    sh['D' + str(num + 2)] = i.brand
+                    sh['E' + str(num + 2)] = i.en_name
+                    sh['F' + str(num + 2)] = i.cn_name
+                    sh['G' + str(num + 2)] = i.declared_value
+                    sh['H' + str(num + 2)] = i.qty
+                    sh['I' + str(num + 2)] = i.declared_value * i.qty
+                    sh['J' + str(num + 2)] = i.en_material
+                    sh['K' + str(num + 2)] = i.cn_material
+                    sh['L' + str(num + 2)] = i.use
+                    sh['M' + str(num + 2)] = i.custom_code
+                    sh['N' + str(num + 2)] = ''
+                    sh['O' + str(num + 2)] = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
+                    sh['P' + str(num + 2)] = ''
+                    sh['Q' + str(num + 2)] = ''
+                    sh['R' + str(num + 2)] = ''
+                    sh['S' + str(num + 2)] = '否'
+                    sh['T' + str(num + 2)] = '否'
+                    sh['U' + str(num + 2)] = ''
+                    sh['V' + str(num + 2)] = ''
+                    sh['W' + str(num + 2)] = ''
+                    sh['X' + str(num + 2)] = ''
+                    sh['Y' + str(num + 2)] = ''
+                    sh['Z' + str(num + 2)] = ''
 
                     img = Image('media/ml_product/' + i.sku + '.jpg')
                     img.width, img.height = 80, 80
-                    sh.add_image(img, 'AA'+str(num+2))
+                    sh.add_image(img, 'AA' + str(num + 2))
 
                     box_tag = 0
                     num += 1
@@ -1310,12 +1347,14 @@ class ShipViewSet(mixins.ListModelMixin,
         sh['D1'] = 'MLM'
         sh['E1'] = '名称'
         sh['F1'] = '图片'
-        sh['G1'] = '数量'
-        sh['H1'] = '单重kg'
-        sh['I1'] = '总重kg'
-        sh['J1'] = '单价'
-        sh['K1'] = '小计'
-        sh['L1'] = '备注'
+        sh['G1'] = '包材名称'
+        sh['H1'] = '包材尺寸'
+        sh['I1'] = '数量'
+        sh['J1'] = '单重kg'
+        sh['K1'] = '总重kg'
+        sh['L1'] = '单价'
+        sh['M1'] = '小计'
+        sh['N1'] = '备注'
 
         ship_detail = ShipDetail.objects.filter(ship=ship)
         num = 0
@@ -1331,12 +1370,14 @@ class ShipViewSet(mixins.ListModelMixin,
             img.width, img.height = 100, 100
             sh.add_image(img, 'F' + str(num + 2))
 
-            sh['G' + str(num + 2)] = i.qty
-            sh['H' + str(num + 2)] = i.weight
-            sh['I' + str(num + 2)] = i.weight * i.qty
-            sh['J' + str(num + 2)] = i.unit_cost
-            sh['K' + str(num + 2)] = i.unit_cost * i.qty
-            sh['L' + str(num + 2)] = ''
+            sh['G' + str(num + 2)] = i.packing_name
+            sh['H' + str(num + 2)] = i.packing_size
+            sh['I' + str(num + 2)] = i.qty
+            sh['J' + str(num + 2)] = i.weight
+            sh['K' + str(num + 2)] = i.weight * i.qty
+            sh['L' + str(num + 2)] = i.unit_cost
+            sh['M' + str(num + 2)] = i.unit_cost * i.qty
+            sh['N' + str(num + 2)] = ''
 
             num += 1
         wb.save('media/export/美客多采购单-' + ship.shop + '.xlsx')
@@ -1696,7 +1737,7 @@ class FinanceViewSet(mixins.ListModelMixin,
         'is_received': ['exact'],
         'f_type': ['exact'],
     }
-    search_fields = ('income', )  # 配置搜索字段
+    search_fields = ('income',)  # 配置搜索字段
     ordering_fields = ('wd_date', 'rec_date', 'exc_date', 'income_rmb', 'income', 'create_time')  # 配置排序字段
 
     # ML创建店铺提现
@@ -1750,7 +1791,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         shop_id = data['shop']
 
         # 在途外汇
-        sum_onway_fund = Finance.objects.filter(shop__id=shop_id, is_received=False, f_type='WD').aggregate(Sum('income'))
+        sum_onway_fund = Finance.objects.filter(shop__id=shop_id, is_received=False, f_type='WD').aggregate(
+            Sum('income'))
         onway_fund = sum_onway_fund['income__sum']
         if not onway_fund:
             onway_fund = 0
@@ -1776,7 +1818,8 @@ class FinanceViewSet(mixins.ListModelMixin,
 
         rest_income = income_fund - exchange_fund
 
-        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income}, status=status.HTTP_200_OK)
+        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income},
+                        status=status.HTTP_200_OK)
 
 
 class MLOrderViewSet(mixins.ListModelMixin,
@@ -1869,7 +1912,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
             buyer_postcode = cell_row[30].value
             buyer_country = cell_row[31].value
 
-            profit = (float(receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
+            profit = (float(
+                receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
             profit_rate = profit / (price * ex_rate)
             if profit_rate < 0:
                 profit_rate = 0

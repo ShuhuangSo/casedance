@@ -1,4 +1,8 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+
+# Create your models here.
+User = get_user_model()
 
 
 class Listing(models.Model):
@@ -246,6 +250,14 @@ class MLProduct(models.Model):
     refer_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='参考链接', help_text='参考链接')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    is_checked = models.BooleanField(default=False, null=True, verbose_name='是否核对', help_text='是否核对')
+    label_title = models.CharField(null=True, blank=True, max_length=100, verbose_name='链接标题', help_text='链接标题')
+    label_option = models.CharField(null=True, blank=True, max_length=50, verbose_name='链接选项', help_text='链接选项')
+    packing_id = models.IntegerField(null=True, blank=True, verbose_name='包材id', help_text='包材id')
+    buy_url2 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接2', help_text='产品采购链接2')
+    buy_url3 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接3', help_text='产品采购链接3')
+    buy_url4 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接4', help_text='产品采购链接4')
+    buy_url5 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接5', help_text='产品采购链接5')
 
     class Meta:
         verbose_name = 'ML产品库'
@@ -254,6 +266,26 @@ class MLProduct(models.Model):
 
     def __str__(self):
         return self.sku
+
+
+class Packing(models.Model):
+    """
+    包材管理
+    """
+
+    name = models.CharField(max_length=80, verbose_name='包材名称', help_text='包材名称')
+    size = models.CharField(max_length=80, verbose_name='尺寸', help_text='尺寸')
+    weight = models.FloatField(default=0, null=True, blank=True, verbose_name='重量g', help_text='重量g')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '包材管理'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return self.name
 
 
 class Shop(models.Model):
@@ -277,6 +309,9 @@ class Shop(models.Model):
     total_cbm = models.FloatField(null=True, blank=True, verbose_name='库存总体积cbm', help_text='库存总体积cbm')
     stock_value = models.FloatField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
     total_qty = models.IntegerField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
+    user = models.ForeignKey(User, related_name='user_shop', on_delete=models.SET_NULL, null=True, verbose_name='user',
+                             help_text='user')
+    name_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='店铺名称颜色', help_text='店铺名称颜色')
 
     class Meta:
         verbose_name = 'FBM店铺'
@@ -463,6 +498,8 @@ class ShipDetail(models.Model):
     weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
     note = models.CharField(max_length=300, null=True, blank=True, verbose_name='短备注', help_text='短备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    packing_name = models.CharField(null=True, blank=True, max_length=80, verbose_name='包材名称', help_text='包材名称')
+    packing_size = models.CharField(null=True, blank=True, max_length=80, verbose_name='包材尺寸', help_text='包材尺寸')
 
     class Meta:
         verbose_name = '运单详情'

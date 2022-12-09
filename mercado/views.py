@@ -726,12 +726,27 @@ class ShopStockViewSet(mixins.ListModelMixin,
         ex = ExRate.objects.filter(currency=shop.currency).first()
         ex_rate = ex.value if ex else 0
 
+        # FBM库存统计
         queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id)
         total_amount = 0
         total_qty = 0
         for i in queryset:
             total_qty += i.qty
             total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+        # 中转仓库存统计
+        ts = TransStock.objects.filter(listing_shop=shop.name)
+        trans_amount = 0
+        for i in ts:
+            trans_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+        # 在途运单统计
+        ships = Ship.objects.filter(shop=shop.name).filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
+        onway_amount = 0
+        for i in ships:
+            onway_amount += i.shipping_fee
+            onway_amount += i.extra_fee
+            onway_amount += i.products_cost
 
         date = datetime.now().date() - timedelta(days=30)
         sum_qty = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('qty'))
@@ -780,7 +795,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         real_profit = total_fund - total_cost
 
         return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty,
-                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit},
+                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit,
+                         'onway_amount': onway_amount, 'trans_amount': trans_amount},
                         status=status.HTTP_200_OK)
 
     # 查询库存在途情况
@@ -909,6 +925,7 @@ class ShipViewSet(mixins.ListModelMixin,
         total_qty = 0  # 总数量
         total_weight = 0  # 总重量
         total_cbm = 0  # 总体积
+        products_cost = 0  # 总货品成本
 
         # 创建运单详情
         for i in ship_detail:
@@ -948,12 +965,14 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 total_qty += i['qty']
                 total_weight += product.weight * i['qty']
+                products_cost += product.unit_cost * i['qty']
                 cbm = product.length * product.width * product.heigth / 1000000
                 total_cbm += cbm
 
         ship.total_qty = total_qty
         ship.weight = total_weight
         ship.cbm = total_cbm
+        ship.products_cost = products_cost
         ship.save()
 
         return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
@@ -1006,6 +1025,7 @@ class ShipViewSet(mixins.ListModelMixin,
         total_qty = 0  # 总数量
         total_weight = 0  # 总重量
         total_cbm = 0  # 总体积
+        products_cost = 0  # 总货品成本
 
         # 更新运单详情
         for i in ship_detail:
@@ -1043,16 +1063,18 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 total_qty += i['qty']
                 total_weight += product.weight * i['qty']
+                products_cost += product.unit_cost * i['qty']
                 cbm = product.length * product.width * product.heigth / 1000000
                 total_cbm += cbm
 
         ship.total_qty = total_qty
         ship.weight = total_weight
         ship.cbm = total_cbm
+        ship.products_cost = products_cost
         ship.save()
         return Response({'msg': '成功更新运单'}, status=status.HTTP_200_OK)
 
-    # 运单发货
+    # 运单发货/保存
     @action(methods=['post'], detail=False, url_path='send_ship')
     def send_ship(self, request):
         ship_id = request.data['id']
@@ -1060,6 +1082,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_detail = request.data['ship_shipDetail']
         ship_action = request.data['action']
 
+        products_cost = 0  # 总货品成本
         for i in ship_detail:
             if not i['qty']:
                 # 发货数量为0的删除
@@ -1070,11 +1093,13 @@ class ShipViewSet(mixins.ListModelMixin,
             sd.box_number = i['box_number']
             sd.note = i['note']
             sd.save()
+            products_cost += sd.unit_cost * sd.qty
 
         ship = Ship.objects.filter(id=ship_id).first()
         if ship_note:
             ship.note = ship_note
         ship.s_status = ship_action
+        ship.products_cost = products_cost
         # 总箱数
         box_qty = ShipBox.objects.filter(ship=ship).count()
         ship.total_box = box_qty
@@ -1093,7 +1118,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.save()
 
         # 添加fbm库存在途数量
-        if ship.target == 'FBM':
+        if ship.target == 'FBM' and ship_action == 'SHIPPED':
             queryset = ShipDetail.objects.filter(ship=ship)
             for i in queryset:
                 shop_stock = ShopStock.objects.filter(sku=i.sku, shop__name=ship.shop).first()

@@ -442,6 +442,7 @@ class Ship(models.Model):
     ship_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='运单类型', help_text='运单类型')
     shipping_fee = models.FloatField(null=True, default=0, verbose_name='运费', help_text='运费')
     extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
+    products_cost = models.FloatField(null=True, default=0, verbose_name='货品成本', help_text='货品成本')
     carrier = models.CharField(max_length=30, null=True, blank=True, verbose_name='承运商', help_text='承运商')
     end_date = models.DateField(null=True, blank=True, verbose_name='物流截单日期', help_text='物流截单日期')
     ship_date = models.DateField(null=True, blank=True, verbose_name='航班日期', help_text='航班日期')

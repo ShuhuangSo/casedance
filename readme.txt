@@ -46,4 +46,6 @@ v0.75
 packing manage
 v0.76
 product image
+v0.77
+修复运单问题，店铺资金统计
 

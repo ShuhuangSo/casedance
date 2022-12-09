@@ -309,8 +309,8 @@ class Shop(models.Model):
     total_cbm = models.FloatField(null=True, blank=True, verbose_name='库存总体积cbm', help_text='库存总体积cbm')
     stock_value = models.FloatField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
     total_qty = models.IntegerField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
-    user = models.ForeignKey(User, related_name='user_shop', on_delete=models.SET_NULL, null=True, verbose_name='user',
-                             help_text='user')
+    user = models.ForeignKey(User, related_name='user_shop', on_delete=models.SET_NULL, null=True, blank=True,
+                             verbose_name='user', help_text='user')
     name_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='店铺名称颜色', help_text='店铺名称颜色')
 
     class Meta:

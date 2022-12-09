@@ -202,6 +202,11 @@ class ShipSerializer(serializers.ModelSerializer):
 
     fbm_name = serializers.SerializerMethodField()
     fbm_address = serializers.SerializerMethodField()
+    shop_color = serializers.SerializerMethodField()
+
+    def get_shop_color(self, obj):
+        shop = Shop.objects.filter(name=obj.shop).first()
+        return shop.name_color if shop else ''
 
     def get_fbm_name(self, obj):
         fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
@@ -218,7 +223,7 @@ class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = (
-            'id', 's_number', 'batch', 's_status', 'shop', 'target', 'envio_number', 'ship_type', 'shipping_fee',
+            'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type', 'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'ship_shipDetail')
@@ -249,6 +254,7 @@ class TransStockSerializer(serializers.ModelSerializer):
     中转仓库存
     """
     stock_days = serializers.SerializerMethodField()
+    shop_color = serializers.SerializerMethodField()
 
     def get_stock_days(self, obj):
         if obj.arrived_date:
@@ -259,10 +265,14 @@ class TransStockSerializer(serializers.ModelSerializer):
         else:
             return 0
 
+    def get_shop_color(self, obj):
+        shop = Shop.objects.filter(name=obj.listing_shop).first()
+        return shop.name_color if shop else ''
+
     class Meta:
         model = TransStock
         fields = (
-            'id', 'listing_shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
+            'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
             'unit_cost', 'first_ship_cost', 's_number', 'batch',
             'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
             'arrived_date', 'is_out', 'shop', 'stock_days')

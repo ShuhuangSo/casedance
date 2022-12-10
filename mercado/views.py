@@ -923,8 +923,6 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.save()
 
         total_qty = 0  # 总数量
-        total_weight = 0  # 总重量
-        total_cbm = 0  # 总体积
         products_cost = 0  # 总货品成本
 
         # 创建运单详情
@@ -964,14 +962,9 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.save()
 
                 total_qty += i['qty']
-                total_weight += product.weight * i['qty']
                 products_cost += product.unit_cost * i['qty']
-                cbm = product.length * product.width * product.heigth / 1000000
-                total_cbm += cbm
 
         ship.total_qty = total_qty
-        ship.weight = total_weight
-        ship.cbm = total_cbm
         ship.products_cost = products_cost
         ship.save()
 
@@ -1023,8 +1016,6 @@ class ShipViewSet(mixins.ListModelMixin,
                 i.delete()
 
         total_qty = 0  # 总数量
-        total_weight = 0  # 总重量
-        total_cbm = 0  # 总体积
         products_cost = 0  # 总货品成本
 
         # 更新运单详情
@@ -1062,14 +1053,9 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.save()
 
                 total_qty += i['qty']
-                total_weight += product.weight * i['qty']
                 products_cost += product.unit_cost * i['qty']
-                cbm = product.length * product.width * product.heigth / 1000000
-                total_cbm += cbm
 
         ship.total_qty = total_qty
-        ship.weight = total_weight
-        ship.cbm = total_cbm
         ship.products_cost = products_cost
         ship.save()
         return Response({'msg': '成功更新运单'}, status=status.HTTP_200_OK)
@@ -1506,6 +1492,18 @@ class ShipBoxViewSet(mixins.ListModelMixin,
             size_weight = length * width * heigth / 6000
             box.size_weight = size_weight
             box.save()
+
+        # 统计包装箱总重量
+        sum_weight = ShipBox.objects.filter(ship=ship).aggregate(Sum('weight'))
+        total_weight = sum_weight['weight__sum']
+        ship.weight = total_weight
+
+        # 统计包装箱总体积
+        sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
+        total_cbm = sum_cbm['cbm__sum']
+        ship.cbm = total_cbm
+        ship.save()
+
         return Response({'msg': '成功新增包装箱!'}, status=status.HTTP_200_OK)
 
     # edit box
@@ -1535,7 +1533,38 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         box.size_weight = size_weight
         box.save()
 
+        # 统计包装箱总重量
+        sum_weight = ShipBox.objects.filter(ship=box.ship).aggregate(Sum('weight'))
+        total_weight = sum_weight['weight__sum']
+        box.ship.weight = total_weight
+
+        # 统计包装箱总体积
+        sum_cbm = ShipBox.objects.filter(ship=box.ship).aggregate(Sum('cbm'))
+        total_cbm = sum_cbm['cbm__sum']
+        box.ship.cbm = total_cbm
+        box.ship.save()
+
         return Response({'msg': '包装箱已更新!'}, status=status.HTTP_200_OK)
+
+    # delete box
+    @action(methods=['post'], detail=False, url_path='delete_shipbox')
+    def delete_shipbox(self, request):
+        box_id = request.data['id']
+        ship_id = request.data['ship_id']
+        ShipBox.objects.filter(id=box_id).delete()
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        # 统计包装箱总重量
+        sum_weight = ShipBox.objects.filter(ship=ship).aggregate(Sum('weight'))
+        total_weight = sum_weight['weight__sum']
+        ship.weight = total_weight
+
+        # 统计包装箱总体积
+        sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
+        total_cbm = sum_cbm['cbm__sum']
+        ship.cbm = total_cbm
+        ship.save()
+        return Response({'msg': '包装箱已删除!'}, status=status.HTTP_200_OK)
 
 
 class CarrierViewSet(mixins.ListModelMixin,

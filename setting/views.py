@@ -262,6 +262,7 @@ class UserViewSet(mixins.ListModelMixin,
         info.update({'role': user.last_name})
         info.update({'email': user.email})
         info.update({'is_superuser': user.is_superuser})
+        info.update({'id': user.id})
 
         return Response(info, status=status.HTTP_200_OK)
 

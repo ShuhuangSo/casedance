@@ -449,7 +449,7 @@ class MLProductViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('p_status', 'site', 'shop')  # 配置过滤字段
+    filter_fields = ('p_status', 'site', 'shop', 'is_checked')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'sku', 'item_id')  # 配置排序字段
 
@@ -622,7 +622,7 @@ class ShopViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('warehouse_type', 'shop_type', 'site', 'is_active')  # 配置过滤字段
+    filter_fields = ('warehouse_type', 'shop_type', 'site', 'is_active', 'user')  # 配置过滤字段
     search_fields = ('name', 'seller_id', 'nickname')  # 配置搜索字段
     ordering_fields = ('create_time', 'total_profit', 'total_weight')  # 配置排序字段
 

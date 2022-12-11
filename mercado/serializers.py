@@ -204,13 +204,20 @@ class ShipSerializer(serializers.ModelSerializer):
     fbm_address = serializers.SerializerMethodField()
     shop_color = serializers.SerializerMethodField()
     book_days = serializers.SerializerMethodField()
+    products_weight = serializers.SerializerMethodField()
+
+    def get_products_weight(self, obj):
+        queryset = ShipDetail.objects.filter(ship=obj)
+        w = 0
+        for i in queryset:
+            w += i.weight * i.qty
+        return w
 
     def get_book_days(self, obj):
         if obj.book_date:
             ad = str(obj.book_date)
             dd = datetime.strptime(ad, '%Y-%m-%d')
             delta = datetime.now() - dd
-            print(ad, datetime.now())
             return 0 - delta.days
         else:
             return 0
@@ -237,7 +244,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type', 'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'ship_shipDetail')
+            'note', 'create_time', 'products_cost', 'products_weight', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

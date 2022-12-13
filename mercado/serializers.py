@@ -273,6 +273,7 @@ class TransStockSerializer(serializers.ModelSerializer):
     """
     stock_days = serializers.SerializerMethodField()
     shop_color = serializers.SerializerMethodField()
+    group = serializers.SerializerMethodField()
 
     def get_stock_days(self, obj):
         if obj.arrived_date:
@@ -287,13 +288,17 @@ class TransStockSerializer(serializers.ModelSerializer):
         shop = Shop.objects.filter(name=obj.listing_shop).first()
         return shop.name_color if shop else ''
 
+    def get_group(self, obj):
+        count = TransStock.objects.filter(box_number=obj.box_number).count()
+        return count if count > 1 else 0
+
     class Meta:
         model = TransStock
         fields = (
             'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
             'unit_cost', 'first_ship_cost', 's_number', 'batch',
             'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
-            'arrived_date', 'is_out', 'shop', 'stock_days')
+            'arrived_date', 'is_out', 'shop', 'stock_days', 'group')
 
 
 class MLSiteSerializer(serializers.ModelSerializer):
@@ -320,10 +325,18 @@ class MLOrderSerializer(serializers.ModelSerializer):
     """
     销售订单
     """
+    sale_url = serializers.SerializerMethodField()
+
+    def get_sale_url(self, obj):
+        url = 'https://articulo.mercadolibre.com.mx/' + obj.shop.site + '-' + obj.item_id
+        return url
 
     class Meta:
         model = MLOrder
-        fields = "__all__"
+        fields = ('id', 'order_number', 'order_status', 'order_time', 'order_time_bj', 'qty', 'currency', 'ex_rate',
+                  'price', 'fees', 'postage', 'receive_fund', 'profit', 'profit_rate', 'is_ad', 'sku', 'p_name',
+                  'item_id', 'image', 'unit_cost', 'first_ship_cost', 'buyer_name', 'buyer_address', 'buyer_city',
+                  'buyer_state', 'buyer_postcode', 'buyer_country', 'create_time', 'shop', 'sale_url')
 
 
 class FinanceSerializer(serializers.ModelSerializer):

@@ -1228,7 +1228,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock.first_ship_cost = i.avg_ship_fee
                 trans_stock.s_number = ship.s_number
                 trans_stock.batch = ship.batch
-                trans_stock.box_number = i.box_number
+                trans_stock.box_number = i.ship.batch + '-' + i.box_number
                 box = ShipBox.objects.filter(ship=ship, box_number=i.box_number).first()
                 trans_stock.carrier_box_number = box.carrier_box_number
                 trans_stock.box_weight = box.weight
@@ -1399,7 +1399,7 @@ class ShipViewSet(mixins.ListModelMixin,
             sh['K' + str(num + 2)] = i.weight * i.qty
             sh['L' + str(num + 2)] = i.unit_cost
             sh['M' + str(num + 2)] = i.unit_cost * i.qty
-            sh['N' + str(num + 2)] = ''
+            sh['N' + str(num + 2)] = i.note
 
             num += 1
         wb.save('media/export/美客多采购单-' + ship.shop + '.xlsx')
@@ -1910,7 +1910,14 @@ class MLOrderViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('shop', 'is_ad', 'order_status')  # 配置过滤字段
+    # filter_fields = ('shop', 'is_ad', 'order_status')  # 配置过滤字段
+    filterset_fields = {
+        'order_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'order_time_bj': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'shop': ['exact'],
+        'is_ad': ['exact'],
+        'order_status': ['exact'],
+    }
     search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price', 'profit')  # 配置排序字段
 

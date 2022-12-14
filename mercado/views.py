@@ -1335,7 +1335,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     sh['Y' + str(num + 2)] = ''
                     sh['Z' + str(num + 2)] = ''
 
-                    img = Image('media/ml_product/' + i.sku + '.jpg')
+                    img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
                     img.width, img.height = 80, 80
                     sh.add_image(img, 'AA' + str(num + 2))
 

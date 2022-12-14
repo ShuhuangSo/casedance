@@ -55,4 +55,6 @@ v0.8
 筛选项处理
 v0.81
 订单日期筛选，中转仓优化，bug修复
+v0.82
+shengde export image
 

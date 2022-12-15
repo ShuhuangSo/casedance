@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
-    Packing
+    Packing, MLOperateLog
 
 
 @admin.register(Listing)
@@ -123,3 +123,9 @@ class FinanceAdmin(admin.ModelAdmin):
 @admin.register(Packing)
 class PackingAdmin(admin.ModelAdmin):
     list_display = ['name', 'size', 'weight']
+
+
+@admin.register(MLOperateLog)
+class MLOperateLogAdmin(admin.ModelAdmin):
+    list_display = ['op_module', 'desc', 'user', 'create_time']
+    list_filter = ['op_module']

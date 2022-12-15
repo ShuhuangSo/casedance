@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
-    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing
+    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -357,3 +357,38 @@ class PackingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Packing
         fields = "__all__"
+
+
+class MLOperateLogSerializer(serializers.ModelSerializer):
+    """
+    操作日志
+    """
+    user_name = serializers.SerializerMethodField()
+    target_name = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+
+        return obj.user.first_name
+
+    def get_target_name(self, obj):
+        name = ''
+        if obj.target_type == 'PRODUCT':
+            if obj.target_id:
+                product = MLProduct.objects.filter(id=obj.target_id).first()
+                if product:
+                    name = product.sku
+        if obj.target_type == 'PACKING':
+            name = '包材管理'
+
+        if obj.target_type == 'SHIP':
+            if obj.target_id:
+                ship = Ship.objects.filter(id=obj.target_id).first()
+                if ship:
+                    name = ship.batch + '-' + ship.shop
+
+        return name
+
+    class Meta:
+        model = MLOperateLog
+        fields = ('id', 'op_module', 'op_type', 'target_id', 'target_type', 'desc', 'user_name', 'create_time',
+                  'target_name')

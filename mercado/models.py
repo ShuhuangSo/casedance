@@ -683,3 +683,26 @@ class Finance(models.Model):
 
     def __str__(self):
         return str(self.shop)
+
+
+class MLOperateLog(models.Model):
+    """
+    操作日志
+    """
+
+    op_module = models.CharField(max_length=10, null=True, blank=True, verbose_name='操作模块', help_text='操作模块')
+    op_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='操作类型', help_text='操作类型')
+    target_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='目标类型', help_text='目标类型')
+    target_id = models.IntegerField(default=0, verbose_name='目标id', help_text='目标id')
+    desc = models.CharField(max_length=300, null=True, blank=True, verbose_name='操作描述', help_text='操作描述')
+    user = models.ForeignKey(User, related_name='user_mlop_log', on_delete=models.SET_NULL, null=True, blank=True,
+                             verbose_name='操作人', help_text='操作人')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='操作时间', help_text='操作时间')
+
+    class Meta:
+        verbose_name = '操作日志'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return str(self.op_module)

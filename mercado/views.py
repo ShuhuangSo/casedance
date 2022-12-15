@@ -19,11 +19,11 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing
+    MLOrder, ExRate, Finance, Packing, MLOperateLog
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
-    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer
+    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer
 from mercado import tasks
 
 
@@ -544,6 +544,14 @@ class MLProductViewSet(mixins.ListModelMixin,
             ))
         MLProduct.objects.bulk_create(add_list)
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'CREATE'
+        log.desc = '导入新产品'
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
     # ML产品图片上传
@@ -568,7 +576,35 @@ class MLProductViewSet(mixins.ListModelMixin,
         pic_new = pic_org.resize((100, 100), Image.ANTIALIAS)
         pic_new.save('media/ml_product/' + product.sku + '_100x100.jpg')
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'EDIT'
+        log.target_type = 'PRODUCT'
+        log.target_id = product.id
+        log.desc = '上传修改图片'
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+    #  重写产品删除
+    def destroy(self, request, *args, **kwargs):
+        product = self.get_object()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'DEL'
+        log.target_type = 'PRODUCT'
+        log.target_id = product.id
+        log.desc = '删除产品 {sku} {p_name}'.format(sku=product.sku, p_name=product.p_name)
+        log.user = request.user
+        log.save()
+
+        product.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class PackingViewSet(mixins.ListModelMixin,
@@ -595,8 +631,66 @@ class PackingViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('name', 'size')  # 配置过滤字段
-    search_fields = ('name', )  # 配置搜索字段
-    ordering_fields = ('create_time', )  # 配置排序字段
+    search_fields = ('name',)  # 配置搜索字段
+    ordering_fields = ('create_time',)  # 配置排序字段
+
+    # 重写
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'CREATE'
+        log.target_type = 'PACKING'
+        log.desc = '新增包材 {name}'.format(name=request.data['name'])
+        log.user = request.user
+        log.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    # 重写
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'EDIT'
+        log.target_type = 'PACKING'
+        log.target_id = serializer.data['id']
+        log.desc = '修改包材 {name}'.format(name=serializer.data['name'])
+        log.user = request.user
+        log.save()
+        return Response(serializer.data)
+
+    # 重写
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PRODUCT'
+        log.op_type = 'DEL'
+        log.target_type = 'PACKING'
+        log.target_id = instance.id
+        log.desc = '删除包材 {name}'.format(name=instance.name)
+        log.user = request.user
+        log.save()
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ShopViewSet(mixins.ListModelMixin,
@@ -968,6 +1062,16 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.products_cost = products_cost
         ship.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '新增运单'
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
 
     # 编辑运单
@@ -1013,6 +1117,16 @@ class ShipViewSet(mixins.ListModelMixin,
         queryset = ShipDetail.objects.filter(ship=ship)
         for i in queryset:
             if i.sku not in sku_list:
+                # 创建操作日志
+                log = MLOperateLog()
+                log.op_module = 'SHIP'
+                log.op_type = 'DEL'
+                log.target_type = 'SHIP'
+                log.target_id = ship.id
+                log.desc = '移除产品 {sku} {p_name}'.format(sku=i.sku, p_name=i.p_name)
+                log.user = request.user
+                log.save()
+
                 i.delete()
 
         total_qty = 0  # 总数量
@@ -1026,6 +1140,17 @@ class ShipViewSet(mixins.ListModelMixin,
                     sd = ShipDetail.objects.filter(id=i['id']).first()
                 else:
                     sd = ShipDetail()
+
+                    # 创建操作日志
+                    log = MLOperateLog()
+                    log.op_module = 'SHIP'
+                    log.op_type = 'CREATE'
+                    log.target_type = 'SHIP'
+                    log.target_id = ship.id
+                    log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name, qty=i['qty'])
+                    log.user = request.user
+                    log.save()
+
                 sd.ship = ship
                 sd.s_type = i['s_type']
                 sd.qty = i['qty']
@@ -1114,6 +1239,16 @@ class ShipViewSet(mixins.ListModelMixin,
 
         if ship_action == 'SHIPPED':
             msg = '成功发货!'
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '运单发货!'
+            log.user = request.user
+            log.save()
         else:
             msg = '保存成功!'
         return Response({'msg': msg}, status=status.HTTP_200_OK)
@@ -1157,6 +1292,65 @@ class ShipViewSet(mixins.ListModelMixin,
                 i.avg_ship_fee = avg_ship_fee
                 i.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '添加头程运费 {name}'.format(name=shipping_fee)
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 添加杂费
+    @action(methods=['post'], detail=False, url_path='extra_fee')
+    def extra_fee(self, request):
+        ship_id = request.data['id']
+        extra_fee = request.data['extra_fee']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship.extra_fee = extra_fee
+        ship.save()
+
+        all_fee = ship.shipping_fee + ship.extra_fee
+
+        queryset = ShipDetail.objects.filter(ship=ship)
+        total_weight = 0
+        total_cbm = 0
+
+        if ship.ship_type == '空运':
+            for i in queryset:
+                total_weight += (i.weight * i.qty)
+            for i in queryset:
+                if total_weight:
+                    percent = (i.weight * i.qty) / total_weight
+                else:
+                    percent = 0
+                avg_ship_fee = percent * all_fee / i.qty
+                i.avg_ship_fee = avg_ship_fee
+                i.save()
+
+        if ship.ship_type == '海运':
+            for i in queryset:
+                cbm = i.length * i.width * i.heigth / 1000000
+                total_cbm += (cbm * i.qty)
+            for i in queryset:
+                cbm = i.length * i.width * i.heigth / 1000000
+                percent = cbm / total_cbm
+                avg_ship_fee = percent * all_fee
+                i.avg_ship_fee = avg_ship_fee
+                i.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '添加杂费 {name}'.format(name=extra_fee)
+        log.user = request.user
+        log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 入仓
@@ -1247,6 +1441,16 @@ class ShipViewSet(mixins.ListModelMixin,
 
         ship.s_status = 'FINISHED'
         ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '操作入仓!'
+        log.user = request.user
+        log.save()
 
         return Response({'msg': '入仓成功!'}, status=status.HTTP_200_OK)
 
@@ -1346,6 +1550,16 @@ class ShipViewSet(mixins.ListModelMixin,
             wb.save('media/export/盛德物流申报-' + ship.shop + '.xlsx')
             url = BASE_URL + '/media/export/盛德物流申报-' + ship.shop + '.xlsx'
 
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'CREATE'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '导出盛德申报单'
+            log.user = request.user
+            log.save()
+
         return Response({'url': url}, status=status.HTTP_200_OK)
 
     # 导出采购单
@@ -1405,7 +1619,34 @@ class ShipViewSet(mixins.ListModelMixin,
         wb.save('media/export/美客多采购单-' + ship.shop + '.xlsx')
         url = BASE_URL + '/media/export/美客多采购单-' + ship.shop + '.xlsx'
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出采购单'
+        log.user = request.user
+        log.save()
+
         return Response({'url': url}, status=status.HTTP_200_OK)
+
+    # 重写
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'DEL'
+        log.target_type = 'SHIP'
+        log.target_id = instance.id
+        log.desc = '删除运单 {batch}-{shop}'.format(batch=instance.batch, shop=instance.shop)
+        log.user = request.user
+        log.save()
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ShipDetailViewSet(mixins.ListModelMixin,
@@ -1504,6 +1745,16 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         ship.cbm = total_cbm
         ship.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '新增包装箱 箱号{name}'.format(name=box.box_number)
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '成功新增包装箱!'}, status=status.HTTP_200_OK)
 
     # edit box
@@ -1544,6 +1795,16 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         box.ship.cbm = total_cbm
         box.ship.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = box.ship.id
+        log.desc = '修改包装箱 箱号{name}'.format(name=box.box_number)
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '包装箱已更新!'}, status=status.HTTP_200_OK)
 
     # delete box
@@ -1551,7 +1812,9 @@ class ShipBoxViewSet(mixins.ListModelMixin,
     def delete_shipbox(self, request):
         box_id = request.data['id']
         ship_id = request.data['ship_id']
-        ShipBox.objects.filter(id=box_id).delete()
+        box = ShipBox.objects.filter(id=box_id).first()
+        box_number = box.box_number
+        box.delete()
 
         ship = Ship.objects.filter(id=ship_id).first()
         # 统计包装箱总重量
@@ -1564,6 +1827,16 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         total_cbm = sum_cbm['cbm__sum']
         ship.cbm = total_cbm
         ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'DEL'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '删除包装箱 箱号{name}'.format(name=box_number)
+        log.user = request.user
+        log.save()
         return Response({'msg': '包装箱已删除!'}, status=status.HTTP_200_OK)
 
 
@@ -2048,3 +2321,31 @@ class MLOrderViewSet(mixins.ListModelMixin,
         tasks.calc_product_sales.delay()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+
+class MLOperateLogViewSet(mixins.ListModelMixin,
+                          mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin,
+                          mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin,
+                          viewsets.GenericViewSet):
+    """
+    list:
+        操作日志列表,分页,过滤,搜索,排序
+    create:
+        操作日志新增
+    retrieve:
+        操作日志详情页
+    update:
+        操作日志修改
+    destroy:
+        操作日志删除
+    """
+    queryset = MLOperateLog.objects.all()
+    serializer_class = MLOperateLogSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('op_module', 'op_type', 'target_id', 'target_type', 'user')  # 配置过滤字段
+    search_fields = ('desc',)  # 配置搜索字段
+    ordering_fields = ('create_time', 'id')  # 配置排序字段

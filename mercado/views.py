@@ -449,7 +449,7 @@ class MLProductViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('p_status', 'site', 'shop', 'is_checked')  # 配置过滤字段
+    filter_fields = ('p_status', 'site', 'shop', 'is_checked', 'user_id')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'sku', 'item_id')  # 配置排序字段
 
@@ -541,6 +541,7 @@ class MLProductViewSet(mixins.ListModelMixin,
                 buy_url=buy_url,
                 sale_url=sale_url,
                 refer_url=refer_url,
+                user_id=request.user.id,
             ))
         MLProduct.objects.bulk_create(add_list)
 
@@ -548,7 +549,7 @@ class MLProductViewSet(mixins.ListModelMixin,
         log = MLOperateLog()
         log.op_module = 'PRODUCT'
         log.op_type = 'CREATE'
-        log.desc = '导入新产品'
+        log.desc = '导入新产品 {name}个'.format(name=len(add_list))
         log.user = request.user
         log.save()
 
@@ -779,6 +780,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         shop_id = data['id']
         wb = openpyxl.load_workbook(data['excel'])
         sheet = wb['Reporte general de stock']
+        shop = Shop.objects.filter(id=shop_id).first()
 
         for cell_row in list(sheet)[5:]:
             sku = cell_row[1].value
@@ -793,7 +795,6 @@ class ShopStockViewSet(mixins.ListModelMixin,
                 ml_product = MLProduct.objects.filter(sku=sku, item_id=item_id).first()
                 if ml_product:
                     shop_stock = ShopStock()
-                    shop = Shop.objects.filter(id=shop_id).first()
                     shop_stock.shop = shop
                     shop_stock.sku = ml_product.sku
                     shop_stock.p_name = ml_product.p_name
@@ -809,6 +810,16 @@ class ShopStockViewSet(mixins.ListModelMixin,
                     shop_stock.unit_cost = ml_product.unit_cost
                     shop_stock.first_ship_cost = ml_product.first_ship_cost
                     shop_stock.save()
+
+        if shop:
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'FBM'
+            log.op_type = 'CREATE'
+            log.target_type = 'FBM'
+            log.desc = 'FBM库存导入 店铺: {name}'.format(name=shop.name)
+            log.user = request.user
+            log.save()
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
@@ -982,7 +993,7 @@ class ShipViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier')  # 配置过滤字段
+    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
     search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
                      'ship_shipDetail__p_name')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段
@@ -1001,19 +1012,22 @@ class ShipViewSet(mixins.ListModelMixin,
 
         batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
 
-        ship = Ship()
-        ship.s_status = 'PREPARING'
-        ship.send_from = 'CN'
-        ship.batch = batch
-        ship.shop = shop
-        ship.target = target
-        ship.ship_type = ship_type
-        ship.carrier = carrier
-        if end_date:
-            ship.end_date = end_date
-        if ship_date:
-            ship.ship_date = ship_date
-        ship.note = note
+        if not end_date:
+            end_date = None
+        if not ship_date:
+            ship_date = None
+        ship = Ship(
+            s_status='PREPARING',
+            batch=batch,
+            shop=shop,
+            target=target,
+            carrier=carrier,
+            ship_type=ship_type,
+            end_date=end_date,
+            ship_date=ship_date,
+            note=note,
+            user_id=request.user.id
+        )
         ship.save()
 
         total_qty = 0  # 总数量
@@ -1068,7 +1082,7 @@ class ShipViewSet(mixins.ListModelMixin,
         log.op_type = 'CREATE'
         log.target_type = 'SHIP'
         log.target_id = ship.id
-        log.desc = '新增运单'
+        log.desc = '创建运单'
         log.user = request.user
         log.save()
 
@@ -1410,6 +1424,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock = TransStock()
                 shop = Shop.objects.filter(name=ship.shop).first()
                 trans_stock.shop = shop
+                trans_stock.user_id = i.ship.user_id
                 trans_stock.listing_shop = i.target_FBM
                 trans_stock.sku = i.sku
                 trans_stock.p_name = i.p_name
@@ -1436,8 +1451,9 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 # 增加fbm库存中转仓数量
                 shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
-                shop_stock.trans_qty += i.qty
-                shop_stock.save()
+                if shop_stock:
+                    shop_stock.trans_qty += i.qty
+                    shop_stock.save()
 
         ship.s_status = 'FINISHED'
         ship.save()
@@ -1457,9 +1473,14 @@ class ShipViewSet(mixins.ListModelMixin,
     # 计算运单数量
     @action(methods=['get'], detail=False, url_path='calc_ships')
     def calc_ships(self, request):
-        pre_qty = Ship.objects.filter(s_status='PREPARING').count()
-        shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
-        booked_qty = Ship.objects.filter(s_status='BOOKED').count()
+        if request.user.is_superuser:
+            pre_qty = Ship.objects.filter(s_status='PREPARING').count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').count()
+        else:
+            pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
                         status=status.HTTP_200_OK)
 
@@ -1891,7 +1912,7 @@ class TransStockViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('listing_shop', 'shop', 'is_out')  # 配置过滤字段
+    filter_fields = ('listing_shop', 'shop', 'is_out', 'user_id')  # 配置过滤字段
     search_fields = (
         'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number',
         'carrier_box_number')  # 配置搜索字段
@@ -1905,13 +1926,24 @@ class TransStockViewSet(mixins.ListModelMixin,
 
         batch = 'Z{time_str}'.format(time_str=time.strftime('%m%d'))
 
-        ship = Ship()
-        ship.s_status = 'SHIPPED'
-        ship.send_from = 'LOCAL'
-        ship.batch = batch
-        ship.shop = shop
-        ship.target = 'FBM'
+        ship = Ship(
+            s_status='SHIPPED',
+            send_from='LOCAL',
+            shop=shop,
+            target='FBM',
+            batch=batch,
+        )
         ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '从中转仓创建运单'
+        log.user = request.user
+        log.save()
 
         total_box = 0  # 总箱数
         total_qty = 0  # 总数量
@@ -1981,6 +2013,17 @@ class TransStockViewSet(mixins.ListModelMixin,
         ship.weight = total_weight
         ship.cbm = total_cbm
         ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'TRANS'
+        log.op_type = 'CREATE'
+        log.target_type = 'TRANS'
+        log.target_id = ship.id
+        log.desc = '中转仓FBM发仓 目标店铺: {name}'.format(name=ship.shop)
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
 
@@ -2320,6 +2363,15 @@ class MLOrderViewSet(mixins.ListModelMixin,
         # 计算产品销量
         tasks.calc_product_sales.delay()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'ORDER'
+        log.op_type = 'CREATE'
+        log.target_type = 'ORDER'
+        log.desc = '销售订单导入 店铺: {name}'.format(name=shop.name)
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
 
@@ -2347,5 +2399,13 @@ class MLOperateLogViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('op_module', 'op_type', 'target_id', 'target_type', 'user')  # 配置过滤字段
+    filterset_fields = {
+        'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'op_module': ['exact'],
+        'op_type': ['exact'],
+        'target_id': ['exact'],
+        'target_type': ['exact'],
+        'user': ['exact'],
+    }
     search_fields = ('desc',)  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段

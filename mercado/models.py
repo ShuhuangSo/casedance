@@ -258,6 +258,7 @@ class MLProduct(models.Model):
     buy_url3 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接3', help_text='产品采购链接3')
     buy_url4 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接4', help_text='产品采购链接4')
     buy_url5 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接5', help_text='产品采购链接5')
+    user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
 
     class Meta:
         verbose_name = 'ML产品库'
@@ -408,6 +409,7 @@ class TransStock(models.Model):
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     arrived_date = models.DateField(null=True, blank=True, verbose_name='到仓日期', help_text='到仓日期')
     is_out = models.BooleanField(default=False, verbose_name='是否已出仓', help_text='是否已出仓')
+    user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
 
     class Meta:
         verbose_name = '中转仓库存'
@@ -453,6 +455,7 @@ class Ship(models.Model):
     cbm = models.FloatField(null=True, blank=True, verbose_name='总体积cbm', help_text='总体积cbm')
     tag_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='标签名称', help_text='标签名称')
     tag_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='标签颜色', help_text='标签颜色')
+    user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 

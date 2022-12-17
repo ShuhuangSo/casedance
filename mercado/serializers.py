@@ -160,7 +160,7 @@ class MLProductSerializer(serializers.ModelSerializer):
                   'en_name', 'brand', 'declared_value', 'cn_material', 'en_material', 'use', 'site', 'shop', 'unit_cost',
                   'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
-                  'buy_url4', 'buy_url5')
+                  'buy_url4', 'buy_url5', 'user_id')
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -244,7 +244,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type', 'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'products_weight', 'ship_shipDetail')
+            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):
@@ -298,7 +298,7 @@ class TransStockSerializer(serializers.ModelSerializer):
             'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
             'unit_cost', 'first_ship_cost', 's_number', 'batch',
             'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
-            'arrived_date', 'is_out', 'shop', 'stock_days', 'group')
+            'arrived_date', 'is_out', 'shop', 'stock_days', 'group', 'user_id')
 
 
 class MLSiteSerializer(serializers.ModelSerializer):

@@ -924,6 +924,19 @@ class ShopStockViewSet(mixins.ListModelMixin,
                         "tag_color": i.ship.tag_color,
                         "batch": i.ship.batch,
                     })
+        if op_type == 'FINISH':
+            date = datetime.now().date() - timedelta(days=30)
+            querySet = ShipDetail.objects.filter(sku=sku, ship__s_status='FINISHED', ship__target='FBM').filter(ship__book_date__gte=date)
+            if querySet:
+                for i in querySet:
+                    data.append({
+                        'qty': i.qty,
+                        "s_status": i.ship.s_status,
+                        "book_date": i.ship.book_date,
+                        "tag_name": i.ship.tag_name,
+                        "tag_color": i.ship.tag_color,
+                        "batch": i.ship.batch,
+                    })
         if op_type == 'TRANS':
             ts = TransStock.objects.filter(sku=sku)
             if ts:
@@ -1446,7 +1459,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock.box_heigth = box.heigth
                 trans_stock.box_cbm = box.cbm
                 trans_stock.note = box.note
-                trans_stock.arrived_date = time.strftime('%Y-%m-%d')
+                trans_stock.arrived_date = ship.book_date
                 trans_stock.save()
 
                 # 增加fbm库存中转仓数量
@@ -1990,7 +2003,7 @@ class TransStockViewSet(mixins.ListModelMixin,
             box.heigth = i['box_heigth']
             box.weight = i['box_weight']
             box.carrier_box_number = i['carrier_box_number']
-            box.note = i['note']
+            box.note = i['s_number']
             cbm = i['box_cbm']
             box.cbm = cbm
             box.save()

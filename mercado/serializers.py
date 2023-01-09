@@ -289,7 +289,7 @@ class TransStockSerializer(serializers.ModelSerializer):
         return shop.name_color if shop else ''
 
     def get_group(self, obj):
-        count = TransStock.objects.filter(box_number=obj.box_number).count()
+        count = TransStock.objects.filter(box_number=obj.box_number, is_out=False).count()
         return count if count > 1 else 0
 
     class Meta:
@@ -298,7 +298,7 @@ class TransStockSerializer(serializers.ModelSerializer):
             'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
             'unit_cost', 'first_ship_cost', 's_number', 'batch',
             'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
-            'arrived_date', 'is_out', 'shop', 'stock_days', 'group', 'user_id')
+            'arrived_date', 'is_out', 'shop', 'stock_days', 'group', 'user_id', 'out_time')
 
 
 class MLSiteSerializer(serializers.ModelSerializer):

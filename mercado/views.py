@@ -938,7 +938,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
                         "batch": i.ship.batch,
                     })
         if op_type == 'TRANS':
-            ts = TransStock.objects.filter(sku=sku)
+            ts = TransStock.objects.filter(sku=sku, is_out=False)
             if ts:
                 for i in ts:
                     data.append({
@@ -1929,7 +1929,7 @@ class TransStockViewSet(mixins.ListModelMixin,
     search_fields = (
         'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number',
         'carrier_box_number')  # 配置搜索字段
-    ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days')  # 配置排序字段
+    ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days', 'out_time')  # 配置排序字段
 
     # fbm发仓
     @action(methods=['post'], detail=False, url_path='send_fbm')
@@ -2020,7 +2020,11 @@ class TransStockViewSet(mixins.ListModelMixin,
                 shop_stock.trans_qty -= sd.qty  # 减去中转仓数量
                 shop_stock.save()
 
-            TransStock.objects.filter(id=i['id']).delete()
+            ts = TransStock.objects.filter(id=i['id']).first()
+            ts.is_out = True
+            ts.out_time = datetime.now()
+            ts.save()
+
         ship.total_box = total_box
         ship.total_qty = total_qty
         ship.weight = total_weight

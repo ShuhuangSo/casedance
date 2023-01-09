@@ -409,6 +409,7 @@ class TransStock(models.Model):
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     arrived_date = models.DateField(null=True, blank=True, verbose_name='到仓日期', help_text='到仓日期')
     is_out = models.BooleanField(default=False, verbose_name='是否已出仓', help_text='是否已出仓')
+    out_time = models.DateTimeField(null=True, blank=True, verbose_name='出仓时间', help_text='出仓时间')
     user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
 
     class Meta:

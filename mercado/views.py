@@ -950,6 +950,55 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         return Response(data, status=status.HTTP_200_OK)
 
+    # 盘点fbm库存
+    @action(methods=['post'], detail=False, url_path='change_stock')
+    def change_stock(self, request):
+        sid = request.data['id']
+        new_qty = request.data['qty']
+        reason = request.data['reason']
+
+        shop_stock = ShopStock.objects.filter(id=sid).first()
+        old_qty = shop_stock.qty
+        shop_stock.qty = new_qty
+        shop_stock.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'FBM'
+        log.op_type = 'EDIT'
+        log.target_id = sid
+        log.target_type = 'FBM'
+        log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku, old_qty=old_qty, new_qty=new_qty, reason=reason)
+        log.user = request.user
+        log.save()
+
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
+    # 修改产品状态
+    @action(methods=['post'], detail=False, url_path='change_status')
+    def change_status(self, request):
+        sid = request.data['id']
+        new_status = request.data['status']
+
+        shop_stock = ShopStock.objects.filter(id=sid).first()
+        if shop_stock.p_status == new_status:
+            return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+        old_status = shop_stock.p_status
+        shop_stock.p_status = new_status
+        shop_stock.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'FBM'
+        log.op_type = 'EDIT'
+        log.target_id = sid
+        log.target_type = 'FBM'
+        log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku, old_status=old_status, new_status=new_status)
+        log.user = request.user
+        log.save()
+
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         t = '29 de noviembre de 2022 02:28 hs.'
@@ -2153,6 +2202,15 @@ class FinanceViewSet(mixins.ListModelMixin,
         finance.f_type = 'WD'
         finance.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'FINANCE'
+        log.op_type = 'CREATE'
+        log.target_type = 'FINANCE'
+        log.desc = '新增店铺提现 店铺: {name}，提现资金: ${income}'.format(name=shop.name, income=finance.income)
+        log.user = request.user
+        log.save()
+
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # ML创建结汇
@@ -2179,6 +2237,15 @@ class FinanceViewSet(mixins.ListModelMixin,
         finance.exc_date = data['exc_date']
         finance.f_type = 'EXC'
         finance.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'FINANCE'
+        log.op_type = 'CREATE'
+        log.target_type = 'FINANCE'
+        log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name, exchange=finance.exchange, income=finance.income_rmb)
+        log.user = request.user
+        log.save()
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
@@ -2281,7 +2348,9 @@ class MLOrderViewSet(mixins.ListModelMixin,
                 continue
             sku = cell_row[13].value
             item_id = cell_row[14].value[3:]
-            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id).first()
+
+            # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
             if not shop_stock:
                 continue
             first_ship_cost = shop_stock.first_ship_cost

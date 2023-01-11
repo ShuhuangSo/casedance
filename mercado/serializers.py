@@ -385,6 +385,11 @@ class MLOperateLogSerializer(serializers.ModelSerializer):
                 ship = Ship.objects.filter(id=obj.target_id).first()
                 if ship:
                     name = ship.batch + '-' + ship.shop
+        if obj.target_type == 'FBM':
+            if obj.target_id:
+                shop_stock = ShopStock.objects.filter(id=obj.target_id).first()
+                if shop_stock:
+                    name = shop_stock.sku
 
         return name
 

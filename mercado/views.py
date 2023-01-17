@@ -19,12 +19,14 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
-    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer
+    FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
+    ShopReportSerializer
 from mercado import tasks
+from report.models import ProductReport
 
 
 class DefaultPagination(PageNumberPagination):
@@ -926,7 +928,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
                     })
         if op_type == 'FINISH':
             date = datetime.now().date() - timedelta(days=30)
-            querySet = ShipDetail.objects.filter(sku=sku, ship__s_status='FINISHED', ship__target='FBM').filter(ship__book_date__gte=date)
+            querySet = ShipDetail.objects.filter(sku=sku, ship__s_status='FINISHED', ship__target='FBM').filter(
+                ship__book_date__gte=date)
             if querySet:
                 for i in querySet:
                     data.append({
@@ -968,7 +971,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.op_type = 'EDIT'
         log.target_id = sid
         log.target_type = 'FBM'
-        log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku, old_qty=old_qty, new_qty=new_qty, reason=reason)
+        log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
+                                                                                         old_qty=old_qty,
+                                                                                         new_qty=new_qty, reason=reason)
         log.user = request.user
         log.save()
 
@@ -993,7 +998,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.op_type = 'EDIT'
         log.target_id = sid
         log.target_type = 'FBM'
-        log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku, old_status=old_status, new_status=new_status)
+        log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
+                                                                                old_status=old_status,
+                                                                                new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1223,7 +1230,8 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.op_type = 'CREATE'
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
-                    log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name, qty=i['qty'])
+                    log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
+                                                                        qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -2243,7 +2251,9 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name, exchange=finance.exchange, income=finance.income_rmb)
+        log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
+                                                                                           exchange=finance.exchange,
+                                                                                           income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -2495,3 +2505,25 @@ class MLOperateLogViewSet(mixins.ListModelMixin,
     }
     search_fields = ('desc',)  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段
+
+
+class ShopReportViewSet(mixins.ListModelMixin,
+                        viewsets.GenericViewSet):
+    """
+    list:
+        统计店铺每天销量
+    """
+    queryset = ShopReport.objects.all()
+    serializer_class = ShopReportSerializer  # 序列化
+
+    filter_backends = (DjangoFilterBackend,)  # 过滤
+    filterset_fields = {
+        'calc_date': ['gte', 'lte', 'exact'],
+        'shop': ['exact'],
+    }
+
+    # 统计30天店铺每天销量
+    @action(methods=['get'], detail=False, url_path='calc_shop_sale')
+    def calc_shop_sale(self, request):
+        tasks.calc_shop_sale()
+        return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)

@@ -23,7 +23,8 @@ class Listing(models.Model):
     reviews = models.IntegerField(default=0, null=True, blank=True, verbose_name='评论数量', help_text='评论数量')
     rating_average = models.FloatField(null=True, blank=True, verbose_name='评分', help_text='评分')
     start_date = models.DateField(null=True, verbose_name='上架时间', help_text='上架时间')
-    listing_status = models.CharField(null=True, blank=True, max_length=10, verbose_name='商品状态', help_text='商品状态')
+    listing_status = models.CharField(null=True, blank=True, max_length=10, verbose_name='商品状态',
+                                      help_text='商品状态')
     health = models.FloatField(null=True, blank=True, verbose_name='健康度', help_text='健康度')
     stock_num = models.IntegerField(default=0, null=True, blank=True, verbose_name='库存数', help_text='库存数')
     ship_type = models.CharField(null=True, blank=True, max_length=20, verbose_name='物流类型', help_text='物流类型')
@@ -53,7 +54,8 @@ class ListingTrack(models.Model):
     商品跟踪
     """
 
-    listing = models.ForeignKey(Listing, related_name='listing_track', on_delete=models.CASCADE, verbose_name='在线产品',
+    listing = models.ForeignKey(Listing, related_name='listing_track', on_delete=models.CASCADE,
+                                verbose_name='在线产品',
                                 help_text='在线产品')
     currency = models.CharField(null=True, blank=True, max_length=5, verbose_name='币种', help_text='币种')
     price = models.FloatField(default=0, null=True, blank=True, verbose_name='销售定价', help_text='销售定价')
@@ -91,7 +93,8 @@ class Seller(models.Model):
     registration_date = models.DateField(null=True, verbose_name='注册日期', help_text='注册日期')
     link = models.CharField(null=True, blank=True, max_length=200, verbose_name='店铺链接', help_text='店铺链接')
     sold_60d = models.IntegerField(default=0, null=True, blank=True, verbose_name='60天销量', help_text='60天销量')
-    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='listing数量', help_text='listing数量')
+    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='listing数量',
+                                      help_text='listing数量')
     collection = models.BooleanField(default=False, verbose_name='是否收藏', help_text='是否收藏')
     update_time = models.DateTimeField(null=True, verbose_name='更新时间', help_text='更新时间')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
@@ -117,7 +120,8 @@ class SellerTrack(models.Model):
     negative = models.FloatField(null=True, blank=True, verbose_name='差评率', help_text='差评率')
     neutral = models.FloatField(null=True, blank=True, verbose_name='中评率', help_text='中评率')
     positive = models.FloatField(null=True, blank=True, verbose_name='好评率', help_text='好评率')
-    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='listing数量', help_text='listing数量')
+    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='listing数量',
+                                      help_text='listing数量')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:
@@ -138,9 +142,11 @@ class Categories(models.Model):
     father_id = models.CharField(null=True, max_length=10, verbose_name='父类目id', help_text='父类目id')
     site_id = models.CharField(max_length=10, verbose_name='站点id', help_text='站点id')
     name = models.CharField(null=True, max_length=100, verbose_name='类目名称', help_text='类目名称')
-    t_name = models.CharField(null=True, blank=True, max_length=100, verbose_name='翻译类目名称', help_text='翻译类目名称')
+    t_name = models.CharField(null=True, blank=True, max_length=100, verbose_name='翻译类目名称',
+                              help_text='翻译类目名称')
     path_from_root = models.CharField(max_length=200, verbose_name='类目导航', help_text='类目导航')
-    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='类目产品数量', help_text='类目产品数量')
+    total_items = models.IntegerField(default=0, null=True, blank=True, verbose_name='类目产品数量',
+                                      help_text='类目产品数量')
     has_children = models.BooleanField(default=True, verbose_name='是否有子类目', help_text='是否有子类目')
     collection = models.BooleanField(default=False, verbose_name='是否收藏', help_text='是否收藏')
     update_time = models.DateTimeField(null=True, verbose_name='创建时间', help_text='创建时间')
@@ -161,7 +167,8 @@ class Keywords(models.Model):
 
     categ_id = models.CharField(max_length=10, verbose_name='类目id', help_text='类目id')
     keyword = models.CharField(null=True, max_length=100, verbose_name='关键词', help_text='关键词')
-    t_keyword = models.CharField(null=True, blank=True, max_length=100, verbose_name='关键词翻译', help_text='关键词翻译')
+    t_keyword = models.CharField(null=True, blank=True, max_length=100, verbose_name='关键词翻译',
+                                 help_text='关键词翻译')
     url = models.CharField(null=True, blank=True, max_length=200, verbose_name='url', help_text='url')
     rank = models.IntegerField(default=0, null=True, blank=True, verbose_name='排名', help_text='排名')
     status = models.CharField(null=True, blank=True, max_length=5, verbose_name='状态', help_text='状态')
@@ -245,7 +252,8 @@ class MLProduct(models.Model):
     width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
     heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
     weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
-    buy_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接', help_text='产品采购链接')
+    buy_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接',
+                               help_text='产品采购链接')
     sale_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='销售链接', help_text='销售链接')
     refer_url = models.CharField(null=True, blank=True, max_length=500, verbose_name='参考链接', help_text='参考链接')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
@@ -254,10 +262,14 @@ class MLProduct(models.Model):
     label_title = models.CharField(null=True, blank=True, max_length=100, verbose_name='链接标题', help_text='链接标题')
     label_option = models.CharField(null=True, blank=True, max_length=50, verbose_name='链接选项', help_text='链接选项')
     packing_id = models.IntegerField(null=True, blank=True, verbose_name='包材id', help_text='包材id')
-    buy_url2 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接2', help_text='产品采购链接2')
-    buy_url3 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接3', help_text='产品采购链接3')
-    buy_url4 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接4', help_text='产品采购链接4')
-    buy_url5 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接5', help_text='产品采购链接5')
+    buy_url2 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接2',
+                                help_text='产品采购链接2')
+    buy_url3 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接3',
+                                help_text='产品采购链接3')
+    buy_url4 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接4',
+                                help_text='产品采购链接4')
+    buy_url5 = models.CharField(null=True, blank=True, max_length=500, verbose_name='产品采购链接5',
+                                help_text='产品采购链接5')
     user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
 
     class Meta:
@@ -312,7 +324,8 @@ class Shop(models.Model):
     total_qty = models.IntegerField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
     user = models.ForeignKey(User, related_name='user_shop', on_delete=models.SET_NULL, null=True, blank=True,
                              verbose_name='user', help_text='user')
-    name_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='店铺名称颜色', help_text='店铺名称颜色')
+    name_color = models.CharField(max_length=20, null=True, blank=True, verbose_name='店铺名称颜色',
+                                  help_text='店铺名称颜色')
 
     class Meta:
         verbose_name = 'FBM店铺'
@@ -438,7 +451,8 @@ class Ship(models.Model):
     s_status = models.CharField(max_length=10, choices=SHIP_STATUS, default='PREPARING', verbose_name='产品状态',
                                 help_text='产品状态')
     shop = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标店铺', help_text='目标店铺')
-    target = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标入仓FBM/中转仓', help_text='目标入仓FBM/中转仓')
+    target = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标入仓FBM/中转仓',
+                              help_text='目标入仓FBM/中转仓')
     fbm_warehouse = models.CharField(max_length=30, null=True, blank=True, verbose_name='fbm仓库', help_text='fbm仓库')
     envio_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='Envio号', help_text='Envio号')
     send_from = models.CharField(max_length=30, null=True, blank=True, verbose_name='从哪发', help_text='从哪发')
@@ -475,7 +489,8 @@ class ShipDetail(models.Model):
     """
     ship = models.ForeignKey(Ship, related_name='ship_shipDetail', on_delete=models.CASCADE, verbose_name='所属运单',
                              help_text='所属运单')
-    target_FBM = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标FBM仓库', help_text='目标FBM仓库')
+    target_FBM = models.CharField(max_length=30, null=True, blank=True, verbose_name='目标FBM仓库',
+                                  help_text='目标FBM仓库')
     box_number = models.CharField(max_length=30, verbose_name='箱号', help_text='箱号')
     s_type = models.CharField(max_length=10, verbose_name='发货类型', help_text='发货类型')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
@@ -646,11 +661,14 @@ class MLOrder(models.Model):
     unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
     first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
     buyer_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='买家姓名', help_text='买家姓名')
-    buyer_address = models.CharField(max_length=500, null=True, blank=True, verbose_name='买家街道', help_text='买家街道')
+    buyer_address = models.CharField(max_length=500, null=True, blank=True, verbose_name='买家街道',
+                                     help_text='买家街道')
     buyer_city = models.CharField(max_length=50, null=True, blank=True, verbose_name='买家城市', help_text='买家城市')
     buyer_state = models.CharField(max_length=30, null=True, blank=True, verbose_name='买家州', help_text='买家州')
-    buyer_postcode = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家邮编', help_text='买家邮编')
-    buyer_country = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家国家', help_text='买家国家')
+    buyer_postcode = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家邮编',
+                                      help_text='买家邮编')
+    buyer_country = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家国家',
+                                     help_text='买家国家')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:
@@ -710,3 +728,24 @@ class MLOperateLog(models.Model):
 
     def __str__(self):
         return str(self.op_module)
+
+
+class ShopReport(models.Model):
+    """
+    统计店铺每天销量
+    """
+    shop = models.ForeignKey(Shop, null=True, related_name='shop_report',
+                             on_delete=models.CASCADE,
+                             verbose_name='店铺', help_text='店铺')
+    qty = models.IntegerField(default=0, verbose_name='订单数量', help_text='订单数量')
+    amount = models.FloatField(default=0.0, verbose_name='销售额', help_text='销售额')
+    profit = models.FloatField(default=0.0, verbose_name='利润rmb', help_text='利润rmb')
+    calc_date = models.DateField(null=True, blank=True, verbose_name='统计日期', help_text='统计日期')
+
+    class Meta:
+        verbose_name = '统计店铺每天销量'
+        verbose_name_plural = verbose_name
+        ordering = ['-calc_date']
+
+    def __str__(self):
+        return str(self.qty)

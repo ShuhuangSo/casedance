@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
-    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog
+    ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -397,3 +397,13 @@ class MLOperateLogSerializer(serializers.ModelSerializer):
         model = MLOperateLog
         fields = ('id', 'op_module', 'op_type', 'target_id', 'target_type', 'desc', 'user_name', 'create_time',
                   'target_name')
+
+
+class ShopReportSerializer(serializers.ModelSerializer):
+    """
+    店铺销量统计
+    """
+
+    class Meta:
+        model = ShopReport
+        fields = ('id', 'amount', 'profit', 'shop', 'calc_date', 'qty')

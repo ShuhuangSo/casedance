@@ -9,10 +9,10 @@ import hashlib
 from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock
+    MLOrder, ShopStock, ShopReport
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -509,6 +509,54 @@ def calc_product_sales():
     task_log = TaskLog()
     task_log.task_type = 11
     task_log.note = 'FBM销量计算'
+    task_log.save()
+
+    return 'OK'
+
+
+# 计算店铺30天每天累积总销量
+@shared_task()
+def calc_shop_sale():
+    q = Q()
+    q.connector = 'OR'
+    q.children.append(('order_status', 'FINISHED'))
+    q.children.append(('order_status', 'RETURN'))
+    q.children.append(('order_status', 'CASE'))
+
+    shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
+    for s in shops:
+        add_list = []
+        for i in range(30):
+            date = datetime.now().date() - timedelta(days=i)
+            order_set = MLOrder.objects.filter(order_time__date=date, shop=s).filter(q)
+            qty = 0
+            amount = 0.0
+            profit = 0.0
+
+            for item in order_set:
+                qty += item.qty
+                amount += item.price
+                profit += item.profit
+
+            sr = ShopReport.objects.filter(calc_date=date, shop=s).first()
+            if sr:
+                sr.qty = qty
+                sr.amount = amount
+                sr.profit = profit
+            else:
+                add_list.append(ShopReport(
+                    qty=qty,
+                    amount=amount,
+                    profit=profit,
+                    shop=s,
+                    calc_date=date
+                ))
+        if len(add_list):
+            ShopReport.objects.bulk_create(add_list)
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 13
+    task_log.note = 'fbm店铺销量计算'
     task_log.save()
 
     return 'OK'

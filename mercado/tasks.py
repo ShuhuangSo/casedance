@@ -537,12 +537,15 @@ def calc_shop_sale():
                 qty += item.qty
                 amount += item.price
                 profit += item.profit
+            if s.id == 2:
+                print(qty, amount)
 
             sr = ShopReport.objects.filter(calc_date=date, shop=s).first()
             if sr:
                 sr.qty = qty
                 sr.amount = amount
                 sr.profit = profit
+                sr.save()
             else:
                 add_list.append(ShopReport(
                     qty=qty,

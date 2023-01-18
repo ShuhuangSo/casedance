@@ -403,6 +403,14 @@ class ShopReportSerializer(serializers.ModelSerializer):
     """
     店铺销量统计
     """
+    amount = serializers.SerializerMethodField()
+    profit = serializers.SerializerMethodField()
+
+    def get_amount(self, obj):
+        return round(obj.amount, 2)
+
+    def get_profit(self, obj):
+        return round(obj.profit, 2)
 
     class Meta:
         model = ShopReport

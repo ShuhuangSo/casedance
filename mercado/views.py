@@ -2458,6 +2458,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
 
         # 计算产品销量
         tasks.calc_product_sales.delay()
+        # 统计过去30天每天销量
+        tasks.calc_shop_sale.delay()
 
         # 创建操作日志
         log = MLOperateLog()

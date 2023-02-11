@@ -21,6 +21,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_p_name != instance.p_name:
             value = '名称: %s ===>> %s' % (instance.__original_p_name, instance.p_name)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'p_name', instance.p_name, request.user)  # 更新未发货运单的产品参数
         if instance.__original_label_code != instance.label_code:
             value = 'FBM条码: %s ===>> %s' % (instance.__original_label_code, instance.label_code)
             create_log(instance.id, value, request.user)
@@ -66,18 +67,23 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_weight != instance.weight:
             value = '重量: %s ===>> %s' % (instance.__original_weight, instance.weight)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'weight', instance.weight, request.user)  # 更新未发货运单的产品参数
         if instance.__original_length != instance.length:
             value = '长: %s ===>> %s' % (instance.__original_length, instance.length)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'length', instance.length, request.user)  # 更新未发货运单的产品参数
         if instance.__original_width != instance.width:
             value = '宽: %s ===>> %s' % (instance.__original_width, instance.width)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'width', instance.width, request.user)  # 更新未发货运单的产品参数
         if instance.__original_heigth != instance.heigth:
             value = '高: %s ===>> %s' % (instance.__original_heigth, instance.heigth)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'heigth', instance.heigth, request.user)  # 更新未发货运单的产品参数
         if instance.__original_unit_cost != instance.unit_cost:
             value = '成本价: %s ===>> %s' % (instance.__original_unit_cost, instance.unit_cost)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'unit_cost', instance.unit_cost, request.user)  # 更新未发货运单的产品参数
         if instance.__original_first_ship_cost != instance.first_ship_cost:
             value = '预估头程运费: %s ===>> %s' % (instance.__original_first_ship_cost, instance.first_ship_cost)
             create_log(instance.id, value, request.user)
@@ -112,6 +118,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             new_name = new_packing.name if new_packing else '空'
             value = '包材: %s ===>> %s' % (old_name, new_name)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'packing', instance.packing_id, request.user)  # 更新未发货运单的产品参数
         if instance.__original_is_checked != instance.is_checked:
             value = '是否核对: %s ===>> %s' % (instance.__original_is_checked, instance.is_checked)
             create_log(instance.id, value, request.user)
@@ -171,6 +178,55 @@ def create_log(pid, value, user):
     log.desc = '修改产品 {name}'.format(name=value)
     log.user = user
     log.save()
+
+
+# 更新未发货运单的产品参数
+def update_ship_product(sku, field, value, user):
+    queryset = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=sku)
+    for i in queryset:
+        if field == 'p_name':
+            i.p_name = value
+            i.save()
+            log_value = '同步更新%s的产品名称' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'weight':
+            i.weight = value
+            i.save()
+            log_value = '同步更新%s的重量' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'unit_cost':
+            i.unit_cost = value
+            i.save()
+            log_value = '同步更新%s的成本价' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'length':
+            i.length = value
+            i.save()
+            log_value = '同步更新%s的长cm' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'width':
+            i.width = value
+            i.save()
+            log_value = '同步更新%s的宽cm' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'heigth':
+            i.heigth = value
+            i.save()
+            log_value = '同步更新%s的高cm' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'packing':
+            p = Packing.objects.filter(id=value).first()
+            i.packing_name = p.name
+            i.packing_size = p.size
+            i.save()
+            log_value = '同步更新%s的包材' % sku
+            create_ship_log(i.ship.id, log_value, user)
 
 
 def create_ship_log(pid, value, user):

@@ -520,6 +520,7 @@ class ShipDetail(models.Model):
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
     packing_name = models.CharField(null=True, blank=True, max_length=80, verbose_name='包材名称', help_text='包材名称')
     packing_size = models.CharField(null=True, blank=True, max_length=80, verbose_name='包材尺寸', help_text='包材尺寸')
+    plan_qty = models.IntegerField(default=0, verbose_name='后台计划数量', help_text='后台计划数量')
 
     class Meta:
         verbose_name = '运单详情'

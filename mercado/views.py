@@ -1110,6 +1110,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.ship = ship
                 sd.s_type = i['s_type']
                 sd.qty = i['qty']
+                sd.plan_qty = i['qty']
                 sd.note = i['note']
                 sd.sku = i['sku']
                 sd.target_FBM = product.shop
@@ -1238,6 +1239,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.ship = ship
                 sd.s_type = i['s_type']
                 sd.qty = i['qty']
+                sd.plan_qty = i['plan_qty']
                 sd.note = i['note']
                 sd.sku = i['sku']
                 sd.target_FBM = product.shop

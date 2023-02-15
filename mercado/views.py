@@ -19,12 +19,12 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
-    ShopReportSerializer
+    ShopReportSerializer, PurchaseManageSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -2531,3 +2531,77 @@ class ShopReportViewSet(mixins.ListModelMixin,
     def calc_shop_sale(self, request):
         tasks.calc_shop_sale()
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
+
+
+class PurchaseManageViewSet(mixins.ListModelMixin,
+                            mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                            mixins.RetrieveModelMixin,
+                            viewsets.GenericViewSet):
+    """
+    list:
+        采购管理列表,分页,过滤,搜索,排序
+    create:
+        采购管理新增
+    retrieve:
+        采购管理详情页
+    update:
+        采购管理修改
+    destroy:
+        采购管理删除
+    """
+    queryset = PurchaseManage.objects.all()
+    serializer_class = PurchaseManageSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_renew', 'is_urgent')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time')  # 配置排序字段
+
+    # 拉取运单备货产品
+    @action(methods=['get'], detail=False, url_path='pull_purchase')
+    def pull_purchase(self, request):
+        queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
+        add_list = []
+        for i in queryset:
+            pm = PurchaseManage.objects.filter(sku=i.sku, p_status='WAITBUY').first()
+            # 如果产品不在待采购中
+            if not pm:
+                shop = Shop.objects.filter(name=i.ship.shop).first()
+                add_list.append(PurchaseManage(
+                    p_status='WAITBUY',
+                    s_type=i.s_type,
+                    create_type='SYS',
+                    sku=i.sku,
+                    p_name=i.p_name,
+                    item_id=i.item_id,
+                    label_code=i.label_code,
+                    image=i.image,
+                    unit_cost=i.unit_cost,
+                    weight=i.weight,
+                    length=i.length,
+                    width=i.width,
+                    heigth=i.heigth,
+                    need_qty=i.qty,
+                    buy_qty=i.qty,
+                    note=i.note,
+                    shop=i.ship.shop,
+                    shop_color=shop.name_color,
+                    packing_size=i.packing_size,
+                    packing_name=i.packing_name,
+                    create_time=datetime.now()
+                ))
+            else:
+                # 如果产品在待采购中，数量不一样，则修改采购数量
+                if pm.need_qty != i.qty:
+                    pm.need_qty = i.qty
+                    pm.buy_qty = i.qty
+                    pm.is_renew = True
+                    pm.create_time = datetime.now()
+                    pm.save()
+        if len(add_list):
+            PurchaseManage.objects.bulk_create(add_list)
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)

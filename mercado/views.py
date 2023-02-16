@@ -2566,7 +2566,9 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
         add_list = []
         for i in queryset:
-            pm = PurchaseManage.objects.filter(sku=i.sku, p_status='WAITBUY').first()
+            # 查询从改批次生成的采购产品是否存在
+            pm = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch).filter(
+                Q(p_status='WAITBUY') | Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED')).count()
             # 如果产品不在待采购中
             if not pm:
                 shop = Shop.objects.filter(name=i.ship.shop).first()
@@ -2574,6 +2576,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     p_status='WAITBUY',
                     s_type=i.s_type,
                     create_type='SYS',
+                    from_batch=i.ship.batch,
                     sku=i.sku,
                     p_name=i.p_name,
                     item_id=i.item_id,
@@ -2594,13 +2597,16 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     create_time=datetime.now()
                 ))
             else:
-                # 如果产品在待采购中，数量不一样，则修改采购数量
-                if pm.need_qty != i.qty:
-                    pm.need_qty = i.qty
-                    pm.buy_qty = i.qty
-                    pm.is_renew = True
-                    pm.create_time = datetime.now()
-                    pm.save()
+                # 查看待采购是否有商品
+                pm2 = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY').first()
+                if pm2:
+                    # 如果产品在待采购中，数量不一样，则修改采购数量
+                    if pm2.need_qty != i.qty:
+                        pm2.need_qty = i.qty
+                        pm2.buy_qty = i.qty
+                        pm2.is_renew = True
+                        pm2.create_time = datetime.now()
+                        pm2.save()
         if len(add_list):
             PurchaseManage.objects.bulk_create(add_list)
 

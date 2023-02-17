@@ -2598,12 +2598,11 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 purchase_manage.save()
             else:
                 # 查看待采购是否有商品
-                pm_set = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY')
-
-                for p in pm_set:
-                    p.buy_qty += i.qty
-                    p.create_time = datetime.now()
-                    p.save()
+                pm2 = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY').first()
+                if not pm2:
+                    continue
+                pm2.create_time = datetime.now()
+                pm2.save()
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
@@ -2616,5 +2615,16 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         for i in products:
             purchase = PurchaseManage.objects.filter(id=i['id']).first()
             purchase.p_status = 'PURCHASED'
+            purchase.buy_qty = i['buy_qty']
+            purchase.buy_time = datetime.now()
+            if is_change:
+                purchase.unit_cost = i['unit_cost']
             purchase.save()
+
+            if is_change:
+                p = MLProduct.objects.filter(sku=purchase.sku).first()
+                if p.unit_cost == purchase.unit_cost:
+                    continue
+                p.unit_cost = purchase.unit_cost
+                p.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)

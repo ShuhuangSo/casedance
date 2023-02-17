@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
+from django.db.models import Q
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
@@ -426,6 +427,8 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
     采购管理
     """
     need_qty = serializers.SerializerMethodField()
+    total_onway_qty = serializers.SerializerMethodField()
+    total_rec_qty = serializers.SerializerMethodField()
 
     def get_need_qty(self, obj):
         qty = 0
@@ -434,10 +437,26 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             qty += i.qty
         return qty
 
+    def get_total_onway_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        for i in queryset:
+            qty += i.buy_qty
+        return qty
+
+    def get_total_rec_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        for i in queryset:
+            qty += i.rec_qty
+            qty += i.pack_qty
+        return qty
+
     class Meta:
         model = PurchaseManage
         fields = (
             'id', 'p_status', 's_type', 'create_type', 'sku', 'p_name', 'label_code', 'item_id', 'image',
             'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
-            'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty')
+            'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
+            'total_rec_qty')

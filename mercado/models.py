@@ -777,7 +777,6 @@ class PurchaseManage(models.Model):
     width = models.FloatField(null=True, blank=True, verbose_name='宽cm', help_text='宽cm')
     heigth = models.FloatField(null=True, blank=True, verbose_name='高cm', help_text='高cm')
     weight = models.FloatField(null=True, blank=True, verbose_name='重量kg', help_text='重量kg')
-    need_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='需求数量', help_text='需求数量')
     buy_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='采购数量', help_text='采购数量')
     rec_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='收货数量', help_text='收货数量')
     pack_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='打包数量', help_text='打包数量')
@@ -795,7 +794,6 @@ class PurchaseManage(models.Model):
     pack_time = models.DateTimeField(null=True, blank=True, verbose_name='打包时间', help_text='打包时间')
     used_time = models.DateTimeField(null=True, blank=True, verbose_name='出库时间', help_text='出库时间')
     location = models.CharField(max_length=30, null=True, blank=True, verbose_name='仓位', help_text='仓位')
-    is_renew = models.BooleanField(default=False, verbose_name='是否更新', help_text='是否更新')
     is_urgent = models.BooleanField(default=False, verbose_name='是否紧急', help_text='是否紧急')
 
     class Meta:

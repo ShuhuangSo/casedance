@@ -2556,7 +2556,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_renew', 'is_urgent')  # 配置过滤字段
+    filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_urgent')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time')  # 配置排序字段
 
@@ -2564,15 +2564,15 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     @action(methods=['get'], detail=False, url_path='pull_purchase')
     def pull_purchase(self, request):
         queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
-        add_list = []
+
         for i in queryset:
             # 查询从改批次生成的采购产品是否存在
             pm = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch).filter(
                 Q(p_status='WAITBUY') | Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED')).count()
             # 如果产品不在待采购中
             if not pm:
-                shop = Shop.objects.filter(name=i.ship.shop).first()
-                add_list.append(PurchaseManage(
+                shop = Shop.objects.filter(name=i.target_FBM).first()
+                purchase_manage = PurchaseManage(
                     p_status='WAITBUY',
                     s_type=i.s_type,
                     create_type='SYS',
@@ -2587,27 +2587,34 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     length=i.length,
                     width=i.width,
                     heigth=i.heigth,
-                    need_qty=i.qty,
                     buy_qty=i.qty,
                     note=i.note,
-                    shop=i.ship.shop,
+                    shop=shop.name,
                     shop_color=shop.name_color,
                     packing_size=i.packing_size,
                     packing_name=i.packing_name,
                     create_time=datetime.now()
-                ))
+                )
+                purchase_manage.save()
             else:
                 # 查看待采购是否有商品
-                pm2 = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY').first()
-                if pm2:
-                    # 如果产品在待采购中，数量不一样，则修改采购数量
-                    if pm2.need_qty != i.qty:
-                        pm2.need_qty = i.qty
-                        pm2.buy_qty = i.qty
-                        pm2.is_renew = True
-                        pm2.create_time = datetime.now()
-                        pm2.save()
-        if len(add_list):
-            PurchaseManage.objects.bulk_create(add_list)
+                pm_set = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY')
 
+                for p in pm_set:
+                    p.buy_qty += i.qty
+                    p.create_time = datetime.now()
+                    p.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 下单采购
+    @action(methods=['post'], detail=False, url_path='place_buy')
+    def place_buy(self, request):
+        data = request.data
+        products = data['products']
+        is_change = data['is_change']
+        for i in products:
+            purchase = PurchaseManage.objects.filter(id=i['id']).first()
+            purchase.p_status = 'PURCHASED'
+            purchase.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)

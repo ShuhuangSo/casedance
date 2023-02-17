@@ -158,7 +158,8 @@ class MLProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = MLProduct
         fields = ('id', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'p_status', 'custom_code', 'cn_name',
-                  'en_name', 'brand', 'declared_value', 'cn_material', 'en_material', 'use', 'site', 'shop', 'unit_cost',
+                  'en_name', 'brand', 'declared_value', 'cn_material', 'en_material', 'use', 'site', 'shop',
+                  'unit_cost',
                   'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
                   'buy_url4', 'buy_url5', 'user_id')
@@ -242,7 +243,8 @@ class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = (
-            'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type', 'shipping_fee',
+            'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type',
+            'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'ship_shipDetail')
@@ -298,7 +300,8 @@ class TransStockSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
             'unit_cost', 'first_ship_cost', 's_number', 'batch',
-            'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm', 'note',
+            'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm',
+            'note',
             'arrived_date', 'is_out', 'shop', 'stock_days', 'group', 'user_id', 'out_time')
 
 
@@ -422,7 +425,19 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
     """
     采购管理
     """
+    need_qty = serializers.SerializerMethodField()
+
+    def get_need_qty(self, obj):
+        qty = 0
+        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__s_status='PREPARING')
+        for i in queryset:
+            qty += i.qty
+        return qty
 
     class Meta:
         model = PurchaseManage
-        fields = "__all__"
+        fields = (
+            'id', 'p_status', 's_type', 'create_type', 'sku', 'p_name', 'label_code', 'item_id', 'image',
+            'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
+            'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
+            'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty')

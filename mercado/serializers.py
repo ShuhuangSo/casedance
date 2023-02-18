@@ -429,6 +429,8 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
     need_qty = serializers.SerializerMethodField()
     total_onway_qty = serializers.SerializerMethodField()
     total_rec_qty = serializers.SerializerMethodField()
+    is_checked = serializers.SerializerMethodField()
+    packing_id = serializers.SerializerMethodField()
 
     def get_need_qty(self, obj):
         qty = 0
@@ -448,9 +450,19 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
         qty = 0
         queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
         for i in queryset:
-            qty += i.rec_qty
-            qty += i.pack_qty
+            if i.p_status == 'RECEIVED':
+                qty += i.rec_qty
+            if i.p_status == 'PACKED':
+                qty += i.pack_qty
         return qty
+
+    def get_is_checked(self, obj):
+        product = MLProduct.objects.filter(sku=obj.sku).first()
+        return product.is_checked
+
+    def get_packing_id(self, obj):
+        product = MLProduct.objects.filter(sku=obj.sku).first()
+        return product.packing_id
 
     class Meta:
         model = PurchaseManage
@@ -459,4 +471,4 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
             'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
-            'total_rec_qty')
+            'total_rec_qty', 'is_checked', 'packing_id')

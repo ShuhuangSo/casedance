@@ -1292,6 +1292,40 @@ class ShipViewSet(mixins.ListModelMixin,
             sd.save()
             products_cost += sd.unit_cost * sd.qty
 
+            # 发货后减去打包库存数量
+            if ship_action == 'SHIPPED':
+                pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
+                if pm:
+                    purchase_manage = PurchaseManage(
+                        p_status='USED',
+                        s_type=pm.s_type,
+                        create_type=pm.create_type,
+                        sku=pm.sku,
+                        p_name=pm.p_name,
+                        item_id=pm.item_id,
+                        label_code=pm.label_code,
+                        image=pm.image,
+                        unit_cost=pm.unit_cost,
+                        weight=pm.weight,
+                        length=pm.length,
+                        width=pm.width,
+                        heigth=pm.heigth,
+                        used_qty=sd.qty,
+                        used_batch=sd.ship.batch,
+                        note=pm.note,
+                        shop=pm.shop,
+                        shop_color=pm.shop_color,
+                        packing_size=pm.packing_size,
+                        packing_name=pm.packing_name,
+                        used_time=datetime.now()
+                    )
+                    purchase_manage.save()
+                    if pm.pack_qty > sd.qty:
+                        pm.pack_qty = pm.pack_qty - sd.qty
+                        pm.save()
+                    else:
+                        pm.delete()
+
         ship = Ship.objects.filter(id=ship_id).first()
         if ship_note:
             ship.note = ship_note
@@ -2556,21 +2590,71 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_urgent')  # 配置过滤字段
+    # filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_urgent')  # 配置过滤字段
+    filterset_fields = {
+        'buy_qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'p_status': ['exact'],
+        'shop': ['exact'],
+        's_type': ['exact'],
+        'create_type': ['exact'],
+        'is_urgent': ['exact'],
+    }
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time')  # 配置排序字段
 
     # 拉取运单备货产品
     @action(methods=['get'], detail=False, url_path='pull_purchase')
     def pull_purchase(self, request):
-        queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
+        pm_queryset = PurchaseManage.objects.filter(p_status='WAITBUY')
+        for i in pm_queryset:
+            sku_count = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku).count()
+            if sku_count == 0:
+                if i.create_type == 'SYS':
+                    i.delete()
+            # 计算该sku已采购数量
+            aready_buy_set = PurchaseManage.objects.filter(sku=i.sku).filter(
+                Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+            total_buy = 0
+            for item in aready_buy_set:
+                if item.p_status == 'PURCHASED':
+                    total_buy += item.buy_qty
+                if item.p_status == 'RECEIVED':
+                    total_buy += item.rec_qty
+                if item.p_status == 'PACKED':
+                    total_buy += item.pack_qty
+            if sku_count == 1:
+                sd = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku).first()
+                i.buy_qty = sd.qty - total_buy if sd.qty - total_buy > 0 else 0
+                i.create_time = datetime.now()
+                i.save()
+            if sku_count > 1:
+                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+                total_ship_qty = 0
+                for item in sd_set:
+                    total_ship_qty += item.qty
+                i.buy_qty = total_ship_qty - total_buy if total_ship_qty - total_buy > 0 else 0
+                i.create_time = datetime.now()
+                i.save()
 
-        for i in queryset:
-            # 查询从改批次生成的采购产品是否存在
-            pm = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch).filter(
-                Q(p_status='WAITBUY') | Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED')).count()
-            # 如果产品不在待采购中
-            if not pm:
+        ship_queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
+        for i in ship_queryset:
+            wait_buy_sku_count = PurchaseManage.objects.filter(sku=i.sku, p_status='WAITBUY').count()
+            if not wait_buy_sku_count:
+                aready_buy_set = PurchaseManage.objects.filter(sku=i.sku).filter(
+                    Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+                total_buy = 0
+                for item in aready_buy_set:
+                    if item.p_status == 'PURCHASED':
+                        total_buy += item.buy_qty
+                    if item.p_status == 'RECEIVED':
+                        total_buy += item.rec_qty
+                    if item.p_status == 'PACKED':
+                        total_buy += item.pack_qty
+                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+                total_ship_qty = 0
+                for item in sd_set:
+                    total_ship_qty += item.qty
+
                 shop = Shop.objects.filter(name=i.target_FBM).first()
                 purchase_manage = PurchaseManage(
                     p_status='WAITBUY',
@@ -2587,7 +2671,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     length=i.length,
                     width=i.width,
                     heigth=i.heigth,
-                    buy_qty=i.qty,
+                    buy_qty=total_ship_qty - total_buy if total_ship_qty - total_buy > 0 else 0,
                     note=i.note,
                     shop=shop.name,
                     shop_color=shop.name_color,
@@ -2596,13 +2680,6 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     create_time=datetime.now()
                 )
                 purchase_manage.save()
-            else:
-                # 查看待采购是否有商品
-                pm2 = PurchaseManage.objects.filter(sku=i.sku, from_batch=i.ship.batch, p_status='WAITBUY').first()
-                if not pm2:
-                    continue
-                pm2.create_time = datetime.now()
-                pm2.save()
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
@@ -2616,6 +2693,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             purchase = PurchaseManage.objects.filter(id=i['id']).first()
             purchase.p_status = 'PURCHASED'
             purchase.buy_qty = i['buy_qty']
+            purchase.rec_qty = i['buy_qty']
             purchase.buy_time = datetime.now()
             if is_change:
                 purchase.unit_cost = i['unit_cost']
@@ -2627,4 +2705,156 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     continue
                 p.unit_cost = purchase.unit_cost
                 p.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 确认收货
+    @action(methods=['post'], detail=False, url_path='rec_buy')
+    def rec_buy(self, request):
+        data = request.data
+
+        for i in data:
+            buy_pm = PurchaseManage.objects.filter(id=i['id']).first()
+            purchase_manage = PurchaseManage(
+                p_status='RECEIVED',
+                s_type=buy_pm.s_type,
+                create_type=buy_pm.create_type,
+                sku=buy_pm.sku,
+                p_name=buy_pm.p_name,
+                item_id=buy_pm.item_id,
+                label_code=buy_pm.label_code,
+                image=buy_pm.image,
+                unit_cost=buy_pm.unit_cost,
+                weight=buy_pm.weight,
+                length=buy_pm.length,
+                width=buy_pm.width,
+                heigth=buy_pm.heigth,
+                rec_qty=i['rec_qty'],
+                pack_qty=i['rec_qty'],
+                note=buy_pm.note,
+                shop=buy_pm.shop,
+                shop_color=buy_pm.shop_color,
+                packing_size=buy_pm.packing_size,
+                packing_name=buy_pm.packing_name,
+                rec_time=datetime.now()
+            )
+            purchase_manage.save()
+
+            if i['rec_qty'] >= i['buy_qty']:
+                buy_pm.delete()
+            else:
+                buy_pm.buy_qty = i['buy_qty'] - i['rec_qty']
+                buy_pm.rec_qty = i['buy_qty'] - i['rec_qty']
+                buy_pm.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 确认打包
+    @action(methods=['post'], detail=False, url_path='pack_buy')
+    def pack_buy(self, request):
+        data = request.data
+
+        for i in data:
+            rec_pm = PurchaseManage.objects.filter(id=i['id']).first()
+            pack_sku = PurchaseManage.objects.filter(sku=i['sku'], p_status='PACKED').first()
+            if not pack_sku:
+                purchase_manage = PurchaseManage(
+                    p_status='PACKED',
+                    s_type=rec_pm.s_type,
+                    create_type=rec_pm.create_type,
+                    sku=rec_pm.sku,
+                    p_name=rec_pm.p_name,
+                    item_id=rec_pm.item_id,
+                    label_code=rec_pm.label_code,
+                    image=rec_pm.image,
+                    unit_cost=rec_pm.unit_cost,
+                    weight=rec_pm.weight,
+                    length=rec_pm.length,
+                    width=rec_pm.width,
+                    heigth=rec_pm.heigth,
+                    pack_qty=i['pack_qty'],
+                    note=rec_pm.note,
+                    shop=rec_pm.shop,
+                    shop_color=rec_pm.shop_color,
+                    packing_size=rec_pm.packing_size,
+                    packing_name=rec_pm.packing_name,
+                    pack_time=datetime.now()
+                )
+                purchase_manage.save()
+            else:
+                pack_sku.pack_qty += i['pack_qty']
+                pack_sku.save()
+
+            if i['pack_qty'] >= i['rec_qty']:
+                rec_pm.delete()
+            else:
+                rec_pm.rec_qty = i['rec_qty'] - i['pack_qty']
+                rec_pm.pack_qty = i['rec_qty'] - i['pack_qty']
+                rec_pm.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 计算采购单数量
+    @action(methods=['get'], detail=False, url_path='calc_purchase')
+    def calc_purchase(self, request):
+        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY').count()
+        purchased_num = PurchaseManage.objects.filter(p_status='PURCHASED').count()
+        rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
+        pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
+
+        return Response({'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
+                        status=status.HTTP_200_OK)
+
+    # 手动新建采购
+    @action(methods=['post'], detail=False, url_path='manuel_create_buy')
+    def manuel_create_buy(self, request):
+        data = request.data
+        for i in data:
+            product = MLProduct.objects.filter(id=i['id']).first()
+            shop = Shop.objects.filter(name=product.shop).first()
+            packing = Packing.objects.filter(id=product.packing_id).first()
+            purchase_manage = PurchaseManage(
+                p_status='WAITBUY',
+                s_type='REFILL',
+                create_type='MANUAL',
+                sku=product.sku,
+                p_name=product.p_name,
+                item_id=product.item_id,
+                label_code=product.label_code,
+                image=product.image,
+                unit_cost=product.unit_cost,
+                weight=product.weight,
+                length=product.length,
+                width=product.width,
+                heigth=product.heigth,
+                buy_qty=1,
+                shop=shop.name,
+                shop_color=shop.name_color,
+                packing_size=packing.size,
+                packing_name=packing.name,
+                create_time=datetime.now()
+            )
+            purchase_manage.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 产品数据核查
+    @action(methods=['post'], detail=False, url_path='check_product')
+    def check_product(self, request):
+        data = request.data
+        packing = Packing.objects.filter(id=data['packing_id']).first()
+        pm = PurchaseManage.objects.filter(id=data['pm_id']).first()
+        pm.packing_name = packing.name
+        pm.packing_size = packing.size
+        pm.length = data['length']
+        pm.width = data['width']
+        pm.heigth = data['heigth']
+        pm.weight = data['weight']
+        pm.save()
+        product = MLProduct.objects.filter(sku=pm.sku).first()
+        product.packing_id = data['packing_id']
+        product.length = data['length']
+        product.width = data['width']
+        product.heigth = data['heigth']
+        product.weight = data['weight']
+        product.is_checked = data['is_checked']
+        product.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)

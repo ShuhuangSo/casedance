@@ -2681,6 +2681,14 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 )
                 purchase_manage.save()
 
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PURCHASE'
+        log.op_type = 'CREATE'
+        log.target_type = 'PURCHASE'
+        log.desc = '拉取采购需求'
+        log.user = request.user
+        log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 下单采购
@@ -2793,6 +2801,17 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
+    # 确认质检
+    @action(methods=['post'], detail=False, url_path='product_qc')
+    def product_qc(self, request):
+        data = request.data
+        for i in data:
+            pm = PurchaseManage.objects.filter(id=i['id']).first()
+            if pm:
+                pm.is_qc = True
+                pm.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
     # 计算采购单数量
     @action(methods=['get'], detail=False, url_path='calc_purchase')
     def calc_purchase(self, request):
@@ -2829,11 +2848,19 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 buy_qty=1,
                 shop=shop.name,
                 shop_color=shop.name_color,
-                packing_size=packing.size,
-                packing_name=packing.name,
+                packing_size=packing.size if packing else '',
+                packing_name=packing.name if packing else '',
                 create_time=datetime.now()
             )
             purchase_manage.save()
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PURCHASE'
+        log.op_type = 'CREATE'
+        log.target_type = 'PURCHASE'
+        log.desc = '手动添加{name}个采购产品'.format(name=len(data))
+        log.user = request.user
+        log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 产品数据核查

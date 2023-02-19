@@ -190,10 +190,33 @@ class ShipDetailSerializer(serializers.ModelSerializer):
     """
     运单详情
     """
+    total_onway_qty = serializers.SerializerMethodField()
+    total_rec_qty = serializers.SerializerMethodField()
+
+    def get_total_onway_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        for i in queryset:
+            qty += i.buy_qty
+        return qty
+
+    def get_total_rec_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        for i in queryset:
+            if i.p_status == 'RECEIVED':
+                qty += i.rec_qty
+            if i.p_status == 'PACKED':
+                qty += i.pack_qty
+        return qty
 
     class Meta:
         model = ShipDetail
-        fields = "__all__"
+        fields = (
+            'id', 'target_FBM', 'box_number', 's_type', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
+            'image', 'custom_code', 'cn_name', 'en_name', 'brand', 'declared_value', 'cn_material', 'en_material',
+            'use', 'unit_cost', 'avg_ship_fee', 'qty', 'length', 'width', 'heigth', 'weight', 'note',
+            'create_time', 'packing_name', 'packing_size', 'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty')
 
 
 class ShipSerializer(serializers.ModelSerializer):
@@ -471,4 +494,4 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
             'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
-            'total_rec_qty', 'is_checked', 'packing_id')
+            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc')

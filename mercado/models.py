@@ -795,6 +795,7 @@ class PurchaseManage(models.Model):
     used_time = models.DateTimeField(null=True, blank=True, verbose_name='出库时间', help_text='出库时间')
     location = models.CharField(max_length=30, null=True, blank=True, verbose_name='仓位', help_text='仓位')
     is_urgent = models.BooleanField(default=False, verbose_name='是否紧急', help_text='是否紧急')
+    is_qc = models.BooleanField(default=False, verbose_name='是否质检', help_text='是否质检')
 
     class Meta:
         verbose_name = '采购管理'

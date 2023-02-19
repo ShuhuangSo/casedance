@@ -1295,7 +1295,15 @@ class ShipViewSet(mixins.ListModelMixin,
             # 发货后减去打包库存数量
             if ship_action == 'SHIPPED':
                 pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
+
                 if pm:
+                    # 创建操作日志
+                    log = MLOperateLog()
+                    log.op_module = 'PURCHASE'
+                    log.op_type = 'CREATE'
+                    log.target_type = 'PURCHASE'
+                    log.desc = '库存扣除 {qty}个 {sku} {p_name}'.format(sku=pm.sku, p_name=pm.p_name, qty=sd.qty)
+                    log.save()
                     purchase_manage = PurchaseManage(
                         p_status='USED',
                         s_type=pm.s_type,
@@ -2713,6 +2721,15 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     continue
                 p.unit_cost = purchase.unit_cost
                 p.save()
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PURCHASE'
+            log.op_type = 'CREATE'
+            log.target_type = 'PURCHASE'
+            log.desc = '下单采购 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['buy_qty'])
+            log.user = request.user
+            log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 确认收货
@@ -2746,6 +2763,15 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 rec_time=datetime.now()
             )
             purchase_manage.save()
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PURCHASE'
+            log.op_type = 'CREATE'
+            log.target_type = 'PURCHASE'
+            log.desc = '确认收货 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['rec_qty'])
+            log.user = request.user
+            log.save()
 
             if i['rec_qty'] >= i['buy_qty']:
                 buy_pm.delete()
@@ -2799,6 +2825,15 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 rec_pm.pack_qty = i['rec_qty'] - i['pack_qty']
                 rec_pm.save()
 
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PURCHASE'
+            log.op_type = 'CREATE'
+            log.target_type = 'PURCHASE'
+            log.desc = '确认打包 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['pack_qty'])
+            log.user = request.user
+            log.save()
+
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 确认质检
@@ -2810,6 +2845,15 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             if pm:
                 pm.is_qc = True
                 pm.save()
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PURCHASE'
+            log.op_type = 'EDIT'
+            log.target_type = 'PURCHASE'
+            log.desc = '完成质检 {sku} {p_name}'.format(sku=i['sku'], p_name=i['p_name'])
+            log.user = request.user
+            log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 计算采购单数量
@@ -2885,3 +2929,20 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         product.is_checked = data['is_checked']
         product.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 重写
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PURCHASE'
+        log.op_type = 'DEL'
+        log.target_type = 'PURCHASE'
+        log.target_id = instance.id
+        log.desc = '删除产品 {sku} {name}'.format(sku=instance.sku, name=instance.p_name)
+        log.user = request.user
+        log.save()
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)

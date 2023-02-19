@@ -396,7 +396,7 @@ class MLOperateLogSerializer(serializers.ModelSerializer):
 
     def get_user_name(self, obj):
 
-        return obj.user.first_name
+        return obj.user.first_name if obj.user else 'System'
 
     def get_target_name(self, obj):
         name = ''

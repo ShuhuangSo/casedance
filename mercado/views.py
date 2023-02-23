@@ -842,7 +842,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
             total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
 
         # 中转仓库存统计
-        ts = TransStock.objects.filter(listing_shop=shop.name)
+        ts = TransStock.objects.filter(listing_shop=shop.name, is_out=False)
         trans_amount = 0
         for i in ts:
             trans_amount += (i.unit_cost + i.first_ship_cost) * i.qty
@@ -1766,6 +1766,108 @@ class ShipViewSet(mixins.ListModelMixin,
 
         return Response({'url': url}, status=status.HTTP_200_OK)
 
+    # 导出打包质检单
+    @action(methods=['post'], detail=False, url_path='export_qc')
+    def export_qc(self, request):
+        from openpyxl.drawing.image import Image
+        from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
+
+        alignment = Alignment(horizontal='center', vertical='center')
+        v_alignment = Alignment(vertical='center')
+        title_font = Font(name='微软雅黑', sz=10, b=True)
+        big_title_font = Font(name='微软雅黑', sz=15, b=True)
+        border = Border(
+            left=Side(border_style='thin', color='000000'),
+            right=Side(border_style='thin', color='000000'),
+            top=Side(style='thin', color='000000'),
+            bottom=Side(style='thin', color='000000'))
+
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.title = '美客多质检单（' + ship.shop + '）'
+        sh.column_dimensions['C'].width = 50
+        sh.column_dimensions['D'].width = 15
+        sh.column_dimensions['E'].width = 15
+        sh.column_dimensions['H'].width = 15
+        sh.column_dimensions['I'].width = 15
+        sh.column_dimensions['J'].width = 15
+        sh['A1'] = '类型'
+        sh['B1'] = 'SKU'
+        sh['C1'] = '名称'
+        sh['D1'] = '图片'
+        sh['E1'] = '包材名称'
+        sh['F1'] = '数量'
+        sh['G1'] = '箱号'
+        sh['H1'] = '配货抽检（签名）'
+        sh['I1'] = '包货抽检（签名）'
+        sh['J1'] = '装 箱（签名）'
+        sh['K1'] = '备注'
+
+        area = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+        for i in area:
+            sh[i+'1'].alignment = alignment
+            sh[i+'1'].font = title_font
+            sh[i+'1'].border = border
+            sh[i+'2'].border = border
+
+        sh.merge_cells('A2:K2')
+        sh['A2'] = ship.shop
+        sh['A2'].alignment = alignment
+        sh['A2'].font = big_title_font
+        sh['A2'].fill = PatternFill(patternType='solid', fgColor='65d6b4')
+
+        ship_detail = ShipDetail.objects.filter(ship=ship)
+        num = 1
+        for i in ship_detail:
+            sh['A' + str(num + 2)] = '新入仓' if i.s_type == 'NEW' else '补仓'
+            sh['A' + str(num + 2)].alignment = alignment
+            sh['A' + str(num + 2)].border = border
+            sh['B' + str(num + 2)] = i.sku
+            sh['B' + str(num + 2)].alignment = alignment
+            sh['B' + str(num + 2)].border = border
+            sh['C' + str(num + 2)] = i.p_name
+            sh['C' + str(num + 2)].alignment = v_alignment
+            sh['C' + str(num + 2)].border = border
+
+            sh.row_dimensions[num + 2].height = 100
+            img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
+            img.width, img.height = 100, 100
+            sh.add_image(img, 'D' + str(num + 2))
+            sh['D' + str(num + 2)].alignment = alignment
+            sh['D' + str(num + 2)].border = border
+
+            sh['E' + str(num + 2)] = i.packing_name
+            sh['E' + str(num + 2)].border = border
+            sh['F' + str(num + 2)] = i.qty
+            sh['F' + str(num + 2)].border = border
+            sh['F' + str(num + 2)].alignment = alignment
+            sh['G' + str(num + 2)] = i.box_number
+            sh['G' + str(num + 2)].alignment = alignment
+            sh['G' + str(num + 2)].border = border
+            sh['H' + str(num + 2)].border = border
+            sh['I' + str(num + 2)].border = border
+            sh['J' + str(num + 2)].border = border
+            sh['K' + str(num + 2)] = i.note
+            sh['K' + str(num + 2)].border = border
+
+            num += 1
+        wb.save('media/export/美客多质检单-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/美客多质检单-' + ship.shop + '.xlsx'
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出质检单'
+        log.user = request.user
+        log.save()
+
+        return Response({'url': url}, status=status.HTTP_200_OK)
+
     # 重写
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -2427,18 +2529,18 @@ class MLOrderViewSet(mixins.ListModelMixin,
             bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
             order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-            price = cell_row[18].value if cell_row[18].value else 0
+            price = cell_row[17].value if cell_row[17].value else 0
             fees = cell_row[8].value if cell_row[8].value else 0
             postage = cell_row[9].value if cell_row[9].value else 0
             receive_fund = cell_row[11].value if cell_row[11].value else 0
             is_ad = True if cell_row[12].value == 'Sí' else False
 
-            buyer_name = cell_row[25].value
-            buyer_address = cell_row[27].value
-            buyer_city = cell_row[28].value
-            buyer_state = cell_row[29].value
-            buyer_postcode = cell_row[30].value
-            buyer_country = cell_row[31].value
+            buyer_name = cell_row[24].value
+            buyer_address = cell_row[26].value
+            buyer_city = cell_row[27].value
+            buyer_state = cell_row[28].value
+            buyer_postcode = cell_row[29].value
+            buyer_country = cell_row[30].value
 
             profit = (float(
                 receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty

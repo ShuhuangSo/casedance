@@ -1568,6 +1568,25 @@ class ShipViewSet(mixins.ListModelMixin,
                 if shop_stock:
                     shop_stock.trans_qty += i.qty
                     shop_stock.save()
+                else:
+                    shop_stock = ShopStock()
+                    shop = Shop.objects.filter(name=i.target_FBM).first()
+                    shop_stock.shop = shop
+                    shop_stock.sku = i.sku
+                    shop_stock.p_name = i.p_name
+                    shop_stock.label_code = i.label_code
+                    shop_stock.upc = i.upc
+                    shop_stock.item_id = i.item_id
+                    shop_stock.image = i.image
+                    shop_stock.trans_qty = i.qty
+                    shop_stock.weight = i.weight
+                    shop_stock.length = i.length
+                    shop_stock.width = i.width
+                    shop_stock.heigth = i.heigth
+                    shop_stock.unit_cost = i.unit_cost
+                    shop_stock.first_ship_cost = i.avg_ship_fee
+                    shop_stock.sale_url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
+                    shop_stock.save()
 
         ship.s_status = 'FINISHED'
         ship.save()
@@ -3018,12 +3037,14 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         pm.packing_name = packing.name
         pm.packing_size = packing.size
         pm.length = data['length']
+        pm.unit_cost = data['unit_cost']
         pm.width = data['width']
         pm.heigth = data['heigth']
         pm.weight = data['weight']
         pm.save()
         product = MLProduct.objects.filter(sku=pm.sku).first()
         product.packing_id = data['packing_id']
+        product.unit_cost = data['unit_cost']
         product.length = data['length']
         product.width = data['width']
         product.heigth = data['heigth']

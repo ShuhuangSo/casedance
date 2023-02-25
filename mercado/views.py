@@ -19,12 +19,12 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
-    ShopReportSerializer, PurchaseManageSerializer
+    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -972,8 +972,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
-                                                                                         old_qty=old_qty,
-                                                                                         new_qty=new_qty, reason=reason)
+                                                                                 old_qty=old_qty,
+                                                                                 new_qty=new_qty, reason=reason)
         log.user = request.user
         log.save()
 
@@ -999,8 +999,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
-                                                                                old_status=old_status,
-                                                                                new_status=new_status)
+                                                                          old_status=old_status,
+                                                                          new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1232,7 +1232,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
                     log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                        qty=i['qty'])
+                                                                   qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -1282,10 +1282,52 @@ class ShipViewSet(mixins.ListModelMixin,
         products_cost = 0  # 总货品成本
         for i in ship_detail:
             if not i['qty']:
+                # 发货为0的加入遗弃清单
+                sd = ShipDetail.objects.filter(id=i['id']).first()
+
+                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship, sku=sd.sku).first()
+                if not ship_ir:
+                    ship_ir = ShipItemRemove()
+                    ship_ir.ship = sd.ship
+                    ship_ir.sku = sd.sku
+                    ship_ir.p_name = sd.p_name
+                    ship_ir.image = sd.image
+                    ship_ir.item_id = sd.item_id
+                    ship_ir.plan_qty = sd.qty
+                    ship_ir.send_qty = 0
+                    ship_ir.item_type = 'REMOVE'
+                    ship_ir.save()
+                else:
+                    if ship_ir.item_type == 'REDUCE':
+                        ship_ir.send_qty = 0
+                        ship_ir.item_type = 'REMOVE'
+                        ship_ir.save()
+
                 # 发货数量为0的删除
-                ShipDetail.objects.filter(id=i['id']).delete()
+                sd.delete()
                 continue
+
             sd = ShipDetail.objects.filter(id=i['id']).first()
+
+            # 发货数量少于计划数量的加入遗弃清单
+            if i['qty'] < sd.qty:
+                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship, sku=sd.sku).first()
+                if not ship_ir:
+                    ship_ir = ShipItemRemove()
+                    ship_ir.ship = sd.ship
+                    ship_ir.sku = sd.sku
+                    ship_ir.p_name = sd.p_name
+                    ship_ir.image = sd.image
+                    ship_ir.item_id = sd.item_id
+                    ship_ir.plan_qty = sd.qty
+                    ship_ir.send_qty = i['qty']
+                    ship_ir.item_type = 'REDUCE'
+                    ship_ir.save()
+                else:
+                    ship_ir.send_qty = i['qty']
+                    ship_ir.item_type = 'REDUCE'
+                    ship_ir.save()
+
             sd.qty = i['qty']
             sd.box_number = i['box_number']
             sd.note = i['note']
@@ -1826,10 +1868,10 @@ class ShipViewSet(mixins.ListModelMixin,
 
         area = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
         for i in area:
-            sh[i+'1'].alignment = alignment
-            sh[i+'1'].font = title_font
-            sh[i+'1'].border = border
-            sh[i+'2'].border = border
+            sh[i + '1'].alignment = alignment
+            sh[i + '1'].font = title_font
+            sh[i + '1'].border = border
+            sh[i + '2'].border = border
 
         sh.merge_cells('A2:K2')
         sh['A2'] = ship.shop
@@ -1931,6 +1973,79 @@ class ShipDetailViewSet(mixins.ListModelMixin,
     filter_fields = ('ship', 'box_number', 's_type')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'qty')  # 配置排序字段
+
+
+class ShipItemRemoveViewSet(mixins.ListModelMixin,
+                            mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                            mixins.RetrieveModelMixin,
+                            viewsets.GenericViewSet):
+    """
+    list:
+        遗弃清单列表,分页,过滤,搜索,排序
+    create:
+        遗弃清单新增
+    retrieve:
+        遗弃清单详情页
+    update:
+        遗弃清单修改
+    destroy:
+        遗弃清单删除
+    """
+    queryset = ShipItemRemove.objects.all()
+    serializer_class = ShipItemRemoveSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('ship', 'item_type')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'item_type')  # 配置排序字段
+
+    # 恢复遗弃项
+    @action(methods=['post'], detail=False, url_path='restore_remove')
+    def restore_remove(self, request):
+        sir_id = request.data['id']
+
+        sir = ShipItemRemove.objects.filter(id=sir_id).first()
+        if sir:
+            product = MLProduct.objects.filter(sku=sir.sku).first()
+            sd = ShipDetail()
+            sd.ship = sir.ship
+            sd.s_type = 'REFILL'
+            sd.qty = sir.plan_qty
+            sd.plan_qty = sir.plan_qty
+            sd.note = '恢复遗弃项'
+            sd.sku = sir.sku
+            sd.target_FBM = product.shop
+            sd.p_name = product.p_name
+            sd.label_code = product.label_code
+            sd.upc = product.upc
+            sd.item_id = product.item_id
+            sd.custom_code = product.custom_code
+            sd.cn_name = product.cn_name
+            sd.en_name = product.en_name
+            sd.brand = product.brand
+            sd.declared_value = product.declared_value
+            sd.cn_material = product.cn_material
+            sd.en_material = product.en_material
+            sd.use = product.use
+            sd.image = product.image
+            sd.unit_cost = product.unit_cost
+            sd.weight = product.weight
+            sd.length = product.length
+            sd.width = product.width
+            sd.heigth = product.heigth
+
+            packing = Packing.objects.filter(id=product.packing_id).first()
+            if packing:
+                sd.packing_name = packing.name
+                sd.packing_size = packing.size
+            sd.save()
+
+            sir.delete()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
 
 class ShipBoxViewSet(mixins.ListModelMixin,
@@ -2417,8 +2532,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
         log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
-                                                                                           exchange=finance.exchange,
-                                                                                           income=finance.income_rmb)
+                                                                             exchange=finance.exchange,
+                                                                             income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -2985,8 +3100,9 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
 
-        return Response({'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
+            status=status.HTTP_200_OK)
 
     # 手动新建采购
     @action(methods=['post'], detail=False, url_path='manuel_create_buy')

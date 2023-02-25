@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
-    PurchaseManage
+    PurchaseManage, ShipItemRemove
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -281,6 +281,16 @@ class ShipBoxSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShipBox
+        fields = "__all__"
+
+
+class ShipItemRemoveSerializer(serializers.ModelSerializer):
+    """
+    遗弃清单
+    """
+
+    class Meta:
+        model = ShipItemRemove
         fields = "__all__"
 
 

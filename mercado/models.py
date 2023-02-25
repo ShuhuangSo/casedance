@@ -531,6 +531,32 @@ class ShipDetail(models.Model):
         return self.sku
 
 
+class ShipItemRemove(models.Model):
+    """
+    遗弃清单
+    """
+    ship = models.ForeignKey(Ship, related_name='ship_itemRemove', on_delete=models.CASCADE, verbose_name='所属运单',
+                             help_text='所属运单')
+    item_type = models.CharField(max_length=10, verbose_name='遗弃类型', help_text='遗弃类型')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
+    plan_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='计划数量', help_text='计划数量')
+    send_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='发货数量', help_text='发货数量')
+    note = models.CharField(max_length=300, null=True, blank=True, verbose_name='移除原因', help_text='移除原因')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '遗弃清单'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return self.sku
+
+
 class ShipBox(models.Model):
     """
     包装箱

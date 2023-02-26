@@ -6,9 +6,10 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 
-from .models import Tag, OperateLog, Menu, SysRefill
+from .models import Tag, OperateLog, Menu, SysRefill, MLUserPermission
 from .serializers import TagSerializer, OperateLogSerializer, MenuSerializer, UserSerializer, ALLMenuSerializer, \
-    UserMenuSerializer, SysRefillSerializer
+    UserMenuSerializer, SysRefillSerializer, ALLMLUserPermissionSerializer, MLUserPermissionSerializer, \
+    MLPermissionSerializer
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -234,6 +235,228 @@ class UserMenuViewSet(mixins.ListModelMixin,
         return Response({'msg': '创建成功'}, status=status.HTTP_200_OK)
 
 
+class AllMLUserPermissionViewSet(mixins.ListModelMixin,
+                                 mixins.CreateModelMixin,
+                                 mixins.UpdateModelMixin,
+                                 mixins.DestroyModelMixin,
+                                 mixins.RetrieveModelMixin,
+                                 viewsets.GenericViewSet):
+    """
+    list:
+        全部美客多操作权限列表
+    """
+    queryset = MLUserPermission.objects.all()
+    serializer_class = ALLMLUserPermissionSerializer  # 序列化
+
+    def get_queryset(self):
+        # 返回admin用户数据
+        user = User.objects.get(username='admin')
+        return MLUserPermission.objects.filter(user=user, parent=None)
+
+    # 创建默认数据
+    @action(methods=['get'], detail=False, url_path='create_default_data')
+    def create_default_data(self, request):
+        mp = MLUserPermission()
+        mp.module_name = '产品库'
+        mp.component = 'product'
+        mp.order_num = 1
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '包材管理'
+        mp_c.component = 'product_packing'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品删除'
+        mp_c.component = 'product_delete'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '采购管理'
+        mp.component = 'purchase'
+        mp.order_num = 2
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '运单管理'
+        mp.component = 'ship'
+        mp.order_num = 3
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = 'FBM库存'
+        mp.component = 'fbm_stock'
+        mp.order_num = 4
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '中转仓'
+        mp.component = 'tran_stock'
+        mp.order_num = 5
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '订单管理'
+        mp.component = 'order'
+        mp.order_num = 6
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '财务管理'
+        mp.component = 'finance'
+        mp.order_num = 7
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '操作日志'
+        mp.component = 'log'
+        mp.order_num = 8
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+        return Response({'msg': '创建成功!'}, status=status.HTTP_200_OK)
+
+
+class MLUserPermissionViewSet(mixins.ListModelMixin,
+                              mixins.CreateModelMixin,
+                              mixins.UpdateModelMixin,
+                              mixins.DestroyModelMixin,
+                              mixins.RetrieveModelMixin,
+                              viewsets.GenericViewSet):
+    """
+    list:
+        指定用户美客多操作权限列表
+    """
+    queryset = MLUserPermission.objects.all()
+    serializer_class = MLUserPermissionSerializer  # 序列化
+
+    def get_queryset(self):
+        user_id = self.request.GET.get("id")
+        # 返回指定用户数据
+        user = User.objects.get(id=user_id)
+        return MLUserPermission.objects.filter(user=user, parent=None)
+
+    @action(methods=['post'], detail=True, url_path='create_ml_permission')
+    def create_ml_permission(self, request, pk):
+        user = User.objects.get(id=pk)
+        admin = User.objects.get(username='admin')
+        queryset = MLUserPermission.objects.filter(user=admin)
+
+        user_count = MLUserPermission.objects.filter(user=user).count()
+        admin_count = MLUserPermission.objects.filter(user=admin).count()
+        menu_set = MLUserPermission.objects.filter(user=user)
+        # 如果菜单数量与admin相同，说明是修改
+        if user_count == admin_count:
+            menu_set.update(is_active=False)
+            p_ids = []
+            for i in menu_set:
+                for item in queryset:
+                    if item.id in request.data:
+                        if item.component == i.component:
+                            i.is_active = True
+                            i.save()
+                            if not i.id in p_ids:
+                                if i.parent:
+                                    p_ids.append(i.parent.id)
+
+            # 如果有子菜单，父菜单设为true
+            for i in p_ids:
+                m = MLUserPermission.objects.get(id=i)
+                m.is_active = True
+                m.save()
+
+            return Response({'msg': '修改成功'}, status=status.HTTP_200_OK)
+
+        # 如果是部分菜单新增，则先全部删除，再新增
+        if admin_count != user_count and user_count > 0:
+            us = MLUserPermission.objects.filter(user=user)
+            for i in us:
+                if i.parent:
+                    i.delete()
+            MLUserPermission.objects.filter(user=user).delete()
+
+        # 先创建父菜单
+        parent_add_list = []
+        for i in queryset:
+            if not i.parent:
+                parent_add_list.append(
+                    MLUserPermission(
+                        parent=i.parent,
+                        component=i.component,
+                        module_name=i.module_name,
+                        order_num=i.order_num,
+                        user=user,
+                        is_active=True if i.id in request.data else False
+                    )
+                )
+        MLUserPermission.objects.bulk_create(parent_add_list)
+
+        # 创建子菜单
+        qt = MLUserPermission.objects.filter(user=user)
+        children_add_list = []
+
+        for i in qt:
+            for item in queryset:
+                if item.parent:
+                    if item.parent.component == i.component:
+                        children_add_list.append(
+                            MLUserPermission(
+                                parent=i,
+                                component=item.component,
+                                module_name=item.module_name,
+                                order_num=item.order_num,
+                                user=user,
+                                is_active=True if item.id in request.data else False
+                            )
+                        )
+                        i.is_active = True
+                        i.save()
+        MLUserPermission.objects.bulk_create(children_add_list)
+
+        return Response({'msg': '创建成功'}, status=status.HTTP_200_OK)
+
+
+class MLPermissionViewSet(mixins.ListModelMixin,
+                          mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin,
+                          mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin,
+                          viewsets.GenericViewSet):
+    """
+    list:
+        前端指定用户美客多操作权限列表
+    """
+    queryset = MLUserPermission.objects.all()
+    serializer_class = MLPermissionSerializer  # 序列化
+
+    def get_queryset(self):
+        # 返回当前用户数据
+        return MLUserPermission.objects.filter(user=self.request.user)
+
+
 class UserViewSet(mixins.ListModelMixin,
                   mixins.CreateModelMixin,
                   mixins.UpdateModelMixin,
@@ -327,4 +550,3 @@ class SysRefillViewSet(mixins.ListModelMixin,
     """
     queryset = SysRefill.objects.all()
     serializer_class = SysRefillSerializer  # 序列化
-

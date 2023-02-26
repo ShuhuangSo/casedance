@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Tag, OperateLog, Menu, SysRefill
+from .models import Tag, OperateLog, Menu, SysRefill, MLUserPermission
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -86,6 +86,59 @@ class UserMenuSerializer(serializers.ModelSerializer):
     class Meta:
         model = Menu
         fields = ('id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'children', 'user')
+
+
+class SubMLUserPermissionSerializer(serializers.ModelSerializer):
+    """
+    美客多操作权限二级菜单
+    """
+
+    class Meta:
+        model = MLUserPermission
+        fields = ('id', 'parent', 'module_name', 'component', 'order_num', 'is_active', 'children')
+
+
+class ALLMLUserPermissionSerializer(serializers.ModelSerializer):
+    """
+    全部美客多操作权限
+    """
+    children = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        user = User.objects.get(username='admin')  # admin用户
+        # 返回嵌套序列化筛选数据
+        return SubMLUserPermissionSerializer(obj.children.filter(user=user), many=True).data
+
+    class Meta:
+        model = MLUserPermission
+        fields = ('id', 'parent', 'module_name', 'component', 'order_num', 'is_active', 'children', 'user')
+
+
+class MLUserPermissionSerializer(serializers.ModelSerializer):
+    """
+    用户美客多操作权限
+    """
+    children = serializers.SerializerMethodField()
+
+    def get_children(self, obj):
+        id = self.context['request'].GET.get("id")
+        user = User.objects.get(id=id)
+        # 返回嵌套序列化筛选数据
+        return SubMLUserPermissionSerializer(obj.children.filter(user=user), many=True).data
+
+    class Meta:
+        model = MLUserPermission
+        fields = ('id', 'parent', 'module_name', 'component', 'order_num', 'is_active', 'children', 'user')
+
+
+class MLPermissionSerializer(serializers.ModelSerializer):
+    """
+    用户美客多操作权限
+    """
+
+    class Meta:
+        model = MLUserPermission
+        fields = ('component', 'is_active')
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, OperateLog, Menu, TaskLog, SysRefill
+from .models import Tag, OperateLog, Menu, TaskLog, SysRefill, MLUserPermission
 
 
 # Register your models here.
@@ -22,6 +22,13 @@ class OperateLogAdmin(admin.ModelAdmin):
 @admin.register(Menu)
 class MenuAdmin(admin.ModelAdmin):
     list_display = ['id', 'parent', 'path', 'component', 'name', 'icon', 'order_num', 'is_active', 'user']
+    list_filter = ['is_active', 'user']
+    search_fields = ['name']
+
+
+@admin.register(MLUserPermission)
+class MenuAdmin(admin.ModelAdmin):
+    list_display = ['id', 'parent', 'module_name', 'component', 'order_num', 'is_active', 'user']
     list_filter = ['is_active', 'user']
     search_fields = ['name']
 

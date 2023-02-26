@@ -88,6 +88,29 @@ class Menu(models.Model):
         return str(self.id)
 
 
+class MLUserPermission(models.Model):
+    """
+    美客多操作权限
+    """
+    parent = models.ForeignKey("MLUserPermission", on_delete=models.DO_NOTHING, null=True, blank=True,
+                               related_name='children', verbose_name='父id', help_text='父id')
+    component = models.CharField(max_length=30, null=True, blank=True, verbose_name='组件名称', help_text='组件名称')
+    module_name = models.CharField(max_length=50, null=True, blank=True, verbose_name='模块名称', help_text='模块名称')
+    order_num = models.IntegerField(default=1, verbose_name='排序号', help_text='排序号')
+    is_active = models.BooleanField(default=True, verbose_name='是否启用', help_text='是否启用')
+    user = models.ForeignKey(User, related_name='user_mlPermission', on_delete=models.SET_NULL, null=True,
+                             verbose_name='user',
+                             help_text='user')
+
+    class Meta:
+        verbose_name = '美客多操作权限'
+        verbose_name_plural = verbose_name
+        ordering = ['order_num']
+
+    def __str__(self):
+        return str(self.id)
+
+
 class TaskLog(models.Model):
     """
     任务执行日志

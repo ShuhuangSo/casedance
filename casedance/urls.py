@@ -34,7 +34,7 @@ from report.views import SalesReportViewSet, StockReportViewSet, CustomerReportV
 from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagViewSet, OrderViewSet, OrderDetailViewSet, \
     OrderTagViewSet
 from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
-    SysRefillViewSet
+    SysRefillViewSet, AllMLUserPermissionViewSet, MLUserPermissionViewSet, MLPermissionViewSet
 
 from rest_framework.routers import DefaultRouter
 
@@ -75,6 +75,12 @@ router.register('settings/user_menu', UserMenuViewSet, basename='user_menu')
 router.register('settings/users', UserViewSet, basename='users')
 # 用户信息
 router.register('settings/sys_refill', SysRefillViewSet, basename='sys_refill')
+# 所有美客多操作权限
+router.register('settings/all_ml_permission', AllMLUserPermissionViewSet, basename='all_ml_permission')
+# 指定用户美客多操作权限
+router.register('settings/user_ml_permission', MLUserPermissionViewSet, basename='user_ml_permission')
+# 前端指定用户美客多操作权限
+router.register('settings/get_ml_permission', MLPermissionViewSet, basename='get_ml_permission')
 
 # ---------------------------仓库/商店模块 -------------------------------------------------
 # 仓库、销售门店

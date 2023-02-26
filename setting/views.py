@@ -256,6 +256,9 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
     # 创建默认数据
     @action(methods=['get'], detail=False, url_path='create_default_data')
     def create_default_data(self, request):
+        admin = User.objects.get(username='admin')
+        MLUserPermission.objects.filter(user=admin, parent__isnull=False).delete()
+        MLUserPermission.objects.filter(user=admin).delete()
         mp = MLUserPermission()
         mp.module_name = '产品库'
         mp.component = 'product'
@@ -275,8 +278,8 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
 
         mp_c = MLUserPermission()
         mp_c.parent = mp
-        mp_c.module_name = '产品删除'
-        mp_c.component = 'product_delete'
+        mp_c.module_name = '产品导入'
+        mp_c.component = 'product_upload'
         mp_c.order_num = 2
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
@@ -289,6 +292,78 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '新增采购'
+        mp_c.component = 'purchase_create'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '下单采购'
+        mp_c.component = 'purchase_buy'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '修改采购价格'
+        mp_c.component = 'purchase_changePrice'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '确认收货'
+        mp_c.component = 'purchase_receive'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品质检'
+        mp_c.component = 'purchase_qc'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '确认打包'
+        mp_c.component = 'purchase_pack'
+        mp_c.order_num = 6
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '数据核查'
+        mp_c.component = 'purchase_dataCheck'
+        mp_c.order_num = 7
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品删除'
+        mp_c.component = 'purchase_delete'
+        mp_c.order_num = 8
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
 
         mp = MLUserPermission()
         mp.module_name = '运单管理'

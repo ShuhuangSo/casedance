@@ -295,9 +295,54 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
 
         mp_c = MLUserPermission()
         mp_c.parent = mp
+        mp_c.module_name = '查看待采购'
+        mp_c.component = 'purchase_checkWaitBuy'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看已采购'
+        mp_c.component = 'purchase_checkAlreadyBuy'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看已收货'
+        mp_c.component = 'purchase_checkReceived'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看已打包'
+        mp_c.component = 'purchase_checkPacked'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看已出库'
+        mp_c.component = 'purchase_checkOut'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
         mp_c.module_name = '新增采购'
         mp_c.component = 'purchase_create'
-        mp_c.order_num = 1
+        mp_c.order_num = 6
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -306,7 +351,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '下单采购'
         mp_c.component = 'purchase_buy'
-        mp_c.order_num = 2
+        mp_c.order_num = 7
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -315,7 +360,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '修改采购价格'
         mp_c.component = 'purchase_changePrice'
-        mp_c.order_num = 3
+        mp_c.order_num = 8
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -324,7 +369,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '确认收货'
         mp_c.component = 'purchase_receive'
-        mp_c.order_num = 4
+        mp_c.order_num = 8
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -333,7 +378,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '产品质检'
         mp_c.component = 'purchase_qc'
-        mp_c.order_num = 5
+        mp_c.order_num = 9
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -342,7 +387,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '确认打包'
         mp_c.component = 'purchase_pack'
-        mp_c.order_num = 6
+        mp_c.order_num = 10
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -351,7 +396,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '数据核查'
         mp_c.component = 'purchase_dataCheck'
-        mp_c.order_num = 7
+        mp_c.order_num = 11
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -360,7 +405,7 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.parent = mp
         mp_c.module_name = '产品删除'
         mp_c.component = 'purchase_delete'
-        mp_c.order_num = 8
+        mp_c.order_num = 12
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
@@ -373,29 +418,173 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp.user = User.objects.get(username='admin')
         mp.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '创建运单'
+        mp_c.component = 'ship_create'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '编辑运单'
+        mp_c.component = 'ship_edit'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '删除运单'
+        mp_c.component = 'ship_delete'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '运单导出'
+        mp_c.component = 'ship_export'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '运单打包'
+        mp_c.component = 'ship_packing'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '费用录入'
+        mp_c.component = 'ship_fees'
+        mp_c.order_num = 6
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '运单预约'
+        mp_c.component = 'ship_book'
+        mp_c.order_num = 7
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '运单改约'
+        mp_c.component = 'ship_rebook'
+        mp_c.order_num = 8
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '操作入仓'
+        mp_c.component = 'ship_inwarehouse'
+        mp_c.order_num = 9
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '数据权限: 查看全部店铺(没打勾仅查看本人店铺)'
+        mp_c.component = 'ship_allShopCheck'
+        mp_c.order_num = 10
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = 'FBM库存'
-        mp.component = 'fbm_stock'
+        mp.component = 'fbmStock'
         mp.order_num = 4
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '店铺数据'
+        mp_c.component = 'fbmStock_shopData'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = 'FBM库存导入'
+        mp_c.component = 'fbmStock_import'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '盘点数量'
+        mp_c.component = 'fbmStock_pandian'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '修改状态'
+        mp_c.component = 'fbmStock_changeStatus'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = '中转仓'
-        mp.component = 'tran_stock'
+        mp.component = 'tranStock'
         mp.order_num = 5
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = 'FBM发仓'
+        mp_c.component = 'tranStock_send'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
-        mp.module_name = '订单管理'
+        mp.module_name = '销售订单'
         mp.component = 'order'
         mp.order_num = 6
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '销售订单导入'
+        mp_c.component = 'order_import'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
 
         mp = MLUserPermission()
         mp.module_name = '财务管理'
@@ -404,6 +593,51 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '新增店铺提现'
+        mp_c.component = 'finance_shopCreate'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '店铺提现确认到账'
+        mp_c.component = 'finance_ShopConfirm'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看资金结汇'
+        mp_c.component = 'finance_exchangeList'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '新增结汇'
+        mp_c.component = 'finance_exchangeCreate'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看店铺资金'
+        mp_c.component = 'finance_shopFinance'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
 
         mp = MLUserPermission()
         mp.module_name = '操作日志'

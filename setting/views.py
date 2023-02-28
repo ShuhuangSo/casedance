@@ -285,6 +285,42 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看全部产品(不打勾仅能查看自己创建的产品)'
+        mp_c.component = 'product_checkAll'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '编辑全部产品(不打勾仅能编辑自己创建的产品)'
+        mp_c.component = 'product_editAll'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '删除全部产品(不打勾仅能删除自己创建的产品)'
+        mp_c.component = 'product_deleteAll'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '默认查看全部产品'
+        mp_c.component = 'product_defaultCheckAll'
+        mp_c.order_num = 6
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = '采购管理'
         mp.component = 'purchase'

@@ -31,6 +31,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_item_id != instance.item_id:
             value = 'ItemID: %s ===>> %s' % (instance.__original_item_id, instance.item_id)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'item_id', instance.item_id, request.user)  # 更新未发货运单的产品参数
         if instance.__original_custom_code != instance.custom_code:
             value = '海关编码: %s ===>> %s' % (instance.__original_custom_code, instance.custom_code)
             create_log(instance.id, value, request.user)
@@ -188,6 +189,12 @@ def update_ship_product(sku, field, value, user):
             i.p_name = value
             i.save()
             log_value = '同步更新%s的产品名称' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'item_id':
+            i.item_id = value
+            i.save()
+            log_value = '同步更新%s的ItemID' % sku
             create_ship_log(i.ship.id, log_value, user)
             continue
         if field == 'weight':

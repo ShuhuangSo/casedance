@@ -723,6 +723,10 @@ class ShopViewSet(mixins.ListModelMixin,
     search_fields = ('name', 'seller_id', 'nickname')  # 配置搜索字段
     ordering_fields = ('create_time', 'total_profit', 'total_weight')  # 配置排序字段
 
+    def get_queryset(self):
+        # 返回已启用的店铺
+        return Shop.objects.filter(is_active=True)
+
 
 class ShopStockViewSet(mixins.ListModelMixin,
                        mixins.CreateModelMixin,

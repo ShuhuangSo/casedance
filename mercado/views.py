@@ -1265,6 +1265,11 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.length = product.length
                 sd.width = product.width
                 sd.heigth = product.heigth
+
+                packing = Packing.objects.filter(id=product.packing_id).first()
+                if packing:
+                    sd.packing_name = packing.name
+                    sd.packing_size = packing.size
                 sd.save()
 
                 total_qty += i['qty']

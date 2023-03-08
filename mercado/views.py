@@ -727,6 +727,39 @@ class ShopViewSet(mixins.ListModelMixin,
         # 返回已启用的店铺
         return Shop.objects.filter(is_active=True)
 
+    # 代办事项
+    @action(methods=['get'], detail=False, url_path='get_daiban')
+    def get_daiban(self, request):
+        # 运单管理
+        if request.user.is_superuser:
+            pre_qty = Ship.objects.filter(s_status='PREPARING').count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').count()
+        else:
+            pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
+
+        # 采购管理
+        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY').count()
+        purchased_num = PurchaseManage.objects.filter(p_status='PURCHASED').count()
+        rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
+        pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
+
+        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
+                         'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
+                        status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='shop_info')
+    def shop_info(self, request):
+        shop_id = request.data['id']
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        manager = shop.user.first_name if shop.user else ''
+        total_qty = shop.total_qty
+        return Response({'manager': manager, 'total_qty': total_qty},
+                        status=status.HTTP_200_OK)
+
 
 class ShopStockViewSet(mixins.ListModelMixin,
                        mixins.CreateModelMixin,
@@ -1030,13 +1063,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-        from PIL import Image
-        products = MLProduct.objects.all()
-        for i in products:
-            if i.image:
-                pic_org = Image.open('media/ml_product/' + i.sku + '.jpg')
-                pic_new = pic_org.resize((100, 100), Image.ANTIALIAS)
-                pic_new.save('media/ml_product/' + i.sku + '_100x100.jpg')
+        tasks.calc_shop_sale()
 
         return Response(
             {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},

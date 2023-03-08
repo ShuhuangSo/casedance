@@ -443,12 +443,16 @@ class ShopReportSerializer(serializers.ModelSerializer):
     """
     amount = serializers.SerializerMethodField()
     profit = serializers.SerializerMethodField()
+    shop = serializers.SerializerMethodField()
 
     def get_amount(self, obj):
         return round(obj.amount, 2)
 
     def get_profit(self, obj):
         return round(obj.profit, 2)
+
+    def get_shop(self, obj):
+        return obj.shop.name
 
     class Meta:
         model = ShopReport

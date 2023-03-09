@@ -731,14 +731,27 @@ class ShopViewSet(mixins.ListModelMixin,
     @action(methods=['get'], detail=False, url_path='get_daiban')
     def get_daiban(self, request):
         # 运单管理
+        overtime_ship = 0
         if request.user.is_superuser:
             pre_qty = Ship.objects.filter(s_status='PREPARING').count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
             booked_qty = Ship.objects.filter(s_status='BOOKED').count()
+
+            ships = Ship.objects.filter(s_status='BOOKED')
         else:
             pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
             booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
+
+            ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
+
+        for i in ships:
+            if i.book_date:
+                ad = str(i.book_date)
+                dd = datetime.strptime(ad, '%Y-%m-%d')
+                delta = datetime.now() - dd
+                if delta.days > 0:
+                    overtime_ship += 1
 
         # 采购管理
         wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY').count()
@@ -747,17 +760,31 @@ class ShopViewSet(mixins.ListModelMixin,
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
 
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
-                         'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
+                         'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num,
+                         'pack_num': pack_num, 'overtime_ship': overtime_ship},
                         status=status.HTTP_200_OK)
 
+    # 店铺信息
     @action(methods=['post'], detail=False, url_path='shop_info')
     def shop_info(self, request):
         shop_id = request.data['id']
 
         shop = Shop.objects.filter(id=shop_id).first()
-        manager = shop.user.first_name if shop.user else ''
-        total_qty = shop.total_qty
-        return Response({'manager': manager, 'total_qty': total_qty},
+        manager = shop.user.first_name if shop.user else '管理员'  # 负责人
+
+        ss = ShopStock.objects.filter(shop=shop)
+        total_sku = 0  # 在售产品
+        total_amount = 0  # 库存金额
+        total_qty = 0  # 库存数量
+        for i in ss:
+            if i.p_status != 'OFFLINE' and i.qty > 0:
+                total_sku += 1
+                total_qty += i.qty
+                total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+        used_quota = tasks.get_shop_quota(shop_id)  # 已用额度
+        return Response({'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
+                         'quota': shop.quota, 'used_quota': used_quota},
                         status=status.HTTP_200_OK)
 
 
@@ -2839,6 +2866,15 @@ class ShopReportViewSet(mixins.ListModelMixin,
         'calc_date': ['gte', 'lte', 'exact'],
         'shop': ['exact'],
     }
+
+    def get_queryset(self):
+        user = self.request.user
+        # 返回指定用户数据
+        if user.is_superuser:
+            queryset = ShopReport.objects.all()
+        else:
+            queryset = ShopReport.objects.filter(shop__user=user)
+        return queryset
 
     # 统计30天店铺每天销量
     @action(methods=['get'], detail=False, url_path='calc_shop_sale')

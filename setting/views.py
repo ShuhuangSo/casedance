@@ -622,6 +622,15 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '数据权限: 查看全部店铺订单(没打勾仅查看本人店铺)'
+        mp_c.component = 'order_allShopCheck'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = '财务管理'
         mp.component = 'finance'
@@ -682,6 +691,42 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp.is_active = True
         mp.user = User.objects.get(username='admin')
         mp.save()
+
+        mp = MLUserPermission()
+        mp.module_name = '首页'
+        mp.component = 'dashboard'
+        mp.order_num = 9
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '待办事项-发货运单'
+        mp_c.component = 'dashboard_ship'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '待办事项-采购管理'
+        mp_c.component = 'dashboard_purchase'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '销量统计'
+        mp_c.component = 'dashboard_saleChart'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         return Response({'msg': '创建成功!'}, status=status.HTTP_200_OK)
 
 

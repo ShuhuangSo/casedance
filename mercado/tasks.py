@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport
+    MLOrder, ShopStock, ShopReport, TransStock, Ship
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -563,3 +563,32 @@ def calc_shop_sale():
     task_log.save()
 
     return 'OK'
+
+
+# 获取店铺额度
+@shared_task()
+def get_shop_quota(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+
+    # FBM库存统计
+    queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id).exclude(p_status='OFFLINE')
+    total_amount = 0
+    for i in queryset:
+        total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+    # 中转仓库存统计
+    ts = TransStock.objects.filter(listing_shop=shop.name, is_out=False)
+    trans_amount = 0
+    for i in ts:
+        trans_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+
+    # 在途运单统计,含备货中
+    ships = Ship.objects.filter(shop=shop.name).filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='PREPARING'))
+    onway_amount = 0
+    for i in ships:
+        onway_amount += i.shipping_fee
+        onway_amount += i.extra_fee
+        onway_amount += i.products_cost
+
+    used_quota = total_amount + trans_amount + onway_amount
+    return used_quota

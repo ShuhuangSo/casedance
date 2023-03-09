@@ -321,6 +321,7 @@ class Shop(models.Model):
     total_weight = models.FloatField(null=True, blank=True, verbose_name='库存总重量kg', help_text='库存总重量kg')
     total_cbm = models.FloatField(null=True, blank=True, verbose_name='库存总体积cbm', help_text='库存总体积cbm')
     stock_value = models.FloatField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
+    quota = models.FloatField(null=True, blank=True, verbose_name='店铺额度', help_text='店铺额度')
     total_qty = models.IntegerField(null=True, blank=True, verbose_name='库存价值rmb', help_text='库存价值rmb')
     user = models.ForeignKey(User, related_name='user_shop', on_delete=models.SET_NULL, null=True, blank=True,
                              verbose_name='user', help_text='user')

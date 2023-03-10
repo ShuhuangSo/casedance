@@ -514,7 +514,7 @@ def calc_product_sales():
     return 'OK'
 
 
-# 计算店铺30天每天累积总销量
+# 计算店铺60天每天累积总销量
 @shared_task()
 def calc_shop_sale():
     q = Q()
@@ -526,7 +526,7 @@ def calc_shop_sale():
     shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
     for s in shops:
         add_list = []
-        for i in range(30):
+        for i in range(60):
             date = datetime.now().date() - timedelta(days=i)
             order_set = MLOrder.objects.filter(order_time__date=date, shop=s).filter(q)
             qty = 0

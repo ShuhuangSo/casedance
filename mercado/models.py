@@ -585,6 +585,25 @@ class ShipBox(models.Model):
         return self.box_number
 
 
+class ShipAttachment(models.Model):
+    """
+    运单附件
+    """
+    ship = models.ForeignKey(Ship, related_name='ship_attachment', on_delete=models.CASCADE, verbose_name='所属运单',
+                             help_text='所属运单')
+    a_type = models.CharField(max_length=10, verbose_name='附件类型', help_text='附件类型')
+    name = models.CharField(max_length=100, null=True, blank=True, verbose_name='附件名称', help_text='附件名称')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '运单附件'
+        verbose_name_plural = verbose_name
+        ordering = ['id']
+
+    def __str__(self):
+        return self.name
+
+
 class Carrier(models.Model):
     """
     物流商

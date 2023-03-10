@@ -3,9 +3,10 @@ from datetime import datetime, timedelta
 from xToolkit import xstring
 from django.db.models import Q
 
+from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
-    PurchaseManage, ShipItemRemove
+    PurchaseManage, ShipItemRemove, ShipAttachment
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -292,6 +293,21 @@ class ShipItemRemoveSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShipItemRemove
         fields = "__all__"
+
+
+class ShipAttachmentSerializer(serializers.ModelSerializer):
+    """
+    运单附件
+    """
+    link = serializers.SerializerMethodField()
+
+    def get_link(self, obj):
+        url = BASE_URL + MEDIA_URL + 'ml_ships/' + obj.ship.envio_number + '/' + obj.name
+        return url
+
+    class Meta:
+        model = ShipAttachment
+        fields = ('id', 'ship', 'a_type', 'name', 'link', 'create_time')
 
 
 class CarrierSerializer(serializers.ModelSerializer):

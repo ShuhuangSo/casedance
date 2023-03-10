@@ -19,12 +19,12 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
-    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer
+    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -731,19 +731,22 @@ class ShopViewSet(mixins.ListModelMixin,
     @action(methods=['get'], detail=False, url_path='get_daiban')
     def get_daiban(self, request):
         # 运单管理
-        overtime_ship = 0
+        overtime_ship = 0  # 入仓核对数量
+        need_book = 0  # 需预约运单数量
         if request.user.is_superuser:
             pre_qty = Ship.objects.filter(s_status='PREPARING').count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
             booked_qty = Ship.objects.filter(s_status='BOOKED').count()
 
             ships = Ship.objects.filter(s_status='BOOKED')
+            need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM').count()
         else:
             pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
             booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
 
             ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
+            need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
 
         for i in ships:
             if i.book_date:
@@ -761,7 +764,7 @@ class ShopViewSet(mixins.ListModelMixin,
 
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
                          'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num,
-                         'pack_num': pack_num, 'overtime_ship': overtime_ship},
+                         'pack_num': pack_num, 'overtime_ship': overtime_ship, 'need_book': need_book},
                         status=status.HTTP_200_OK)
 
     # 店铺信息
@@ -2109,6 +2112,100 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             sir.delete()
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+
+class ShipAttachmentViewSet(mixins.ListModelMixin,
+                            mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                            mixins.RetrieveModelMixin,
+                            viewsets.GenericViewSet):
+    """
+    list:
+        运单附件 列表,分页,过滤,搜索,排序
+    create:
+        运单附件 新增
+    retrieve:
+        运单附件 详情页
+    update:
+        运单附件 修改
+    destroy:
+        运单附件 删除
+    """
+    queryset = ShipAttachment.objects.all()
+    serializer_class = ShipAttachmentSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('ship', 'a_type')  # 配置过滤字段
+    search_fields = ('name',)  # 配置搜索字段
+    ordering_fields = ('create_time', 'a_type')  # 配置排序字段
+
+    # 运单附件上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        import os
+        data = request.data
+        path = 'media/ml_ships/'
+        ship_id = data['id']
+        a_type = data['a_type']
+        ship = Ship.objects.filter(id=ship_id).first()
+
+        head_path = path + ship.envio_number
+        # 判断是否存在文件夹,如果没有就创建文件路径
+        if not os.path.exists(head_path):
+            os.makedirs(head_path)
+
+        file = request.FILES.get('file')
+        file_name = file.name
+        # 判断是否存在文件
+        is_exist = ShipAttachment.objects.filter(ship=ship, name=file.name).count()
+        if is_exist:
+            file_name = '{fn}({time_str})'.format(fn=file.name, time_str=time.strftime('%m%d%H%M%S'))
+
+        head_path = head_path + '/' + file_name
+        with open(head_path, 'wb') as f:
+            for chunk in file.chunks():
+                f.write(chunk)
+        sa = ShipAttachment()
+        sa.ship = ship
+        sa.name = file_name
+        sa.a_type = a_type
+        sa.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship_id
+        log.desc = '上传附件：' + file_name
+        log.user = request.user
+        log.save()
+
+        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='sa_delete')
+    def sa_delete(self, request):
+        import os
+        sa_id = request.data['id']
+        sa = ShipAttachment.objects.filter(id=sa_id).first()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'DEL'
+        log.target_type = 'SHIP'
+        log.target_id = sa.ship.id
+        log.desc = '删除附件：' + sa.name
+        log.user = request.user
+        log.save()
+
+        path = 'media/ml_ships/' + sa.ship.envio_number + '/' + sa.name
+        os.remove(path)
+        sa.delete()
+
+        return Response({'msg': '成功删除'}, status=status.HTTP_200_OK)
 
 
 class ShipBoxViewSet(mixins.ListModelMixin,

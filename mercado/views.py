@@ -2158,10 +2158,13 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
 
         file = request.FILES.get('file')
         file_name = file.name
+
         # 判断是否存在文件
-        is_exist = ShipAttachment.objects.filter(ship=ship, name=file.name).count()
+        is_exist = ShipAttachment.objects.filter(ship=ship, name=file_name).count()
         if is_exist:
-            file_name = '{fn}({time_str})'.format(fn=file.name, time_str=time.strftime('%m%d%H%M%S'))
+            after_name = os.path.splitext(file_name)[-1]  # 获取扩展名
+            first_name = os.path.splitext(file_name)[0]  # 获取文件名
+            file_name = '{fn}({time_str})'.format(fn=first_name, time_str=time.strftime('%m%d%H%M%S')) + after_name
 
         head_path = head_path + '/' + file_name
         with open(head_path, 'wb') as f:

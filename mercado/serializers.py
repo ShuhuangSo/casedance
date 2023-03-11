@@ -233,6 +233,7 @@ class ShipSerializer(serializers.ModelSerializer):
     book_days = serializers.SerializerMethodField()
     products_weight = serializers.SerializerMethodField()
     is_attach = serializers.SerializerMethodField()
+    manager = serializers.SerializerMethodField()
 
     def get_products_weight(self, obj):
         queryset = ShipDetail.objects.filter(ship=obj)
@@ -271,6 +272,11 @@ class ShipSerializer(serializers.ModelSerializer):
 
         return True if sa else False
 
+    def get_manager(self, obj):
+        shop = Shop.objects.filter(name=obj.shop).first()
+        manager = shop.user.first_name if shop.user else '管理员'  # 负责人
+        return manager
+
     class Meta:
         model = Ship
         fields = (
@@ -278,7 +284,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'logi_fee_clear', 'is_attach', 'ship_shipDetail')
+            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear', 'is_attach', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

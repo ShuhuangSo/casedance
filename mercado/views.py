@@ -80,6 +80,11 @@ class ListingViewSet(mixins.ListModelMixin,
         # date = datetime.now() - timedelta(days=1)
         #
         # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
+        import re
+        t = '2023-03-22'
+        s = t.replace('-', '')
+
+        print(s[2:])
 
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
@@ -785,7 +790,7 @@ class ShopViewSet(mixins.ListModelMixin,
                 total_qty += i.qty
                 total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
 
-        used_quota = tasks.get_shop_quota(shop_id)  # 已用额度
+        used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
         return Response({'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
                          'quota': shop.quota, 'used_quota': used_quota},
                         status=status.HTTP_200_OK)
@@ -1132,6 +1137,8 @@ class ShipViewSet(mixins.ListModelMixin,
     @action(methods=['post'], detail=False, url_path='create_ship')
     def create_ship(self, request):
         shop = request.data['shop']
+        shop_obj = Shop.objects.filter(name=shop).first()
+        shop_id = shop_obj.id
         target = request.data['target']
         ship_type = request.data['ship_type']
         carrier = request.data['carrier']
@@ -1140,8 +1147,19 @@ class ShipViewSet(mixins.ListModelMixin,
         note = request.data['note']
         ship_detail = request.data['ship_detail']
 
-        batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
+        # 检查店铺额度
+        products_cost = 0  # 总货品成本
+        for i in ship_detail:
+            product = MLProduct.objects.filter(sku=i['sku']).first()
+            products_cost += product.unit_cost * i['qty']
+        used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
+        if (products_cost + used_quota) > shop_obj.quota:
+            return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
+        batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
+        if end_date:
+            b_num = end_date.replace('-', '')[2:]
+            batch = 'P{time_str}'.format(time_str=b_num)
         if not end_date:
             end_date = None
         if not ship_date:
@@ -1198,6 +1216,12 @@ class ShipViewSet(mixins.ListModelMixin,
                 if packing:
                     sd.packing_name = packing.name
                     sd.packing_size = packing.size
+
+                # 如果店铺库存中没有，自动标为新品
+                is_exist = ShopStock.objects.filter(sku=sd.sku).count()
+                if not is_exist:
+                    sd.s_type = 'NEW'
+
                 sd.save()
 
                 total_qty += i['qty']
@@ -1217,13 +1241,15 @@ class ShipViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
 
-        return Response({'msg': '成功创建运单'}, status=status.HTTP_200_OK)
+        return Response({'msg': '成功创建运单', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 编辑运单
     @action(methods=['post'], detail=False, url_path='edit_ship')
     def edit_ship(self, request):
         id = request.data['id']
         shop = request.data['shop']
+        shop_obj = Shop.objects.filter(name=shop).first()
+        shop_id = shop_obj.id
         target = request.data['target']
         fbm_warehouse = request.data['fbm_warehouse']
         ship_type = request.data['ship_type']
@@ -1235,6 +1261,17 @@ class ShipViewSet(mixins.ListModelMixin,
         batch = request.data['batch']
         envio_number = request.data['envio_number']
         ship_detail = request.data['ship_shipDetail']
+
+        # 检查店铺额度
+        if target == 'FBM':
+            products_cost = 0  # 总货品成本
+            for i in ship_detail:
+                product = MLProduct.objects.filter(sku=i['sku']).first()
+                products_cost += product.unit_cost * i['qty']
+            used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
+            if (products_cost + used_quota) > shop_obj.quota:
+                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         ship = Ship.objects.filter(id=id).first()
         if not ship:
@@ -1327,6 +1364,13 @@ class ShipViewSet(mixins.ListModelMixin,
                 if packing:
                     sd.packing_name = packing.name
                     sd.packing_size = packing.size
+
+                # 如果店铺库存中没有，自动标为新品
+                if 'id' not in i.keys():
+                    is_exist = ShopStock.objects.filter(sku=sd.sku).count()
+                    if not is_exist:
+                        sd.s_type = 'NEW'
+
                 sd.save()
 
                 total_qty += i['qty']
@@ -1335,7 +1379,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.total_qty = total_qty
         ship.products_cost = products_cost
         ship.save()
-        return Response({'msg': '成功更新运单'}, status=status.HTTP_200_OK)
+        return Response({'msg': '成功更新运单', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 运单发货/保存
     @action(methods=['post'], detail=False, url_path='send_ship')

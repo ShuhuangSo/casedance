@@ -459,6 +459,7 @@ class Ship(models.Model):
     send_from = models.CharField(max_length=30, null=True, blank=True, verbose_name='从哪发', help_text='从哪发')
     ship_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='运单类型', help_text='运单类型')
     shipping_fee = models.FloatField(null=True, default=0, verbose_name='运费', help_text='运费')
+    logi_fee_clear = models.BooleanField(default=False, verbose_name='物流费是否结算', help_text='物流费是否结算')
     extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
     products_cost = models.FloatField(null=True, default=0, verbose_name='货品成本', help_text='货品成本')
     carrier = models.CharField(max_length=30, null=True, blank=True, verbose_name='承运商', help_text='承运商')

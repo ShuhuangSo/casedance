@@ -1125,7 +1125,7 @@ class ShipViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
     search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
-                     'ship_shipDetail__p_name')  # 配置搜索字段
+                     'ship_shipDetail__p_name', 'shop')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段
 
     # 创建运单
@@ -1345,6 +1345,15 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_detail = request.data['ship_shipDetail']
         ship_action = request.data['action']
 
+        # 运单发货前检查库存是否足够
+        if ship_action == 'SHIPPED':
+            for i in ship_detail:
+                pm = PurchaseManage.objects.filter(p_status='PACKED', sku=i['sku']).first()
+                if pm:
+                    if pm.pack_qty >= i['qty']:
+                        continue
+                return Response({'msg': '已打包货品库存不足!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
         products_cost = 0  # 总货品成本
         for i in ship_detail:
             if not i['qty']:
@@ -1487,7 +1496,7 @@ class ShipViewSet(mixins.ListModelMixin,
             log.save()
         else:
             msg = '保存成功!'
-        return Response({'msg': msg}, status=status.HTTP_200_OK)
+        return Response({'msg': msg, 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 添加运费
     @action(methods=['post'], detail=False, url_path='postage')
@@ -1994,6 +2003,27 @@ class ShipViewSet(mixins.ListModelMixin,
         log.save()
 
         return Response({'url': url}, status=status.HTTP_200_OK)
+
+    # 修改运费结算状态
+    @action(methods=['post'], detail=False, url_path='change_logi_fee_status')
+    def change_logi_fee_status(self, request):
+        ship_id = request.data['id']
+        logi_fee_clear = request.data['logi_fee_clear']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship.logi_fee_clear = logi_fee_clear
+        ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '标记物流费用已结算' if logi_fee_clear else '取消标记物流费用结算'
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):

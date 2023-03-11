@@ -232,6 +232,7 @@ class ShipSerializer(serializers.ModelSerializer):
     shop_color = serializers.SerializerMethodField()
     book_days = serializers.SerializerMethodField()
     products_weight = serializers.SerializerMethodField()
+    is_attach = serializers.SerializerMethodField()
 
     def get_products_weight(self, obj):
         queryset = ShipDetail.objects.filter(ship=obj)
@@ -265,6 +266,11 @@ class ShipSerializer(serializers.ModelSerializer):
             return fbm.address
         return ''
 
+    def get_is_attach(self, obj):
+        sa = ShipAttachment.objects.filter(ship=obj).count()
+
+        return True if sa else False
+
     class Meta:
         model = Ship
         fields = (
@@ -272,7 +278,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'shipping_fee',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'ship_shipDetail')
+            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'logi_fee_clear', 'is_attach', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

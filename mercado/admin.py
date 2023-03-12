@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
-    Packing, MLOperateLog, ShopReport, PurchaseManage
+    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC
 
 
 @admin.register(Listing)
@@ -142,3 +142,10 @@ class PurchaseManageAdmin(admin.ModelAdmin):
     list_display = ['sku', 'p_name', 'p_status']
     list_filter = ['p_status']
     search_fields = ['sku']
+
+
+@admin.register(UPC)
+class UPCAdmin(admin.ModelAdmin):
+    list_display = ['number', 'is_used', 'create_time']
+    list_filter = ['is_used']
+    search_fields = ['number']

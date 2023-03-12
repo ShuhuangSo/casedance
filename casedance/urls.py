@@ -26,7 +26,8 @@ from bonus.views import AccountSalesViewSet, AccountBonusViewSet, AccountsViewSe
 from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet, SellerViewSet, SellerTrackViewSet, \
     MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
-    MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet
+    MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
+    UPCViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -186,6 +187,8 @@ router.register('ml_operate_log', MLOperateLogViewSet, basename='ml_operate_log'
 router.register('ml_shop_reports', ShopReportViewSet, basename='ml_shop_reports')
 # 采购管理列表,
 router.register('ml_purchase', PurchaseManageViewSet, basename='ml_purchase')
+# UPC号码池列表,
+router.register('upc_manage', UPCViewSet, basename='upc_manage')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

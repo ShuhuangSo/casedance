@@ -727,6 +727,15 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '收支管理'
+        mp_c.component = 'dashboard_shopFinance'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         return Response({'msg': '创建成功!'}, status=status.HTTP_200_OK)
 
 

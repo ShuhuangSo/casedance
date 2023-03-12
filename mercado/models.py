@@ -475,6 +475,7 @@ class Ship(models.Model):
     user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='创建人id', help_text='创建人id')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    sent_time = models.DateTimeField(null=True, blank=True, verbose_name='发货时间', help_text='发货时间')
 
     class Meta:
         verbose_name = '头程运单'
@@ -851,3 +852,24 @@ class PurchaseManage(models.Model):
 
     def __str__(self):
         return self.sku
+
+
+class UPC(models.Model):
+    """
+    UPC号码池
+    """
+
+    number = models.CharField(max_length=50, null=True, blank=True, verbose_name='upc号码', help_text='upc号码')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='生成时间', help_text='生成时间')
+    use_time = models.DateTimeField(null=True, blank=True, verbose_name='使用时间', help_text='使用时间')
+    is_used = models.BooleanField(default=False, verbose_name='是否使用', help_text='是否使用')
+    user = models.ForeignKey(User, related_name='user_upc', on_delete=models.SET_NULL, null=True, blank=True,
+                             verbose_name='user', help_text='user')
+
+    class Meta:
+        verbose_name = 'UPC号码池'
+        verbose_name_plural = verbose_name
+        ordering = ['-use_time']
+
+    def __str__(self):
+        return self.number

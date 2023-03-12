@@ -19,12 +19,12 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
-    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer
+    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -80,12 +80,20 @@ class ListingViewSet(mixins.ListModelMixin,
         # date = datetime.now() - timedelta(days=1)
         #
         # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
-        import re
-        t = '2023-03-22'
-        s = t.replace('-', '')
 
-        print(s[2:])
+        queryset = Ship.objects.exclude(s_status='PREPARING')
+        for i in queryset:
+            if not i.sent_time:
+                log = MLOperateLog.objects.filter(target_type='SHIP', target_id=i.id, desc='运单发货!').first()
+                if log:
+                    i.sent_time = log.create_time
+                    i.save()
 
+        queryset = Ship.objects.filter(send_from='LOCAL')
+        for i in queryset:
+            if not i.sent_time:
+                i.sent_time = i.create_time
+                i.save()
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -791,9 +799,40 @@ class ShopViewSet(mixins.ListModelMixin,
                 total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
 
         used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
-        return Response({'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
-                         'quota': shop.quota, 'used_quota': used_quota},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
+             'quota': shop.quota, 'used_quota': used_quota},
+            status=status.HTTP_200_OK)
+
+    # 店铺收支管理
+    @action(methods=['post'], detail=False, url_path='shop_finance')
+    def shop_finance(self, request):
+        start_date = request.data['start_date']
+        end_date = request.data['end_date']
+
+        shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
+        data = []
+        for s in shops:
+            ships = Ship.objects.filter(shop=s.name).filter(
+                Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
+                sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+            total_pay = 0  # 总支出
+            for i in ships:
+                total_pay += i.shipping_fee
+                total_pay += i.extra_fee
+                total_pay += i.products_cost
+
+            finance = Finance.objects.filter(shop=s, f_type='EXC').filter(exc_date__gte=start_date,
+                                                                          exc_date__lte=end_date)
+            total_rec = 0  # 总收入
+            for i in finance:
+                total_rec += i.income_rmb
+            data.append(
+                {'shop_name': s.name, 'total_pay': total_pay, 'total_rec': total_rec, 'profit': total_rec - total_pay})
+
+        return Response(
+            {'data': data},
+            status=status.HTTP_200_OK)
 
 
 class ShopStockViewSet(mixins.ListModelMixin,
@@ -1044,8 +1083,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
-                                                                                 old_qty=old_qty,
-                                                                                 new_qty=new_qty, reason=reason)
+                                                                                         old_qty=old_qty,
+                                                                                         new_qty=new_qty, reason=reason)
         log.user = request.user
         log.save()
 
@@ -1071,8 +1110,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
-                                                                          old_status=old_status,
-                                                                          new_status=new_status)
+                                                                                old_status=old_status,
+                                                                                new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1330,7 +1369,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
                     log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                   qty=i['qty'])
+                                                                        qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -1514,6 +1553,10 @@ class ShipViewSet(mixins.ListModelMixin,
         # 总体积cbm
         sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
         ship.cbm = sum_cbm['cbm__sum']
+
+        # 添加发货时间
+        if ship_action == 'SHIPPED':
+            ship.sent_time = datetime.now()
 
         ship.save()
 
@@ -2519,6 +2562,7 @@ class TransStockViewSet(mixins.ListModelMixin,
             shop=shop,
             target='FBM',
             batch=batch,
+            sent_time=datetime.now()
         )
         ship.save()
 
@@ -2769,8 +2813,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
         log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
-                                                                             exchange=finance.exchange,
-                                                                             income=finance.income_rmb)
+                                                                                           exchange=finance.exchange,
+                                                                                           income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -3431,3 +3475,73 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UPCViewSet(mixins.ListModelMixin,
+                 mixins.CreateModelMixin,
+                 mixins.UpdateModelMixin,
+                 mixins.DestroyModelMixin,
+                 mixins.RetrieveModelMixin,
+                 viewsets.GenericViewSet):
+    """
+    list:
+        UPC号码池列表,分页,过滤,搜索,排序
+    create:
+        UPC号码池新增
+    retrieve:
+        UPC号码池详情页
+    update:
+        UPC号码池修改
+    destroy:
+        UPC号码池删除
+    """
+    queryset = UPC.objects.all()
+    serializer_class = UPCSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('is_used', 'user', 'use_time')  # 配置过滤字段
+    filterset_fields = {
+    'use_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+    'is_used': ['exact'],
+    'user': ['exact'],
+    }
+    search_fields = ('number',)  # 配置搜索字段
+    ordering_fields = ('create_time', 'use_time')  # 配置排序字段
+
+    # upc号码上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        data = request.data
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb.active
+
+        add_list = []
+        for cell_row in list(sheet):
+            number = cell_row[0].value
+            if not number:
+                continue
+            is_exist = UPC.objects.filter(number=number).count()
+            if not is_exist:
+                add_list.append(UPC(
+                    number=number
+                ))
+        UPC.objects.bulk_create(add_list)
+        msg = '成功上传 {s} 条'.format(s=len(add_list))
+
+        return Response({'msg': msg}, status=status.HTTP_200_OK)
+
+    # upc号码上传
+    @action(methods=['post'], detail=False, url_path='request_upc')
+    def request_upc(self, request):
+        qty = request.data['qty']
+        available = UPC.objects.filter(is_used=False).count()
+        if qty > available:
+            return Response({'msg': 'UPC号码数量不足，请联系管理员'}, status=status.HTTP_202_ACCEPTED)
+        upcs = UPC.objects.filter(is_used=False)[:qty]
+        for i in upcs:
+            i.is_used = True
+            i.user = request.user
+            i.use_time = datetime.now()
+            i.save()
+        return Response({'msg': '申请成功'}, status=status.HTTP_200_OK)

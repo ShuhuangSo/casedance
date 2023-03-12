@@ -6,7 +6,7 @@ from django.db.models import Q
 from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
-    PurchaseManage, ShipItemRemove, ShipAttachment
+    PurchaseManage, ShipItemRemove, ShipAttachment, UPC
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -281,7 +281,7 @@ class ShipSerializer(serializers.ModelSerializer):
         model = Ship
         fields = (
             'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type',
-            'shipping_fee',
+            'shipping_fee', 'sent_time',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear', 'is_attach', 'ship_shipDetail')
@@ -537,3 +537,17 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
             'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
             'total_rec_qty', 'is_checked', 'packing_id', 'is_qc')
+
+
+class UPCSerializer(serializers.ModelSerializer):
+    """
+    UPC号码池
+    """
+    user_name = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+        return obj.user.first_name if obj.user else ''
+
+    class Meta:
+        model = UPC
+        fields = ('id', 'number', 'is_used', 'user_name', 'create_time', 'use_time')

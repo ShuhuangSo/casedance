@@ -537,9 +537,36 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
 
         mp_c = MLUserPermission()
         mp_c.parent = mp
+        mp_c.module_name = '物流结算'
+        mp_c.component = 'ship_logi_fee'
+        mp_c.order_num = 10
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '附件上传'
+        mp_c.component = 'ship_attach_create'
+        mp_c.order_num = 11
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '附件删除'
+        mp_c.component = 'ship_attach_delete'
+        mp_c.order_num = 12
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
         mp_c.module_name = '数据权限: 查看全部店铺(没打勾仅查看本人店铺)'
         mp_c.component = 'ship_allShopCheck'
-        mp_c.order_num = 10
+        mp_c.order_num = 13
         mp_c.is_active = True
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()

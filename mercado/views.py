@@ -81,18 +81,10 @@ class ListingViewSet(mixins.ListModelMixin,
         #
         # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
 
-        queryset = Ship.objects.exclude(s_status='PREPARING')
+        queryset = Ship.objects.all()
         for i in queryset:
-            if not i.sent_time:
-                log = MLOperateLog.objects.filter(target_type='SHIP', target_id=i.id, desc='运单发货!').first()
-                if log:
-                    i.sent_time = log.create_time
-                    i.save()
-
-        queryset = Ship.objects.filter(send_from='LOCAL')
-        for i in queryset:
-            if not i.sent_time:
-                i.sent_time = i.create_time
+            if not i.send_from:
+                i.send_from = 'CN'
                 i.save()
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
@@ -604,6 +596,17 @@ class MLProductViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
+    # 查询ML产品id
+    @action(methods=['post'], detail=False, url_path='get_product_id')
+    def get_product_id(self, request):
+        sku = request.data['sku']
+        product = MLProduct.objects.filter(sku=sku).first()
+        pid = 0
+        if product:
+            pid = product.id
+
+        return Response({'id': pid}, status=status.HTTP_200_OK)
+
     #  重写产品删除
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()
@@ -746,6 +749,8 @@ class ShopViewSet(mixins.ListModelMixin,
         # 运单管理
         overtime_ship = 0  # 入仓核对数量
         need_book = 0  # 需预约运单数量
+
+        income_confirm = 0  # 提现待确认数量
         if request.user.is_superuser:
             pre_qty = Ship.objects.filter(s_status='PREPARING').count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
@@ -753,6 +758,8 @@ class ShopViewSet(mixins.ListModelMixin,
 
             ships = Ship.objects.filter(s_status='BOOKED')
             need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM').count()
+
+            income_confirm = Finance.objects.filter(f_type='WD', is_received=False).count()
         else:
             pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
             shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
@@ -761,6 +768,7 @@ class ShopViewSet(mixins.ListModelMixin,
             ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
             need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
 
+            income_confirm = Finance.objects.filter(f_type='WD', is_received=False, shop__user_id=request.user.id).count()
         for i in ships:
             if i.book_date:
                 ad = str(i.book_date)
@@ -775,9 +783,24 @@ class ShopViewSet(mixins.ListModelMixin,
         rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
 
+        # 检查产品完整状态
+        all_product_incomplete = False
+        products = MLProduct.objects.filter(user_id=request.user.id).exclude(p_status='OFFLINE')
+        for i in products:
+            if not (i.site and i.item_id and i.unit_cost and i.image and i.shop):
+                all_product_incomplete = True
+                break
+            if not (i.custom_code and i.cn_name and i.en_name and i.brand and i.declared_value and i.cn_material and i.en_material):
+                all_product_incomplete = True
+                break
+            if not (i.use and i.weight and i.length and i.width and i.heigth and i.first_ship_cost):
+                all_product_incomplete = True
+                break
+
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
                          'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num,
-                         'pack_num': pack_num, 'overtime_ship': overtime_ship, 'need_book': need_book},
+                         'pack_num': pack_num, 'overtime_ship': overtime_ship, 'need_book': need_book,
+                         'income_confirm': income_confirm, 'all_product_incomplete': all_product_incomplete},
                         status=status.HTTP_200_OK)
 
     # 店铺信息
@@ -813,14 +836,26 @@ class ShopViewSet(mixins.ListModelMixin,
         shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
         data = []
         for s in shops:
-            ships = Ship.objects.filter(shop=s.name).filter(
+            # 直发目标店铺的支出统计(不统计中转入仓运单)
+            total_pay = 0  # 总支出
+            ships = Ship.objects.filter(shop=s.name, send_from='CN').filter(
                 Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
                 sent_time__date__gte=start_date, sent_time__date__lte=end_date)
-            total_pay = 0  # 总支出
+
             for i in ships:
                 total_pay += i.shipping_fee
                 total_pay += i.extra_fee
                 total_pay += i.products_cost
+            # 中转运单的支出统计
+            ships = Ship.objects.filter(target='TRANSIT').filter(
+                Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
+                sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+            for i in ships:
+                sd = ShipDetail.objects.filter(ship=i)
+                for item in sd:
+                    # 统计中转运单中该店铺产品部分
+                    if item.target_FBM == s.name:
+                        total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
 
             finance = Finance.objects.filter(shop=s, f_type='EXC').filter(exc_date__gte=start_date,
                                                                           exc_date__lte=end_date)
@@ -1186,14 +1221,15 @@ class ShipViewSet(mixins.ListModelMixin,
         note = request.data['note']
         ship_detail = request.data['ship_detail']
 
-        # 检查店铺额度
-        products_cost = 0  # 总货品成本
-        for i in ship_detail:
-            product = MLProduct.objects.filter(sku=i['sku']).first()
-            products_cost += product.unit_cost * i['qty']
-        used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
-        if (products_cost + used_quota) > shop_obj.quota:
-            return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        # 检查店铺额度(仅检查直发运单额度)
+        if target == 'FBM':
+            products_cost = 0  # 总货品成本
+            for i in ship_detail:
+                product = MLProduct.objects.filter(sku=i['sku']).first()
+                products_cost += product.unit_cost * i['qty']
+            used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
+            if (products_cost + used_quota) > shop_obj.quota:
+                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
         batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
         if end_date:
@@ -1205,6 +1241,7 @@ class ShipViewSet(mixins.ListModelMixin,
             ship_date = None
         ship = Ship(
             s_status='PREPARING',
+            send_from='CN',
             batch=batch,
             shop=shop,
             target=target,
@@ -3502,9 +3539,9 @@ class UPCViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('is_used', 'user', 'use_time')  # 配置过滤字段
     filterset_fields = {
-    'use_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
-    'is_used': ['exact'],
-    'user': ['exact'],
+        'use_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'is_used': ['exact'],
+        'user': ['exact'],
     }
     search_fields = ('number',)  # 配置搜索字段
     ordering_fields = ('create_time', 'use_time')  # 配置排序字段

@@ -156,6 +156,17 @@ class MLProductSerializer(serializers.ModelSerializer):
     """
     mercado产品库
     """
+    is_incomplete = serializers.SerializerMethodField()  # 是否不完整
+
+    def get_is_incomplete(self, obj):
+        status = False
+        if not (obj.site and obj.item_id and obj.unit_cost and obj.image and obj.shop):
+            status = True
+        if not (obj.custom_code and obj.cn_name and obj.en_name and obj.brand and obj.declared_value and obj.cn_material and obj.en_material):
+            status = True
+        if not (obj.use and obj.weight and obj.length and obj.width and obj.heigth and obj.first_ship_cost):
+            status = True
+        return status
 
     class Meta:
         model = MLProduct
@@ -164,7 +175,7 @@ class MLProductSerializer(serializers.ModelSerializer):
                   'unit_cost',
                   'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
-                  'buy_url4', 'buy_url5', 'user_id')
+                  'buy_url4', 'buy_url5', 'user_id', 'is_incomplete')
 
 
 class ShopSerializer(serializers.ModelSerializer):

@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_init, post_delete
 from django.dispatch import receiver
 import inspect
 
-from mercado.models import MLProduct, MLOperateLog, Packing, Ship, ShipDetail
+from mercado.models import MLProduct, MLOperateLog, Packing, Ship, ShipDetail, PurchaseManage
 
 
 # 产品数据保存后，如果不是新建数据，将新旧数据拿出来对比
@@ -22,6 +22,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             value = '名称: %s ===>> %s' % (instance.__original_p_name, instance.p_name)
             create_log(instance.id, value, request.user)
             update_ship_product(instance.sku, 'p_name', instance.p_name, request.user)  # 更新未发货运单的产品参数
+            update_purchase_product(instance.sku, 'p_name', instance.p_name)  # 更新采购管理的产品参数
         if instance.__original_label_code != instance.label_code:
             value = 'FBM条码: %s ===>> %s' % (instance.__original_label_code, instance.label_code)
             create_log(instance.id, value, request.user)
@@ -85,6 +86,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             value = '成本价: %s ===>> %s' % (instance.__original_unit_cost, instance.unit_cost)
             create_log(instance.id, value, request.user)
             update_ship_product(instance.sku, 'unit_cost', instance.unit_cost, request.user)  # 更新未发货运单的产品参数
+            update_purchase_product(instance.sku, 'unit_cost', instance.unit_cost)  # 更新采购管理的产品参数
         if instance.__original_first_ship_cost != instance.first_ship_cost:
             value = '预估头程运费: %s ===>> %s' % (instance.__original_first_ship_cost, instance.first_ship_cost)
             create_log(instance.id, value, request.user)
@@ -120,6 +122,7 @@ def product_edit_signal(sender, instance, created, **kwargs):
             value = '包材: %s ===>> %s' % (old_name, new_name)
             create_log(instance.id, value, request.user)
             update_ship_product(instance.sku, 'packing', instance.packing_id, request.user)  # 更新未发货运单的产品参数
+            update_purchase_product(instance.sku, 'packing', instance.packing_id)  # 更新采购管理的产品参数
         if instance.__original_is_checked != instance.is_checked:
             value = '是否核对: %s ===>> %s' % (instance.__original_is_checked, instance.is_checked)
             create_log(instance.id, value, request.user)
@@ -234,6 +237,25 @@ def update_ship_product(sku, field, value, user):
             i.save()
             log_value = '同步更新%s的包材' % sku
             create_ship_log(i.ship.id, log_value, user)
+
+
+# 更新采购管理的产品参数
+def update_purchase_product(sku, field, value):
+    queryset = PurchaseManage.objects.filter(sku=sku).exclude(p_status='USED')  # 不包含已出库的产品
+    for i in queryset:
+        if field == 'p_name':
+            i.p_name = value
+            i.save()
+            continue
+        if field == 'unit_cost':
+            i.unit_cost = value
+            i.save()
+            continue
+        if field == 'packing':
+            p = Packing.objects.filter(id=value).first()
+            i.packing_name = p.name
+            i.packing_size = p.size
+            i.save()
 
 
 def create_ship_log(pid, value, user):

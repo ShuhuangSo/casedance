@@ -925,22 +925,23 @@ class ShopViewSet(mixins.ListModelMixin,
                 product_cost = 0  # 货品成本
                 shipping_fee = 0  # 运费（含杂费）
                 sd = ShipDetail.objects.filter(ship=i)
-                for item in sd:
-                    # 统计中转运单中该店铺产品部分
-                    if item.target_FBM == shop.name:
-                        product_cost += item.unit_cost * item.qty
-                        shipping_fee += item.avg_ship_fee * item.qty
-                        total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
-                        f_sheet['A' + str(num)] = i.sent_time.strftime('%Y-%m-%d')
-                        f_sheet['B' + str(num)] = i.batch
-                        f_sheet['C' + str(num)] = shop.name
-                        f_sheet['D' + str(num)] = '中转'
-                        f_sheet['E' + str(num)] = Decimal(product_cost).quantize(Decimal("0.00"))
-                        if shipping_fee:
-                            f_sheet['F' + str(num)] = Decimal(shipping_fee).quantize(Decimal("0.00"))
-                        if product_cost + shipping_fee:
-                            f_sheet['H' + str(num)] = Decimal(product_cost + shipping_fee).quantize(Decimal("0.00"))
-                        num += 1
+                if sd:
+                    for item in sd:
+                        # 统计中转运单中该店铺产品部分
+                        if item.target_FBM == shop.name:
+                            product_cost += item.unit_cost * item.qty
+                            shipping_fee += item.avg_ship_fee * item.qty
+                            total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
+                    f_sheet['A' + str(num)] = i.sent_time.strftime('%Y-%m-%d')
+                    f_sheet['B' + str(num)] = i.batch
+                    f_sheet['C' + str(num)] = shop.name
+                    f_sheet['D' + str(num)] = '中转'
+                    f_sheet['E' + str(num)] = Decimal(product_cost).quantize(Decimal("0.00"))
+                    if shipping_fee:
+                        f_sheet['F' + str(num)] = Decimal(shipping_fee).quantize(Decimal("0.00"))
+                    if product_cost + shipping_fee:
+                        f_sheet['H' + str(num)] = Decimal(product_cost + shipping_fee).quantize(Decimal("0.00"))
+                    num += 1
 
         f_sheet = wb.create_sheet('收入明细')
         f_sheet['A1'] = '结汇日期'

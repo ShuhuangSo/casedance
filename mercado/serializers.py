@@ -325,7 +325,8 @@ class ShipAttachmentSerializer(serializers.ModelSerializer):
     link = serializers.SerializerMethodField()
 
     def get_link(self, obj):
-        url = BASE_URL + MEDIA_URL + 'ml_ships/' + obj.ship.envio_number + '/' + obj.name
+        path = '{batch}_{id}/{name}'.format(batch=obj.ship.batch, id=obj.ship.id, name=obj.name)
+        url = BASE_URL + MEDIA_URL + 'ml_ships/' + path
         return url
 
     class Meta:

@@ -768,7 +768,8 @@ class ShopViewSet(mixins.ListModelMixin,
             ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
             need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
 
-            income_confirm = Finance.objects.filter(f_type='WD', is_received=False, shop__user_id=request.user.id).count()
+            income_confirm = Finance.objects.filter(f_type='WD', is_received=False,
+                                                    shop__user_id=request.user.id).count()
         for i in ships:
             if i.book_date:
                 ad = str(i.book_date)
@@ -790,7 +791,8 @@ class ShopViewSet(mixins.ListModelMixin,
             if not (i.site and i.item_id and i.unit_cost and i.image and i.shop):
                 all_product_incomplete = True
                 break
-            if not (i.custom_code and i.cn_name and i.en_name and i.brand and i.declared_value and i.cn_material and i.en_material):
+            if not (
+                    i.custom_code and i.cn_name and i.en_name and i.brand and i.declared_value and i.cn_material and i.en_material):
                 all_product_incomplete = True
                 break
             if not (i.use and i.weight and i.length and i.width and i.heigth and i.first_ship_cost):
@@ -863,10 +865,120 @@ class ShopViewSet(mixins.ListModelMixin,
             for i in finance:
                 total_rec += i.income_rmb
             data.append(
-                {'shop_name': s.name, 'total_pay': total_pay, 'total_rec': total_rec, 'profit': total_rec - total_pay})
+                {'shop_id': s.id, 'shop_name': s.name, 'total_pay': total_pay, 'total_rec': total_rec,
+                 'profit': total_rec - total_pay})
 
         return Response(
             {'data': data},
+            status=status.HTTP_200_OK)
+
+    # 导出店铺收支明细
+    @action(methods=['post'], detail=False, url_path='export_shop_finance')
+    def export_shop_finance(self, request):
+        import openpyxl
+        from decimal import Decimal
+        start_date = request.data['start_date']
+        end_date = request.data['end_date']
+        shop_id = request.data['shop_id']
+        shop = Shop.objects.filter(id=shop_id).first()
+
+        wb = openpyxl.Workbook()
+
+        total_pay = 0  # 总支出
+
+        f_sheet = wb.create_sheet('支出明细')
+        f_sheet['A1'] = '发货日期'
+        f_sheet['B1'] = '批次号'
+        f_sheet['C1'] = '目标店铺'
+        f_sheet['D1'] = '类型'
+        f_sheet['E1'] = '货品成本'
+        f_sheet['F1'] = '头程运费'
+        f_sheet['G1'] = '杂费'
+        f_sheet['H1'] = '小计'
+
+        ships = Ship.objects.filter(send_from='CN').filter(
+            Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
+            sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+        num = 2
+        for i in ships:
+            # 直发目标店铺的支出统计(不含中转入仓运单)
+            if i.shop == shop.name:
+                total_pay += i.shipping_fee
+                total_pay += i.extra_fee
+                total_pay += i.products_cost
+                subtotal = i.shipping_fee + i.extra_fee + i.products_cost
+
+                f_sheet['A' + str(num)] = i.sent_time.strftime('%Y-%m-%d')
+                f_sheet['B' + str(num)] = i.batch
+                f_sheet['C' + str(num)] = shop.name
+                f_sheet['D' + str(num)] = 'FBM直发'
+                f_sheet['E' + str(num)] = Decimal(i.products_cost).quantize(Decimal("0.00"))
+                if i.shipping_fee:
+                    f_sheet['F' + str(num)] = Decimal(i.shipping_fee).quantize(Decimal("0.00"))
+                if i.extra_fee:
+                    f_sheet['G' + str(num)] = Decimal(i.extra_fee).quantize(Decimal("0.00"))
+                f_sheet['H' + str(num)] = subtotal
+                num += 1
+
+            # 中转运单的支出统计
+            if i.target == 'TRANSIT':
+                product_cost = 0  # 货品成本
+                shipping_fee = 0  # 运费（含杂费）
+                sd = ShipDetail.objects.filter(ship=i)
+                for item in sd:
+                    # 统计中转运单中该店铺产品部分
+                    if item.target_FBM == shop.name:
+                        product_cost += item.unit_cost * item.qty
+                        shipping_fee += item.avg_ship_fee * item.qty
+                        total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
+                        f_sheet['A' + str(num)] = i.sent_time.strftime('%Y-%m-%d')
+                        f_sheet['B' + str(num)] = i.batch
+                        f_sheet['C' + str(num)] = shop.name
+                        f_sheet['D' + str(num)] = '中转'
+                        f_sheet['E' + str(num)] = Decimal(product_cost).quantize(Decimal("0.00"))
+                        if shipping_fee:
+                            f_sheet['F' + str(num)] = Decimal(shipping_fee).quantize(Decimal("0.00"))
+                        if product_cost + shipping_fee:
+                            f_sheet['H' + str(num)] = Decimal(product_cost + shipping_fee).quantize(Decimal("0.00"))
+                        num += 1
+
+        f_sheet = wb.create_sheet('收入明细')
+        f_sheet['A1'] = '结汇日期'
+        f_sheet['B1'] = '店铺名称'
+        f_sheet['C1'] = '外汇金额({currency})'.format(currency=shop.currency)
+        f_sheet['D1'] = '到账金额(RMB)'
+        finance = Finance.objects.filter(shop=shop, f_type='EXC').filter(exc_date__gte=start_date,
+                                                                      exc_date__lte=end_date)
+        total_rec = 0  # 总收入
+        num = 2
+        for i in finance:
+            total_rec += i.income_rmb
+
+            f_sheet['A' + str(num)] = i.exc_date
+            f_sheet['B' + str(num)] = shop.name
+            f_sheet['C' + str(num)] = Decimal(i.exchange).quantize(Decimal("0.00"))
+            f_sheet['D' + str(num)] = Decimal(i.income_rmb).quantize(Decimal("0.00"))
+            num += 1
+
+        f_sheet = wb.create_sheet('汇总')
+        f_sheet['A1'] = '店铺名称'
+        f_sheet['B1'] = '负责人'
+        f_sheet['C1'] = '统计日期'
+        f_sheet['D1'] = '总支出'
+        f_sheet['E1'] = '总收入'
+        f_sheet['F1'] = '盈亏'
+        f_sheet['A2'] = shop.name
+        f_sheet['B2'] = shop.user.first_name if shop.user else ''
+        f_sheet['C2'] = start_date + '至' + end_date
+        f_sheet['D2'] = Decimal(total_pay).quantize(Decimal("0.00"))
+        f_sheet['E2'] = Decimal(total_rec).quantize(Decimal("0.00"))
+        f_sheet['F2'] = Decimal(total_rec - total_pay).quantize(Decimal("0.00"))
+
+        del wb['Sheet']
+        wb.save('media/export/shop_finance/收支明细报表-' + shop.name + '.xlsx')
+        url = BASE_URL + '/media/export/shop_finance/收支明细报表-' + shop.name + '.xlsx'
+        return Response(
+            {'url': url},
             status=status.HTTP_200_OK)
 
 
@@ -1229,7 +1341,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 products_cost += product.unit_cost * i['qty']
             used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
             if (products_cost + used_quota) > shop_obj.quota:
-                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
         if end_date:
@@ -2305,7 +2418,7 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         a_type = data['a_type']
         ship = Ship.objects.filter(id=ship_id).first()
 
-        head_path = path + ship.envio_number
+        head_path = '{path}{batch}_{id}'.format(path=path, batch=ship.batch, id=ship.id)
         # 判断是否存在文件夹,如果没有就创建文件路径
         if not os.path.exists(head_path):
             os.makedirs(head_path)
@@ -2358,7 +2471,8 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
 
-        path = 'media/ml_ships/' + sa.ship.envio_number + '/' + sa.name
+        path = 'media/ml_ships/{batch}_{id}/{name}'.format(batch=sa.ship.batch, id=sa.ship.id, name=sa.name)
+        # path = 'media/ml_ships/' + sa.ship.envio_number + '/' + sa.name
         os.remove(path)
         sa.delete()
 

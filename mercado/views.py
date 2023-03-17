@@ -1579,8 +1579,13 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_detail = request.data['ship_shipDetail']
         ship_action = request.data['action']
 
-        # 运单发货前检查库存是否足够
+        # 运单发货前检查
         if ship_action == 'SHIPPED':
+            # 检查是否重复发货
+            is_exist = Ship.objects.filter(id=ship_id, s_status='PREPARING').count()
+            if not is_exist:
+                return Response({'msg': '重复发货!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            # 检查库存是否足够
             for i in ship_detail:
                 pm = PurchaseManage.objects.filter(p_status='PACKED', sku=i['sku']).first()
                 if pm:
@@ -3383,6 +3388,12 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         data = request.data
         products = data['products']
         is_change = data['is_change']
+        # 检查是否有产品重复下单采购
+        for i in products:
+            is_exist = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').count()
+            if is_exist:
+                return Response({'msg': '产品重复下单采购，请刷新页面检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
         for i in products:
             purchase = PurchaseManage.objects.filter(id=i['id']).first()
             purchase.p_status = 'PURCHASED'
@@ -3393,6 +3404,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 purchase.unit_cost = i['unit_cost']
             purchase.save()
 
+            # 是否需要更新产品价格
             if is_change:
                 p = MLProduct.objects.filter(sku=purchase.sku).first()
                 if p.unit_cost == purchase.unit_cost:
@@ -3408,12 +3420,21 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.desc = '下单采购 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['buy_qty'])
             log.user = request.user
             log.save()
-        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 确认收货
     @action(methods=['post'], detail=False, url_path='rec_buy')
     def rec_buy(self, request):
         data = request.data
+
+        # 检查是否重复操作
+        for i in data:
+            pm = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').first()
+            if not pm:
+                return Response({'msg': '产品重复收货，请刷新页面检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            if i['rec_qty'] > pm.buy_qty:
+                return Response({'msg': '产品收货数量错误，请刷新页面检查！', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         for i in data:
             buy_pm = PurchaseManage.objects.filter(id=i['id']).first()
@@ -3458,12 +3479,22 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 buy_pm.rec_qty = i['buy_qty'] - i['rec_qty']
                 buy_pm.save()
 
-        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 确认打包
     @action(methods=['post'], detail=False, url_path='pack_buy')
     def pack_buy(self, request):
         data = request.data
+
+        # 检查是否重复操作
+        for i in data:
+            pm = PurchaseManage.objects.filter(id=i['id'], p_status='RECEIVED').first()
+            if not pm:
+                return Response({'msg': '产品重复打包，请刷新页面检查！', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
+            if i['pack_qty'] > pm.rec_qty:
+                return Response({'msg': '产品打包数量错误，请刷新页面检查！', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         for i in data:
             rec_pm = PurchaseManage.objects.filter(id=i['id']).first()
@@ -3512,7 +3543,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.user = request.user
             log.save()
 
-        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 确认质检
     @action(methods=['post'], detail=False, url_path='product_qc')

@@ -779,7 +779,7 @@ class ShopViewSet(mixins.ListModelMixin,
                     overtime_ship += 1
 
         # 采购管理
-        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY').count()
+        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY', buy_qty__gt=0).count()
         purchased_num = PurchaseManage.objects.filter(p_status='PURCHASED').count()
         rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
@@ -2702,7 +2702,7 @@ class TransStockViewSet(mixins.ListModelMixin,
     filter_fields = ('listing_shop', 'shop', 'is_out', 'user_id')  # 配置过滤字段
     search_fields = (
         'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number',
-        'carrier_box_number')  # 配置搜索字段
+        'carrier_box_number', 'listing_shop')  # 配置搜索字段
     ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days', 'out_time')  # 配置排序字段
 
     # fbm发仓
@@ -2719,6 +2719,7 @@ class TransStockViewSet(mixins.ListModelMixin,
             shop=shop,
             target='FBM',
             batch=batch,
+            logi_fee_clear=True,
             sent_time=datetime.now()
         )
         ship.save()

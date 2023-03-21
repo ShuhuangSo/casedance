@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
-    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC
+    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings
 
 
 @admin.register(Listing)
@@ -61,7 +61,7 @@ class ShopAdmin(admin.ModelAdmin):
 @admin.register(ShopStock)
 class ShopStockAdmin(admin.ModelAdmin):
     list_display = ['sku', 'p_name', 'qty']
-    list_filter = ['p_status']
+    list_filter = ['p_status', 'shop']
     search_fields = ['sku', 'p_name']
 
 
@@ -149,3 +149,16 @@ class UPCAdmin(admin.ModelAdmin):
     list_display = ['number', 'is_used', 'create_time']
     list_filter = ['is_used']
     search_fields = ['number']
+
+
+@admin.register(RefillRecommend)
+class RefillRecommendAdmin(admin.ModelAdmin):
+    list_display = ['sku', 'min_send', 'full_send', 'create_time']
+    list_filter = ['is_new']
+    search_fields = ['sku']
+
+
+@admin.register(RefillSettings)
+class RefillSettingsAdmin(admin.ModelAdmin):
+    list_display = ['fly_days', 'fly_batch_period', 'is_include_trans']
+    list_filter = ['is_include_trans']

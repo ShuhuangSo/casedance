@@ -442,6 +442,14 @@ def calc_product_sales():
             continue
         shop_stocks = ShopStock.objects.filter(shop=s, is_active=True)
         for st in shop_stocks:
+            # 7天销量
+            day7 = datetime.now().date() - timedelta(days=7)
+            sum_day15 = MLOrder.objects.filter(shop=s,
+                                               sku=st.sku,
+                                               item_id=st.item_id,
+                                               order_time_bj__gte=day7).aggregate(Sum('qty'))
+            day7_sold = sum_day15['qty__sum']
+
             # 15天销量
             day15 = datetime.now().date() - timedelta(days=15)
             sum_day15 = MLOrder.objects.filter(shop=s,
@@ -497,6 +505,7 @@ def calc_product_sales():
                 refund_rate = 0
 
             st.day15_sold = day15_sold if day15_sold else 0
+            st.day7_sold = day7_sold if day7_sold else 0
             st.day30_sold = day30_sold if day30_sold else 0
             st.total_sold = total_sold if total_sold else 0
             st.total_profit = total_profit if sum_profit else 0

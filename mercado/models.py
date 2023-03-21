@@ -362,6 +362,7 @@ class ShopStock(models.Model):
     qty = models.IntegerField(default=0, verbose_name='库存数量', help_text='库存数量')
     onway_qty = models.IntegerField(default=0, verbose_name='在途数量', help_text='在途数量')
     trans_qty = models.IntegerField(default=0, verbose_name='中转仓数量', help_text='中转仓数量')
+    day7_sold = models.IntegerField(default=0, verbose_name='7天销量', help_text='7天销量')
     day15_sold = models.IntegerField(default=0, verbose_name='15天销量', help_text='15天销量')
     day30_sold = models.IntegerField(default=0, verbose_name='30天销量', help_text='30天销量')
     total_sold = models.IntegerField(default=0, verbose_name='累计销量', help_text='累计销量')
@@ -873,3 +874,60 @@ class UPC(models.Model):
 
     def __str__(self):
         return self.number
+
+
+class RefillRecommend(models.Model):
+    """
+    补货推荐
+    """
+    shop = models.ForeignKey(Shop, null=True, related_name='shop_refill',
+                             on_delete=models.CASCADE,
+                             verbose_name='店铺', help_text='店铺')
+    sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
+    is_new = models.BooleanField(default=False, verbose_name='是否新品', help_text='是否新品')
+    first_list_days = models.IntegerField(default=0, verbose_name='首次上架天数', help_text='首次上架天数')
+    trend = models.CharField(max_length=10, null=True, blank=True, verbose_name='销量趋势', help_text='销量趋势')
+    all_sold = models.IntegerField(default=0, verbose_name='总销量', help_text='总销量')
+    days30_sold = models.IntegerField(default=0, verbose_name='30天销量', help_text='30天销量')
+    days15_sold = models.IntegerField(default=0, verbose_name='15天销量', help_text='15天销量')
+    days7_sold = models.IntegerField(default=0, verbose_name='7天销量', help_text='7天销量')
+    fbm_qty = models.IntegerField(default=0, verbose_name='fbm库存数量', help_text='fbm库存数量')
+    onway_qty = models.IntegerField(default=0, verbose_name='在途数量', help_text='在途数量')
+    trans_qty = models.IntegerField(default=0, verbose_name='中转仓数量', help_text='中转仓数量')
+    trans_onway_qty = models.IntegerField(default=0, verbose_name='中转在途数量', help_text='中转在途数量')
+    prepare_qty = models.IntegerField(default=0, verbose_name='备货中数量', help_text='备货中数量')
+    own_qty = models.IntegerField(default=0, verbose_name='现货数量', help_text='现货数量')
+    avg_sale = models.FloatField(default=0.0, verbose_name='日均销量', help_text='日均销量')
+    keep_days = models.IntegerField(default=0, verbose_name='库存维持天数', help_text='库存维持天数')
+    min_send = models.IntegerField(default=0, verbose_name='最低发货数量', help_text='最低发货数量')
+    full_send = models.IntegerField(default=0, verbose_name='完整周期发货数量', help_text='完整周期发货数量')
+    create_time = models.DateTimeField(null=True, blank=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '补货推荐'
+        verbose_name_plural = verbose_name
+        ordering = ['item_id']
+
+    def __str__(self):
+        return self.sku
+
+
+class RefillSettings(models.Model):
+    """
+    补货推荐设置
+    """
+    fly_days = models.IntegerField(default=0, verbose_name='空运物流及上架时间', help_text='空运物流及上架时间')
+    sea_days = models.IntegerField(default=0, verbose_name='海运物流及上架时间', help_text='海运物流及上架时间')
+    fly_batch_period = models.IntegerField(default=0, verbose_name='空运批次周期', help_text='空运批次周期')
+    sea_batch_period = models.IntegerField(default=0, verbose_name='海运批次周期', help_text='海运批次周期')
+    is_include_trans = models.BooleanField(default=True, verbose_name='是否包含中转仓数量', help_text='是否包含中转仓数量')
+
+    class Meta:
+        verbose_name = '补货推荐设置'
+        verbose_name_plural = verbose_name
+        ordering = ['fly_days']
+
+    def __str__(self):
+        return str(self.fly_days)

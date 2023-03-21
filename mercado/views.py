@@ -19,12 +19,14 @@ from django.db.models import Q
 from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
-    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC
+    MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
+    RefillRecommend, RefillSettings
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
-    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer
+    ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
+    RefillRecommendSerializer, RefillSettingsSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -81,11 +83,10 @@ class ListingViewSet(mixins.ListModelMixin,
         #
         # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
 
-        queryset = Ship.objects.all()
-        for i in queryset:
-            if not i.send_from:
-                i.send_from = 'CN'
-                i.save()
+        # tasks.calc_product_sales()  # 计算销量
+        dd = datetime.strptime('2023-03-22', '%Y-%m-%d')
+        delta = dd - datetime.now()
+        print(delta.days)
         return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -949,7 +950,7 @@ class ShopViewSet(mixins.ListModelMixin,
         f_sheet['C1'] = '外汇金额({currency})'.format(currency=shop.currency)
         f_sheet['D1'] = '到账金额(RMB)'
         finance = Finance.objects.filter(shop=shop, f_type='EXC').filter(exc_date__gte=start_date,
-                                                                      exc_date__lte=end_date)
+                                                                         exc_date__lte=end_date)
         total_rec = 0  # 总收入
         num = 2
         for i in finance:
@@ -3393,7 +3394,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         for i in products:
             is_exist = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').count()
             if is_exist:
-                return Response({'msg': '产品重复下单采购，请刷新页面检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({'msg': '产品重复下单采购，请刷新页面检查！', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         for i in products:
             purchase = PurchaseManage.objects.filter(id=i['id']).first()
@@ -3432,7 +3434,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         for i in data:
             pm = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').first()
             if not pm:
-                return Response({'msg': '产品重复收货，请刷新页面检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({'msg': '产品重复收货，请刷新页面检查！', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
             if i['rec_qty'] > pm.buy_qty:
                 return Response({'msg': '产品收货数量错误，请刷新页面检查！', 'status': 'error'},
                                 status=status.HTTP_202_ACCEPTED)
@@ -3715,7 +3718,7 @@ class UPCViewSet(mixins.ListModelMixin,
 
         return Response({'msg': msg}, status=status.HTTP_200_OK)
 
-    # upc号码上传
+    # 申请upc号码
     @action(methods=['post'], detail=False, url_path='request_upc')
     def request_upc(self, request):
         qty = request.data['qty']
@@ -3729,3 +3732,208 @@ class UPCViewSet(mixins.ListModelMixin,
             i.use_time = datetime.now()
             i.save()
         return Response({'msg': '申请成功'}, status=status.HTTP_200_OK)
+
+
+class RefillRecommendViewSet(mixins.ListModelMixin,
+                             mixins.CreateModelMixin,
+                             mixins.UpdateModelMixin,
+                             mixins.DestroyModelMixin,
+                             mixins.RetrieveModelMixin,
+                             viewsets.GenericViewSet):
+    """
+    list:
+        补货推荐列表,分页,过滤,搜索,排序
+    create:
+        补货推荐新增
+    retrieve:
+        补货推荐详情页
+    update:
+        补货推荐修改
+    destroy:
+        补货推荐删除
+    """
+    queryset = RefillRecommend.objects.all()
+    serializer_class = RefillRecommendSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('is_new', 'shop', 'trend')  # 配置过滤字段
+    search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
+    ordering_fields = ('create_time', 'item_id', 'all_sold', 'days30_sold', 'days15_sold', 'days7_sold', 'min_send',
+                       'full_send')  # 配置排序字段
+
+    # 创建补货推荐列表
+    @action(methods=['post'], detail=False, url_path='create_refill')
+    def create_refill(self, request):
+        ship_type = request.data['ship_type']
+        end_date = request.data['end_date']
+        shop_id = request.data['shop_id']
+        shop = Shop.objects.filter(id=shop_id).first()
+
+        # 生成批次号
+        b_num = end_date.replace('-', '')[2:]
+        batch = 'P{time_str}'.format(time_str=b_num)
+
+        refill_setting = RefillSettings.objects.first()
+        if not refill_setting:
+            return Response({'msg': '补货参数未初始化!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        # 获取设置参数
+        ship_days = refill_setting.fly_days  # 截单日期到上架所需天数
+        batch_period = refill_setting.fly_batch_period  # 批次周期（发货批次间隔天数）
+        is_include_trans = refill_setting.is_include_trans
+        if ship_type == 'SEA':
+            ship_days = refill_setting.sea_days
+            batch_period = refill_setting.sea_batch_period
+
+        # 计算FBM已入仓产品
+        queryset = ShopStock.objects.filter(shop__id=shop_id)
+        add_list = []
+        for i in queryset:
+            # 停售和清仓产品不计算
+            if i.p_status == 'OFFLINE' or i.p_status == 'CLEAN':
+                continue
+            # 该批次已备货的产品不计算
+            is_exist = ShipDetail.objects.filter(ship__s_status='PREPARING', ship__batch=batch, sku=i.sku).count()
+            if is_exist:
+                continue
+
+            # 获取首次入仓的天数
+            sd = ShipDetail.objects.filter(ship__s_status='FINISHED', sku=i.sku).order_by('-create_time').first()
+            is_new = False  # 是否新品
+            first_list_days = 0  # 首次上架天数
+            avg_sale = 0  # 日均销量
+            trend = 'UP'  # 15天销量趋势
+            if sd:
+                first_list_date = str(sd.create_time.date())
+                dd = datetime.strptime(first_list_date, '%Y-%m-%d')
+                delta = datetime.now() - dd
+                is_new = True if delta.days < 15 else False
+                first_list_days = delta.days
+
+            # 入仓时间小于15天为新品，新品日均销量为7天日均，非新品为15天日均
+            if is_new:
+                avg_sale = i.day7_sold / 7
+            else:
+                avg_sale = i.day15_sold / 15
+
+            # 15天销量趋势
+            avg15 = i.day15_sold / 15
+            avg30 = i.day30_sold / 30
+            if avg15 < avg30:
+                trend = 'DOWN'
+
+            trans_qty = 0  # 中转仓数量
+            trans_onway_qty = 0  # 中转在途数量
+            all_stock = i.qty + i.onway_qty  # 总库存
+            # 如果计算包含中转仓数量
+            if is_include_trans:
+                # 中转在仓数量
+                ts = TransStock.objects.filter(sku=i.sku)
+                for t in ts:
+                    trans_qty += t.qty
+                # 中转在途数量
+                ssd = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+                for s in ssd:
+                    trans_onway_qty += s.qty
+                all_stock = i.qty + i.onway_qty + trans_qty + trans_onway_qty
+
+            # 库存维持天数,日均销量为0，默认维持天数为100天
+            keep_days = int(all_stock / avg_sale) if avg_sale else 100
+
+            dd = datetime.strptime(end_date, '%Y-%m-%d')
+            delta = dd - datetime.now()
+            current_days = delta.days + 1
+            # 多余天数 库存维持天数 - 发货入仓所需总天数（当前到截单日期 + 截单到上架）
+            remain_days = keep_days - (current_days + ship_days)
+
+            # 如果维持天数大于 从现在起到下个周期发货所需天数，说明库存充足， 无需补货
+            if remain_days > current_days + ship_days + batch_period:
+                continue
+
+            min_send = 0  # 最低发货数量
+            full_send = 0  # 完整周期发货数量
+            if remain_days > 0:
+                # 最低发货数量（维持不断货） 如多余天数小于等于0，则按批次周期天数计算
+                min_send = int(avg_sale * (batch_period - remain_days))
+                # 如果维持天数大于发货批次周期，则本批次可以不用补货
+                if remain_days > batch_period:
+                    min_send = 0
+                # 完整周期发货数量（维持整个发货周期不断货） 如多余天数小于等于0，则按完整周期天数计算
+                full_send = int(avg_sale * (ship_days - remain_days))
+                # 如果维持天数大于发货批次周期，则本批次可以不用补货
+                if remain_days > ship_days + batch_period:
+                    full_send = 0
+            else:
+                min_send = int(avg_sale * batch_period)
+                full_send = int(avg_sale * ship_days)
+
+            # 备货中数量
+            prepare_qty = 0
+            sd = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+            for s in sd:
+                prepare_qty += s.qty
+            own_qty = 0
+            # 已采购现货数量
+            pm = PurchaseManage.objects.filter(sku=i.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+            for p in pm:
+                if p.p_status == 'RECEIVED':
+                    own_qty += i.rec_qty
+                if p.p_status == 'PACKED':
+                    own_qty += i.pack_qty
+            add_list.append(RefillRecommend(
+                shop=shop,
+                sku=i.sku,
+                p_name=i.p_name,
+                item_id=i.item_id,
+                is_new=is_new,
+                first_list_days=first_list_days,
+                trend=trend,
+                all_sold=i.total_sold,
+                days30_sold=i.day30_sold,
+                days15_sold=i.day15_sold,
+                days7_sold=i.day7_sold,
+                fbm_qty=i.qty,
+                onway_qty=i.onway_qty,
+                trans_qty=trans_qty,
+                trans_onway_qty=trans_onway_qty,
+                prepare_qty=prepare_qty,
+                own_qty=own_qty,
+                avg_sale=avg_sale,
+                keep_days=keep_days,
+                min_send=min_send,
+                full_send=full_send,
+            ))
+        if len(add_list) > 0:
+            RefillRecommend.objects.bulk_create(add_list)
+        msg = '成功推荐{n}个产品'.format(n=len(add_list))
+
+        return Response({'msg': msg}, status=status.HTTP_200_OK)
+
+
+class RefillSettingsViewSet(mixins.ListModelMixin,
+                            mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                            mixins.RetrieveModelMixin,
+                            viewsets.GenericViewSet):
+    """
+    list:
+        补货推荐设置列表,分页,过滤,搜索,排序
+    create:
+        补货推荐设置新增
+    retrieve:
+        补货推荐设置详情页
+    update:
+        补货推荐设置修改
+    destroy:
+        补货推荐设置删除
+    """
+    queryset = RefillSettings.objects.all()
+    serializer_class = RefillSettingsSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('is_include_trans',)  # 配置过滤字段
+    search_fields = ('fly_days',)  # 配置搜索字段
+    ordering_fields = ('fly_days',)  # 配置排序字段

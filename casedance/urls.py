@@ -27,7 +27,7 @@ from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
     MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
     MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
-    UPCViewSet
+    UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -189,6 +189,10 @@ router.register('ml_shop_reports', ShopReportViewSet, basename='ml_shop_reports'
 router.register('ml_purchase', PurchaseManageViewSet, basename='ml_purchase')
 # UPC号码池列表,
 router.register('upc_manage', UPCViewSet, basename='upc_manage')
+# 补货推荐设置列表,
+router.register('ml_refill_settings', RefillSettingsViewSet, basename='ml_refill_settings')
+# 补货推荐列表,
+router.register('ml_refill', RefillRecommendViewSet, basename='ml_refill')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

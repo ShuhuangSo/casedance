@@ -444,11 +444,11 @@ def calc_product_sales():
         for st in shop_stocks:
             # 7天销量
             day7 = datetime.now().date() - timedelta(days=7)
-            sum_day15 = MLOrder.objects.filter(shop=s,
-                                               sku=st.sku,
-                                               item_id=st.item_id,
-                                               order_time_bj__gte=day7).aggregate(Sum('qty'))
-            day7_sold = sum_day15['qty__sum']
+            sum_day7 = MLOrder.objects.filter(shop=s,
+                                              sku=st.sku,
+                                              item_id=st.item_id,
+                                              order_time_bj__gte=day7).aggregate(Sum('qty'))
+            day7_sold = sum_day7['qty__sum']
 
             # 15天销量
             day15 = datetime.now().date() - timedelta(days=15)
@@ -592,7 +592,8 @@ def get_shop_quota(shop_id):
         trans_amount += (i.unit_cost + i.first_ship_cost) * i.qty
 
     # 在途运单统计,含备货中
-    ships = Ship.objects.filter(shop=shop.name).filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='PREPARING'))
+    ships = Ship.objects.filter(shop=shop.name).filter(
+        Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='PREPARING'))
     onway_amount = 0
     for i in ships:
         onway_amount += i.shipping_fee

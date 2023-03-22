@@ -83,7 +83,7 @@ class ListingViewSet(mixins.ListModelMixin,
         #
         # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
 
-        # tasks.calc_product_sales()  # 计算销量
+        tasks.calc_product_sales()  # 计算销量
         dd = datetime.strptime('2023-03-22', '%Y-%m-%d')
         delta = dd - datetime.now()
         print(delta.days)
@@ -3770,6 +3770,9 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
         shop_id = request.data['shop_id']
         shop = Shop.objects.filter(id=shop_id).first()
 
+        # 删除旧数据
+        RefillRecommend.objects.filter(shop=shop).delete()
+
         # 生成批次号
         b_num = end_date.replace('-', '')[2:]
         batch = 'P{time_str}'.format(time_str=b_num)
@@ -3825,17 +3828,17 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             trans_qty = 0  # 中转仓数量
             trans_onway_qty = 0  # 中转在途数量
             all_stock = i.qty + i.onway_qty  # 总库存
+            # 中转在仓数量
+            ts = TransStock.objects.filter(sku=i.sku, is_out=False)
+            for t in ts:
+                trans_qty += t.qty
+            # 中转在途数量
+            ssd = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            for s in ssd:
+                trans_onway_qty += s.qty
             # 如果计算包含中转仓数量
             if is_include_trans:
-                # 中转在仓数量
-                ts = TransStock.objects.filter(sku=i.sku)
-                for t in ts:
-                    trans_qty += t.qty
-                # 中转在途数量
-                ssd = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
-                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
-                for s in ssd:
-                    trans_onway_qty += s.qty
                 all_stock = i.qty + i.onway_qty + trans_qty + trans_onway_qty
 
             # 库存维持天数,日均销量为0，默认维持天数为100天
@@ -3844,29 +3847,31 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             dd = datetime.strptime(end_date, '%Y-%m-%d')
             delta = dd - datetime.now()
             current_days = delta.days + 1
-            # 多余天数 库存维持天数 - 发货入仓所需总天数（当前到截单日期 + 截单到上架）
-            remain_days = keep_days - (current_days + ship_days)
 
             # 如果维持天数大于 从现在起到下个周期发货所需天数，说明库存充足， 无需补货
-            if remain_days > current_days + ship_days + batch_period:
+            if keep_days > current_days + ship_days + batch_period and i.p_status != 'HOT_SALE':
                 continue
 
             min_send = 0  # 最低发货数量
             full_send = 0  # 完整周期发货数量
-            if remain_days > 0:
-                # 最低发货数量（维持不断货） 如多余天数小于等于0，则按批次周期天数计算
-                min_send = int(avg_sale * (batch_period - remain_days))
-                # 如果维持天数大于发货批次周期，则本批次可以不用补货
-                if remain_days > batch_period:
-                    min_send = 0
-                # 完整周期发货数量（维持整个发货周期不断货） 如多余天数小于等于0，则按完整周期天数计算
-                full_send = int(avg_sale * (ship_days - remain_days))
-                # 如果维持天数大于发货批次周期，则本批次可以不用补货
-                if remain_days > ship_days + batch_period:
-                    full_send = 0
-            else:
+            advice = ''
+
+            # 维持天数小于货运时间 + 当前时间,将会断货
+            if keep_days < current_days + ship_days:
+                # 补货天数：周期 + 货运时间
+                min_send = int(avg_sale * (batch_period + ship_days))
+                full_send = int(avg_sale * (current_days + batch_period + ship_days))
+                advice = '即将缺货'
+            # 维持天数大于货运时间 + 当前时间,不断货
+            elif keep_days < current_days + ship_days + batch_period:
                 min_send = int(avg_sale * batch_period)
                 full_send = int(avg_sale * ship_days)
+                advice = '可以下批次补货'
+            # 维持天数大于从现在起到下个周期发货所需天数,库存充足
+            else:
+                min_send = 0
+                full_send = 0
+                advice = '库存充足'
 
             # 备货中数量
             prepare_qty = 0
@@ -3878,13 +3883,14 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             pm = PurchaseManage.objects.filter(sku=i.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
             for p in pm:
                 if p.p_status == 'RECEIVED':
-                    own_qty += i.rec_qty
+                    own_qty += p.rec_qty
                 if p.p_status == 'PACKED':
-                    own_qty += i.pack_qty
+                    own_qty += p.pack_qty
             add_list.append(RefillRecommend(
                 shop=shop,
                 sku=i.sku,
                 p_name=i.p_name,
+                image=i.image,
                 item_id=i.item_id,
                 is_new=is_new,
                 first_list_days=first_list_days,
@@ -3903,6 +3909,7 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
                 keep_days=keep_days,
                 min_send=min_send,
                 full_send=full_send,
+                advice=advice,
             ))
         if len(add_list) > 0:
             RefillRecommend.objects.bulk_create(add_list)

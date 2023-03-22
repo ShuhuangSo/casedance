@@ -885,6 +885,8 @@ class RefillRecommend(models.Model):
                              verbose_name='店铺', help_text='店铺')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
     p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
+    image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
+                              help_text='产品图片')
     item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
     is_new = models.BooleanField(default=False, verbose_name='是否新品', help_text='是否新品')
     first_list_days = models.IntegerField(default=0, verbose_name='首次上架天数', help_text='首次上架天数')
@@ -903,6 +905,7 @@ class RefillRecommend(models.Model):
     keep_days = models.IntegerField(default=0, verbose_name='库存维持天数', help_text='库存维持天数')
     min_send = models.IntegerField(default=0, verbose_name='最低发货数量', help_text='最低发货数量')
     full_send = models.IntegerField(default=0, verbose_name='完整周期发货数量', help_text='完整周期发货数量')
+    advice = models.CharField(max_length=50, null=True, blank=True, verbose_name='建议注释', help_text='建议注释')
     create_time = models.DateTimeField(null=True, blank=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:

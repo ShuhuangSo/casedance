@@ -3866,7 +3866,7 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             elif keep_days < current_days + ship_days + batch_period:
                 min_send = int(avg_sale * batch_period)
                 full_send = int(avg_sale * ship_days)
-                advice = '可以下批次补货'
+                advice = '本批次不补货将可能断货'
             # 维持天数大于从现在起到下个周期发货所需天数,库存充足
             else:
                 min_send = 0

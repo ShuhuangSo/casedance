@@ -447,6 +447,14 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.save()
 
         mp = MLUserPermission()
+        mp.module_name = '补货推荐'
+        mp.component = 'refill'
+        mp.order_num = 3
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp = MLUserPermission()
         mp.module_name = '运单管理'
         mp.component = 'ship'
         mp.order_num = 3

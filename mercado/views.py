@@ -1408,9 +1408,11 @@ class ShipViewSet(mixins.ListModelMixin,
                     sd.packing_name = packing.name
                     sd.packing_size = packing.size
 
-                # 如果店铺库存中没有，自动标为新品
+                # 如果店铺库存中没有，发货在途没有，自动标为新品
                 is_exist = ShopStock.objects.filter(sku=sd.sku).count()
-                if not is_exist:
+                is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                if not is_exist and not is_ship:
                     sd.s_type = 'NEW'
 
                 sd.save()
@@ -1558,8 +1560,11 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 # 如果店铺库存中没有，自动标为新品
                 if 'id' not in i.keys():
+                    # 如果店铺库存中没有，发货在途没有，自动标为新品
                     is_exist = ShopStock.objects.filter(sku=sd.sku).count()
-                    if not is_exist:
+                    is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
+                        Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                    if not is_exist and not is_ship:
                         sd.s_type = 'NEW'
 
                 sd.save()
@@ -2268,6 +2273,28 @@ class ShipViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
+    # 检查发货运单数量变动
+    @action(methods=['get'], detail=False, url_path='check_ship_change')
+    def check_ship_change(self, request):
+        is_exist = False
+        qty = 0
+        queryset = ShipItemRemove.objects.filter(ship__user_id=request.user.id).filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+        num_list = []
+        if queryset:
+            is_exist = True
+            for i in queryset:
+                if i.ship.envio_number not in num_list:
+                    num_list.append(i.ship.envio_number)
+        qty = len(num_list)
+        num_value = ''
+        if qty:
+            num_value = ','.join(num_list)
+        desc = '运单号 {value} 有发货数量变动，请注意核查'.format(value=num_value)
+
+        return Response({'is_exist': is_exist, 'qty': qty, 'desc': desc},
+                        status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):

@@ -719,6 +719,15 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看全部在途'
+        mp_c.component = 'finance_allOnway'
+        mp_c.order_num = 6
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = '操作日志'
         mp.component = 'log'

@@ -421,10 +421,16 @@ class FinanceSerializer(serializers.ModelSerializer):
     """
     财务管理
     """
+    shop_name = serializers.SerializerMethodField()
+
+    def get_shop_name(self, obj):
+        shop_name = obj.shop.name
+        return shop_name
 
     class Meta:
         model = Finance
-        fields = "__all__"
+        fields = ('id', 'shop', 'currency', 'income', 'wd_date', 'rec_date', 'exchange', 'income_rmb', 'exc_date',
+                  'f_type', 'is_received', 'create_time', 'shop_name')
 
 
 class PackingSerializer(serializers.ModelSerializer):

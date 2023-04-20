@@ -1316,7 +1316,16 @@ class ShipViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
+    # filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
+    filterset_fields = {
+        'book_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'shop': ['exact'],
+        's_status': ['exact'],
+        'target': ['exact'],
+        'ship_type': ['exact'],
+        'carrier': ['exact'],
+        'user_id': ['exact'],
+    }
     search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
                      'ship_shipDetail__p_name', 'shop')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date')  # 配置排序字段

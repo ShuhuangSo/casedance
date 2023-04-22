@@ -3170,7 +3170,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
             if cell_row[2].value[:8] == 'Devuelto':
                 order_status = 'RETURN'
 
-            ml_order = MLOrder.objects.filter(order_number=order_number).first()
+            # 检查同一店铺订单编号是否存在
+            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
             if not ml_order:
                 add_list.append(MLOrder(
                     shop=shop,

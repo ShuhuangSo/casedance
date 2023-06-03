@@ -3330,7 +3330,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         'is_urgent': ['exact'],
     }
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time')  # 配置排序字段
+    ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time', 'p_name')  # 配置排序字段
 
     # 拉取运单备货产品
     @action(methods=['get'], detail=False, url_path='pull_purchase')

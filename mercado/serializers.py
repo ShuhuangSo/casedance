@@ -162,7 +162,8 @@ class MLProductSerializer(serializers.ModelSerializer):
         status = False
         if not (obj.site and obj.item_id and obj.unit_cost and obj.image and obj.shop):
             status = True
-        if not (obj.custom_code and obj.cn_name and obj.en_name and obj.brand and obj.declared_value and obj.cn_material and obj.en_material):
+        if not (
+                obj.custom_code and obj.cn_name and obj.en_name and obj.brand and obj.declared_value and obj.cn_material and obj.en_material):
             status = True
         if not (obj.use and obj.weight and obj.length and obj.width and obj.heigth and obj.first_ship_cost):
             status = True
@@ -192,10 +193,42 @@ class ShopStockSerializer(serializers.ModelSerializer):
     """
     店铺库存
     """
+    preparing_qty = serializers.SerializerMethodField()  # 运单备货数量
+    p_onway_qty = serializers.SerializerMethodField()  # 采购在途数量
+    p_rec_qty = serializers.SerializerMethodField()  # 采购到货数量
+
+    def get_preparing_qty(self, obj):
+        qty = 0
+        queryset = ShipDetail.objects.filter(sku=obj.sku, item_id=obj.item_id, ship__s_status='PREPARING')
+        for i in queryset:
+            qty += i.qty
+        return qty
+
+    def get_p_onway_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        for i in queryset:
+            qty += i.buy_qty
+        return qty
+
+    def get_p_rec_qty(self, obj):
+        qty = 0
+        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        for i in queryset:
+            if i.p_status == 'RECEIVED':
+                qty += i.rec_qty
+            if i.p_status == 'PACKED':
+                qty += i.pack_qty
+        return qty
 
     class Meta:
         model = ShopStock
-        fields = "__all__"
+        fields = (
+            'id', 'shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
+            'image', 'p_status', 'qty', 'onway_qty', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
+            'total_sold', 'unit_cost', 'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'total_profit',
+            'total_weight', 'total_cbm', 'stock_value', 'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
+            'note', 'create_time', 'is_active', 'is_collect', 'preparing_qty', 'p_onway_qty', 'p_rec_qty')
 
 
 class ShipDetailSerializer(serializers.ModelSerializer):
@@ -295,7 +328,8 @@ class ShipSerializer(serializers.ModelSerializer):
             'shipping_fee', 'sent_time',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear', 'is_attach', 'ship_shipDetail')
+            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',
+            'is_attach', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

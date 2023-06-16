@@ -1328,7 +1328,7 @@ class ShipViewSet(mixins.ListModelMixin,
     }
     search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
                      'ship_shipDetail__p_name', 'shop')  # 配置搜索字段
-    ordering_fields = ('create_time', 'book_date')  # 配置排序字段
+    ordering_fields = ('create_time', 'book_date', 'shop')  # 配置排序字段
 
     # 创建运单
     @action(methods=['post'], detail=False, url_path='create_ship')

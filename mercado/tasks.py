@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport, TransStock, Ship
+    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -599,6 +599,14 @@ def get_shop_quota(shop_id):
         onway_amount += i.shipping_fee
         onway_amount += i.extra_fee
         onway_amount += i.products_cost
+
+    # 在途中转运单统计,含备货中
+    ship_detail = ShipDetail.objects.filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED') | Q(ship__s_status='PREPARING')).filter(ship__target='TRANSIT')
+    for i in ship_detail:
+        is_shop_product = MLProduct.objects.filter(shop=shop.name, sku=i.sku).first()
+        # 如果是该店铺下的产品
+        if is_shop_product:
+            onway_amount += (i.unit_cost + i.avg_ship_fee) * i.qty
 
     used_quota = total_amount + trans_amount + onway_amount
     return used_quota

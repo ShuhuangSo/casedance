@@ -1324,7 +1324,7 @@ class ShipViewSet(mixins.ListModelMixin,
         'target': ['exact'],
         'ship_type': ['exact'],
         'carrier': ['exact'],
-        'user_id': ['exact'],
+        'user_id': ['exact', 'in'],
     }
     search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
                      'ship_shipDetail__p_name', 'shop')  # 配置搜索字段
@@ -1342,6 +1342,7 @@ class ShipViewSet(mixins.ListModelMixin,
         end_date = request.data['end_date']
         ship_date = request.data['ship_date']
         note = request.data['note']
+        all_see = request.data['all_see']
         ship_detail = request.data['ship_detail']
 
         # 检查店铺额度(仅检查直发运单额度)
@@ -1363,6 +1364,10 @@ class ShipViewSet(mixins.ListModelMixin,
             end_date = None
         if not ship_date:
             ship_date = None
+        user_id = request.user.id
+        # 如果全员可见，id=0
+        if all_see:
+            user_id = 0
         ship = Ship(
             s_status='PREPARING',
             send_from='CN',
@@ -1374,7 +1379,7 @@ class ShipViewSet(mixins.ListModelMixin,
             end_date=end_date,
             ship_date=ship_date,
             note=note,
-            user_id=request.user.id
+            user_id=user_id
         )
         ship.save()
 
@@ -1459,6 +1464,7 @@ class ShipViewSet(mixins.ListModelMixin,
         end_date = request.data['end_date']
         ship_date = request.data['ship_date']
         note = request.data['note']
+        all_see = request.data['all_see']
         s_number = request.data['s_number']
         batch = request.data['batch']
         envio_number = request.data['envio_number']
@@ -1491,6 +1497,12 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.note = note
         ship.s_number = s_number
         ship.envio_number = envio_number
+
+        # 如果关闭全员可见，修改用户id
+        if not all_see:
+            ship.user_id = request.user.id
+        else:
+            ship.user_id = 0
 
         # 需要更新的sku列表
         sku_list = []
@@ -1913,7 +1925,12 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock = TransStock()
                 shop = Shop.objects.filter(name=ship.shop).first()
                 trans_stock.shop = shop
-                trans_stock.user_id = i.ship.user_id
+
+                # 查该sku所属店铺下的用户id
+                shop2 = Shop.objects.filter(name=i.target_FBM).first()
+                if shop2:
+                    if shop2.user:
+                        trans_stock.user_id = shop2.user.id
                 trans_stock.listing_shop = i.target_FBM
                 trans_stock.sku = i.sku
                 trans_stock.p_name = i.p_name

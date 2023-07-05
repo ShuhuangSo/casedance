@@ -237,6 +237,7 @@ class ShipDetailSerializer(serializers.ModelSerializer):
     """
     total_onway_qty = serializers.SerializerMethodField()
     total_rec_qty = serializers.SerializerMethodField()
+    user_id = serializers.SerializerMethodField()
 
     def get_total_onway_qty(self, obj):
         qty = 0
@@ -255,13 +256,21 @@ class ShipDetailSerializer(serializers.ModelSerializer):
                 qty += i.pack_qty
         return qty
 
+    def get_user_id(self, obj):
+        shop = Shop.objects.filter(name=obj.target_FBM).first()
+        user_id = None
+        if shop:
+            if shop.user:
+                user_id = shop.user.id
+        return user_id
+
     class Meta:
         model = ShipDetail
         fields = (
             'id', 'target_FBM', 'box_number', 's_type', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
             'image', 'custom_code', 'cn_name', 'en_name', 'brand', 'declared_value', 'cn_material', 'en_material',
             'use', 'unit_cost', 'avg_ship_fee', 'qty', 'length', 'width', 'heigth', 'weight', 'note',
-            'create_time', 'packing_name', 'packing_size', 'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty')
+            'create_time', 'packing_name', 'packing_size', 'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty', 'user_id')
 
 
 class ShipSerializer(serializers.ModelSerializer):

@@ -762,9 +762,9 @@ class ShopViewSet(mixins.ListModelMixin,
 
             income_confirm = Finance.objects.filter(f_type='WD', is_received=False).count()
         else:
-            pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
-            shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
-            booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
+            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
 
             ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
             need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
@@ -1023,7 +1023,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         'avg_profit': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'avg_profit_rate': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'shop': ['exact'],
-        'p_status': ['exact'],
+        'p_status': ['exact', 'in'],
         'is_active': ['exact'],
         'is_collect': ['exact'],
     }
@@ -2003,9 +2003,9 @@ class ShipViewSet(mixins.ListModelMixin,
             shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
             booked_qty = Ship.objects.filter(s_status='BOOKED').count()
         else:
-            pre_qty = Ship.objects.filter(s_status='PREPARING', user_id=request.user.id).count()
-            shipped_qty = Ship.objects.filter(s_status='SHIPPED', user_id=request.user.id).count()
-            booked_qty = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id).count()
+            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
                         status=status.HTTP_200_OK)
 

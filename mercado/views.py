@@ -1498,11 +1498,12 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.s_number = s_number
         ship.envio_number = envio_number
 
-        # 如果关闭全员可见，修改用户id
-        if not all_see:
-            ship.user_id = request.user.id
-        else:
-            ship.user_id = 0
+        # 如果中转运单关闭全员可见，修改用户id
+        if target == 'TRANSIT':
+            if not all_see:
+                ship.user_id = request.user.id
+            else:
+                ship.user_id = 0
 
         # 需要更新的sku列表
         sku_list = []
@@ -1675,8 +1676,78 @@ class ShipViewSet(mixins.ListModelMixin,
             sd.save()
             products_cost += sd.unit_cost * sd.qty
 
-            # 发货后减去打包库存数量
-            if ship_action == 'SHIPPED':
+            # 发货后减去打包库存数量(旧代码)
+            # if ship_action == 'SHIPPED':
+            #     pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
+            #
+            #     if pm:
+            #         # 创建操作日志
+            #         log = MLOperateLog()
+            #         log.op_module = 'PURCHASE'
+            #         log.op_type = 'CREATE'
+            #         log.target_type = 'PURCHASE'
+            #         log.desc = '库存扣除 {qty}个 {sku} {p_name}'.format(sku=pm.sku, p_name=pm.p_name, qty=sd.qty)
+            #         log.save()
+            #         purchase_manage = PurchaseManage(
+            #             p_status='USED',
+            #             s_type=pm.s_type,
+            #             create_type=pm.create_type,
+            #             sku=pm.sku,
+            #             p_name=pm.p_name,
+            #             item_id=pm.item_id,
+            #             label_code=pm.label_code,
+            #             image=pm.image,
+            #             unit_cost=pm.unit_cost,
+            #             weight=pm.weight,
+            #             length=pm.length,
+            #             width=pm.width,
+            #             heigth=pm.heigth,
+            #             used_qty=sd.qty,
+            #             used_batch=sd.ship.batch,
+            #             note=pm.note,
+            #             shop=pm.shop,
+            #             shop_color=pm.shop_color,
+            #             packing_size=pm.packing_size,
+            #             packing_name=pm.packing_name,
+            #             used_time=datetime.now()
+            #         )
+            #         purchase_manage.save()
+            #         if pm.pack_qty > sd.qty:
+            #             pm.pack_qty = pm.pack_qty - sd.qty
+            #             pm.save()
+            #         else:
+            #             pm.delete()
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        if ship_note:
+            ship.note = ship_note
+        ship.s_status = ship_action
+        ship.products_cost = products_cost
+        # 总箱数
+        box_qty = ShipBox.objects.filter(ship=ship).count()
+        ship.total_box = box_qty
+
+        sum_weight = ShipBox.objects.filter(ship=ship).aggregate(Sum('weight'))
+        ship.weight = sum_weight['weight__sum']
+
+        # 总数量
+        result = ShipDetail.objects.filter(ship=ship).aggregate(Sum('qty'))
+        ship.total_qty = result['qty__sum']
+
+        # 总体积cbm
+        sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
+        ship.cbm = sum_cbm['cbm__sum']
+
+        # 添加发货时间
+        if ship_action == 'SHIPPED':
+            ship.sent_time = datetime.now()
+
+        ship.save()
+
+        # 发货后减去打包库存数量
+        if ship_action == 'SHIPPED':
+            sd_set = ShipDetail.objects.filter(ship=ship)
+            for sd in sd_set:
                 pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
 
                 if pm:
@@ -1716,32 +1787,6 @@ class ShipViewSet(mixins.ListModelMixin,
                         pm.save()
                     else:
                         pm.delete()
-
-        ship = Ship.objects.filter(id=ship_id).first()
-        if ship_note:
-            ship.note = ship_note
-        ship.s_status = ship_action
-        ship.products_cost = products_cost
-        # 总箱数
-        box_qty = ShipBox.objects.filter(ship=ship).count()
-        ship.total_box = box_qty
-
-        sum_weight = ShipBox.objects.filter(ship=ship).aggregate(Sum('weight'))
-        ship.weight = sum_weight['weight__sum']
-
-        # 总数量
-        result = ShipDetail.objects.filter(ship=ship).aggregate(Sum('qty'))
-        ship.total_qty = result['qty__sum']
-
-        # 总体积cbm
-        sum_cbm = ShipBox.objects.filter(ship=ship).aggregate(Sum('cbm'))
-        ship.cbm = sum_cbm['cbm__sum']
-
-        # 添加发货时间
-        if ship_action == 'SHIPPED':
-            ship.sent_time = datetime.now()
-
-        ship.save()
 
         # 添加fbm库存在途数量
         if ship.target == 'FBM' and ship_action == 'SHIPPED':

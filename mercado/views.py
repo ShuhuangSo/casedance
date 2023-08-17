@@ -1472,12 +1472,18 @@ class ShipViewSet(mixins.ListModelMixin,
 
         # 检查店铺额度
         if target == 'FBM':
-            products_cost = 0  # 总货品成本
+            products_cost = 0  # 新总货品成本
             for i in ship_detail:
                 product = MLProduct.objects.filter(sku=i['sku']).first()
                 products_cost += product.unit_cost * i['qty']
+
+            ori_products_cost = 0  # 原货品成本
+            sd_set = ShipDetail.objects.filter(ship__id=id)
+            for i in sd_set:
+                ori_products_cost += i.unit_cost * i.qty
+
             used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
-            if (products_cost + used_quota) > shop_obj.quota:
+            if (products_cost - ori_products_cost + used_quota) > shop_obj.quota:
                 return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'},
                                 status=status.HTTP_202_ACCEPTED)
 
@@ -2811,6 +2817,19 @@ class TransStockViewSet(mixins.ListModelMixin,
         shop = data[0]['listing_shop']
 
         batch = 'Z{time_str}'.format(time_str=time.strftime('%m%d'))
+
+        # 检查拼箱产品是否全部选中
+        box_number_set = []
+        for i in data:
+            box_number_set.append(i['box_number'])
+
+        for i in data:
+            # 检查是否拼箱
+            box_count = TransStock.objects.filter(box_number=i['box_number'], is_out=False).count()
+            if box_count > 1:
+                current_box_count = box_number_set.count(i['box_number'])
+                if box_count != current_box_count:
+                    return Response({'msg': '拼箱货品需同时出库！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
         ship = Ship(
             s_status='SHIPPED',

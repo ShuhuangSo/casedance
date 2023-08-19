@@ -2888,24 +2888,27 @@ class TransStockViewSet(mixins.ListModelMixin,
             sd.heigth = product.heigth
             sd.save()
 
-            # 创建包装箱
-            box = ShipBox()
-            box.ship = ship
-            box.box_number = i['box_number']
-            box.length = i['box_length']
-            box.width = i['box_width']
-            box.heigth = i['box_heigth']
-            box.weight = i['box_weight']
-            box.carrier_box_number = i['carrier_box_number']
-            box.note = i['s_number']
-            cbm = i['box_cbm']
-            box.cbm = cbm
-            box.save()
+            # 检查是否同箱号的拼箱
+            is_exist = ShipBox.objects.filter(ship=ship, box_number=i['box_number']).count()
+            if not is_exist:
+                # 创建包装箱
+                box = ShipBox()
+                box.ship = ship
+                box.box_number = i['box_number']
+                box.length = i['box_length']
+                box.width = i['box_width']
+                box.heigth = i['box_heigth']
+                box.weight = i['box_weight']
+                box.carrier_box_number = i['carrier_box_number']
+                box.note = i['s_number']
+                cbm = i['box_cbm']
+                box.cbm = cbm
+                box.save()
 
-            total_box += 1
+                total_box += 1
+                total_weight += i['box_weight']
+                total_cbm += i['box_cbm']
             total_qty += i['qty']
-            total_weight += i['box_weight']
-            total_cbm += i['box_cbm']
 
             # 减去fbm库存 中转仓数量
             shop_stock = ShopStock.objects.filter(sku=sd.sku, item_id=sd.item_id).first()

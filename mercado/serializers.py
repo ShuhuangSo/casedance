@@ -287,6 +287,12 @@ class ShipSerializer(serializers.ModelSerializer):
     products_weight = serializers.SerializerMethodField()
     is_attach = serializers.SerializerMethodField()
     manager = serializers.SerializerMethodField()
+    is_remove_items = serializers.SerializerMethodField()  # 是否有变动清单产品
+
+    def get_is_remove_items(self, obj):
+        is_exist = ShipItemRemove.objects.filter(ship=obj).count()
+
+        return True if is_exist else False
 
     def get_products_weight(self, obj):
         queryset = ShipDetail.objects.filter(ship=obj)
@@ -338,7 +344,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',
-            'is_attach', 'ship_shipDetail')
+            'is_attach', 'is_remove_items', 'ship_shipDetail')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

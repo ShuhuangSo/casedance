@@ -551,6 +551,8 @@ class ShipItemRemove(models.Model):
     send_qty = models.IntegerField(default=0, null=True, blank=True, verbose_name='发货数量', help_text='发货数量')
     note = models.CharField(max_length=300, null=True, blank=True, verbose_name='移除原因', help_text='移除原因')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    handle = models.IntegerField(default=0, null=True, blank=True, verbose_name='处理结果', help_text='处理结果')
+    handle_time = models.DateTimeField(null=True, blank=True, verbose_name='处理时间', help_text='处理时间')
 
     class Meta:
         verbose_name = '遗弃清单'

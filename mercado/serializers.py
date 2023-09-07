@@ -361,10 +361,29 @@ class ShipItemRemoveSerializer(serializers.ModelSerializer):
     """
     遗弃清单
     """
+    batch = serializers.SerializerMethodField()
+    shop = serializers.SerializerMethodField()
+    shop_color = serializers.SerializerMethodField()
+    belong_shop = serializers.SerializerMethodField()
+
+    def get_batch(self, obj):
+        return obj.ship.batch
+
+    def get_shop(self, obj):
+        return obj.ship.shop
+
+    def get_shop_color(self, obj):
+        shop = Shop.objects.filter(name=obj.ship.shop).first()
+        return shop.name_color if shop else ''
+
+    def get_belong_shop(self, obj):
+        product = MLProduct.objects.filter(sku=obj.sku).first()
+        return product.shop if product else ''
 
     class Meta:
         model = ShipItemRemove
-        fields = "__all__"
+        fields = ('id', 'item_type', 'sku', 'p_name', 'item_id', 'image', 'plan_qty', 'send_qty', 'note', 'create_time',
+                  'handle', 'handle_time', 'ship', 'batch', 'shop', 'shop_color', 'belong_shop')
 
 
 class ShipAttachmentSerializer(serializers.ModelSerializer):

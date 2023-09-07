@@ -1320,7 +1320,7 @@ class ShipViewSet(mixins.ListModelMixin,
     filterset_fields = {
         'book_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'shop': ['exact'],
-        's_status': ['exact'],
+        's_status': ['exact', 'in'],
         'target': ['exact'],
         'ship_type': ['exact'],
         'carrier': ['exact'],
@@ -2442,9 +2442,9 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('ship', 'item_type')  # 配置过滤字段
+    filter_fields = ('ship', 'item_type', 'handle')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'item_type')  # 配置排序字段
+    ordering_fields = ('create_time', 'item_type', 'ship__id')  # 配置排序字段
 
     # 恢复遗弃项
     @action(methods=['post'], detail=False, url_path='restore_remove')

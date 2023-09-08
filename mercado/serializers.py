@@ -364,7 +364,6 @@ class ShipItemRemoveSerializer(serializers.ModelSerializer):
     batch = serializers.SerializerMethodField()
     shop = serializers.SerializerMethodField()
     shop_color = serializers.SerializerMethodField()
-    belong_shop = serializers.SerializerMethodField()
 
     def get_batch(self, obj):
         return obj.ship.batch
@@ -375,10 +374,6 @@ class ShipItemRemoveSerializer(serializers.ModelSerializer):
     def get_shop_color(self, obj):
         shop = Shop.objects.filter(name=obj.ship.shop).first()
         return shop.name_color if shop else ''
-
-    def get_belong_shop(self, obj):
-        product = MLProduct.objects.filter(sku=obj.sku).first()
-        return product.shop if product else ''
 
     class Meta:
         model = ShipItemRemove

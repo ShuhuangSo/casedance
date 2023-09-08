@@ -243,6 +243,9 @@ class MLProduct(models.Model):
     cn_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文材质', help_text='中文材质')
     en_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文材质', help_text='英文材质')
     use = models.CharField(null=True, blank=True, max_length=50, verbose_name='用途', help_text='用途')
+    is_elec = models.BooleanField(default=False, null=True, verbose_name='是否带电', help_text='是否带电')
+    is_magnet = models.BooleanField(default=False, null=True, verbose_name='是否带磁', help_text='是否带磁')
+    is_water = models.BooleanField(default=False, null=True, verbose_name='是否带液体', help_text='是否带液体')
     site = models.CharField(null=True, blank=True, max_length=30, verbose_name='站点', help_text='站点')
     shop = models.CharField(null=True, blank=True, max_length=50, verbose_name='上架店铺', help_text='上架店铺')
 
@@ -513,6 +516,9 @@ class ShipDetail(models.Model):
     cn_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文材质', help_text='中文材质')
     en_material = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文材质', help_text='英文材质')
     use = models.CharField(null=True, blank=True, max_length=50, verbose_name='用途', help_text='用途')
+    is_elec = models.BooleanField(default=False, null=True, verbose_name='是否带电', help_text='是否带电')
+    is_magnet = models.BooleanField(default=False, null=True, verbose_name='是否带磁', help_text='是否带磁')
+    is_water = models.BooleanField(default=False, null=True, verbose_name='是否带液体', help_text='是否带液体')
     unit_cost = models.FloatField(null=True, default=0, verbose_name='成本价', help_text='成本价')
     avg_ship_fee = models.FloatField(null=True, default=0, verbose_name='单个分摊运费', help_text='单个分摊运费')
     qty = models.IntegerField(default=0, verbose_name='数量', help_text='数量')
@@ -543,6 +549,7 @@ class ShipItemRemove(models.Model):
                              help_text='所属运单')
     item_type = models.CharField(max_length=10, verbose_name='遗弃类型', help_text='遗弃类型')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
+    belong_shop = models.CharField(null=True, blank=True, max_length=30, verbose_name='产品所属店铺', help_text='产品所属店铺')
     p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
     item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
     image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',

@@ -762,9 +762,12 @@ class ShopViewSet(mixins.ListModelMixin,
 
             income_confirm = Finance.objects.filter(f_type='WD', is_received=False).count()
         else:
-            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
-            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
-            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
 
             ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
             need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
@@ -1268,28 +1271,17 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        t = '29 de noviembre de 2022 02:28 hs.'
-        month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
-                      'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
-                      'diciembre': '12'}
-        import re
-        de_locate = [m.start() for m in re.finditer('de', t)]
-        day = t[:de_locate[0] - 1]
-        if int(day) < 10:
-            day = '0' + day
-        month = t[de_locate[0] + 3:de_locate[1] - 1]
-        year = t[de_locate[1] + 3:de_locate[1] + 7]
-        hour = t[de_locate[1] + 8:de_locate[1] + 10]
-        min = t[de_locate[1] + 11:de_locate[1] + 13]
-        dt = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
-
-        bj = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
-        bj_time = bj.strftime('%Y-%m-%d %H:%M:%S')
-
-        tasks.calc_shop_sale()
+        queryset = ShipItemRemove.objects.all()
+        for i in queryset:
+            p = MLProduct.objects.filter(sku=i.sku).first()
+            if p:
+                i.belong_shop = p.shop
+                i.handle = 1
+                i.handle_time = datetime.now()
+                i.save()
 
         return Response(
-            {'day': day, 'month': month, 'year': year, 'hour': hour, 'min': min, 'dt': dt, 'bj_time': bj_time},
+            {'ok'},
             status=status.HTTP_200_OK)
 
 
@@ -1410,6 +1402,9 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.cn_material = product.cn_material
                 sd.en_material = product.en_material
                 sd.use = product.use
+                sd.is_elec = product.is_elec
+                sd.is_magnet = product.is_magnet
+                sd.is_water = product.is_water
                 sd.image = product.image
                 sd.unit_cost = product.unit_cost
                 sd.weight = product.weight
@@ -1574,6 +1569,9 @@ class ShipViewSet(mixins.ListModelMixin,
                 sd.cn_material = product.cn_material
                 sd.en_material = product.en_material
                 sd.use = product.use
+                sd.is_elec = product.is_elec
+                sd.is_magnet = product.is_magnet
+                sd.is_water = product.is_water
                 sd.image = product.image
                 sd.unit_cost = product.unit_cost
                 sd.weight = product.weight
@@ -1637,6 +1635,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 if not ship_ir:
                     ship_ir = ShipItemRemove()
                     ship_ir.ship = sd.ship
+                    ship_ir.belong_shop = sd.target_FBM
                     ship_ir.sku = sd.sku
                     ship_ir.p_name = sd.p_name
                     ship_ir.image = sd.image
@@ -1663,6 +1662,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 if not ship_ir:
                     ship_ir = ShipItemRemove()
                     ship_ir.ship = sd.ship
+                    ship_ir.belong_shop = sd.target_FBM
                     ship_ir.sku = sd.sku
                     ship_ir.p_name = sd.p_name
                     ship_ir.image = sd.image
@@ -2054,9 +2054,12 @@ class ShipViewSet(mixins.ListModelMixin,
             shipped_qty = Ship.objects.filter(s_status='SHIPPED').count()
             booked_qty = Ship.objects.filter(s_status='BOOKED').count()
         else:
-            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
-            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
-            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(Q(user_id=request.user.id) | Q(user_id=0)).count()
+            pre_qty = Ship.objects.filter(s_status='PREPARING').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
+            shipped_qty = Ship.objects.filter(s_status='SHIPPED').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
+            booked_qty = Ship.objects.filter(s_status='BOOKED').filter(
+                Q(user_id=request.user.id) | Q(user_id=0)).count()
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
                         status=status.HTTP_200_OK)
 
@@ -2357,7 +2360,7 @@ class ShipViewSet(mixins.ListModelMixin,
         is_exist = False
         qty = 0
         queryset = ShipItemRemove.objects.filter(ship__user_id=request.user.id).filter(
-                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
         num_list = []
         if queryset:
             is_exist = True
@@ -2442,7 +2445,13 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('ship', 'item_type', 'handle')  # 配置过滤字段
+    # filter_fields = ('ship', 'item_type', 'handle', 'belong_shop')  # 配置过滤字段
+    filterset_fields = {
+        'ship': ['exact'],
+        'item_type': ['exact'],
+        'handle': ['exact'],
+        'belong_shop': ['exact', 'in'],
+    }
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'item_type', 'ship__id')  # 配置排序字段
 
@@ -2474,6 +2483,9 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             sd.cn_material = product.cn_material
             sd.en_material = product.en_material
             sd.use = product.use
+            sd.is_elec = product.is_elec
+            sd.is_magnet = product.is_magnet
+            sd.is_water = product.is_water
             sd.image = product.image
             sd.unit_cost = product.unit_cost
             sd.weight = product.weight
@@ -2490,6 +2502,137 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             sir.delete()
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 迁移遗弃项
+    @action(methods=['post'], detail=False, url_path='move_items')
+    def move_items(self, request):
+        ship_id = request.data['ship_id']
+        move_method = request.data['move_method']
+        product_list = request.data['product_list']
+
+        ship = Ship.objects.filter(id=ship_id).first()
+        # 检查产品与目标店铺是否相符
+        if ship.target == 'FBM':
+            for i in product_list:
+                if i['belong_shop'] != ship.shop:
+                    return Response({'msg': '产品与目标店铺不符，请核查', 'status': 'error'},
+                                    status=status.HTTP_202_ACCEPTED)
+
+        sd_set = ShipDetail.objects.filter(ship=ship)
+        for i in product_list:
+            item_remove = ShipItemRemove.objects.filter(id=i['id']).first()
+            p = sd_set.filter(sku=i['sku']).first()
+            # 如果产品不存在，则直接新建添加
+            if not p:
+                product = MLProduct.objects.filter(sku=i['sku']).first()
+                sd = ShipDetail()
+                sd.ship = ship
+                sd.s_type = 'REFILL'
+                sd.qty = i['move_qty']
+                sd.plan_qty = i['move_qty']
+                sd.sku = i['sku']
+                sd.target_FBM = product.shop
+                sd.p_name = product.p_name
+                sd.label_code = product.label_code
+                sd.upc = product.upc
+                sd.item_id = product.item_id
+                sd.custom_code = product.custom_code
+                sd.cn_name = product.cn_name
+                sd.en_name = product.en_name
+                sd.brand = product.brand
+                sd.declared_value = product.declared_value
+                sd.cn_material = product.cn_material
+                sd.en_material = product.en_material
+                sd.use = product.use
+                sd.is_elec = product.is_elec
+                sd.is_magnet = product.is_magnet
+                sd.is_water = product.is_water
+                sd.image = product.image
+                sd.unit_cost = product.unit_cost
+                sd.weight = product.weight
+                sd.length = product.length
+                sd.width = product.width
+                sd.heigth = product.heigth
+
+                # 如果店铺库存中没有，发货在途没有，自动标为新品
+                is_exist = ShopStock.objects.filter(sku=sd.sku).count()
+                is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                if not is_exist and not is_ship:
+                    sd.s_type = 'NEW'
+
+                sd.save()
+
+                item_remove.handle = 1
+                item_remove.handle_time = datetime.now()
+                item_remove.save()
+
+                # 创建操作日志
+                log = MLOperateLog()
+                log.op_module = 'SHIP'
+                log.op_type = 'CREATE'
+                log.target_type = 'SHIP'
+                log.target_id = ship.id
+                log.desc = '迁入产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
+                                                                    qty=i['move_qty'])
+                log.user = request.user
+                log.save()
+                continue
+
+            if p and move_method == 'DEL':
+                item_remove.handle = 2
+                item_remove.handle_time = datetime.now()
+                item_remove.save()
+                # 创建操作日志
+                log = MLOperateLog()
+                log.op_module = 'SHIP'
+                log.op_type = 'DEL'
+                log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
+                                                                        qty=i['move_qty'])
+                log.user = request.user
+                log.save()
+                continue
+
+            if p and move_method == 'ADD':
+                p.qty += i['move_qty']
+                p.plan_qty += i['move_qty']
+                p.save()
+
+                item_remove.handle = 1
+                item_remove.handle_time = datetime.now()
+                item_remove.save()
+                # 创建操作日志
+                log = MLOperateLog()
+                log.op_module = 'SHIP'
+                log.op_type = 'CREATE'
+                log.target_type = 'SHIP'
+                log.target_id = ship.id
+                log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
+                                                                    qty=i['move_qty'])
+                log.user = request.user
+                log.save()
+                continue
+
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+
+    # 批量移除变动产品
+    @action(methods=['post'], detail=False, url_path='del_items')
+    def del_items(self, request):
+        product_list = request.data
+        for i in product_list:
+            item_remove = ShipItemRemove.objects.filter(id=i['id']).first()
+            item_remove.handle = 2
+            item_remove.handle_time = datetime.now()
+            item_remove.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'DEL'
+            log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
+                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+            log.user = request.user
+            log.save()
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
 
 class ShipAttachmentViewSet(mixins.ListModelMixin,
@@ -3414,7 +3557,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         'is_urgent': ['exact'],
     }
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time', 'p_name')  # 配置排序字段
+    ordering_fields = (
+        'create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time', 'p_name')  # 配置排序字段
 
     # 拉取运单备货产品
     @action(methods=['get'], detail=False, url_path='pull_purchase')

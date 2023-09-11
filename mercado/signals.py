@@ -57,6 +57,15 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_use != instance.use:
             value = '用途: %s ===>> %s' % (instance.__original_use, instance.use)
             create_log(instance.id, value, request.user)
+        if instance.__original_is_elec != instance.is_elec:
+            value = '是否带电: %s ===>> %s' % (instance.__original_is_elec, instance.is_elec)
+            create_log(instance.id, value, request.user)
+        if instance.__original_is_magnet != instance.is_magnet:
+            value = '是否带磁: %s ===>> %s' % (instance.__original_is_magnet, instance.is_magnet)
+            create_log(instance.id, value, request.user)
+        if instance.__original_is_water != instance.is_water:
+            value = '是否液体: %s ===>> %s' % (instance.__original_is_water, instance.is_water)
+            create_log(instance.id, value, request.user)
         if instance.__original_p_status != instance.p_status:
             value = '状态: %s ===>> %s' % (instance.__original_p_status, instance.p_status)
             create_log(instance.id, value, request.user)
@@ -149,6 +158,9 @@ def product_init_signal(instance, **kwargs):
     instance.__original_cn_material = instance.cn_material
     instance.__original_en_material = instance.en_material
     instance.__original_use = instance.use
+    instance.__original_is_elec = instance.is_elec
+    instance.__original_is_magnet = instance.is_magnet
+    instance.__original_is_water = instance.is_water
     instance.__original_p_status = instance.p_status
     instance.__original_site = instance.site
     instance.__original_shop = instance.shop

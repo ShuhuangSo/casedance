@@ -173,7 +173,7 @@ class MLProductSerializer(serializers.ModelSerializer):
         model = MLProduct
         fields = ('id', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'p_status', 'custom_code', 'cn_name',
                   'en_name', 'brand', 'declared_value', 'cn_material', 'en_material', 'use', 'site', 'shop',
-                  'unit_cost',
+                  'unit_cost', 'is_elec', 'is_magnet', 'is_water',
                   'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
                   'buy_url4', 'buy_url5', 'user_id', 'is_incomplete')

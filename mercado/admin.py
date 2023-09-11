@@ -117,7 +117,8 @@ class ExRateAdmin(admin.ModelAdmin):
 
 @admin.register(Finance)
 class FinanceAdmin(admin.ModelAdmin):
-    list_display = ['currency', 'income', 'is_received']
+    list_display = ['shop', 'currency', 'income', 'is_received', 'wd_date', 'rec_date']
+    list_filter = ['f_type', 'shop']
 
 
 @admin.register(Packing)

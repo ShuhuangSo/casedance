@@ -803,10 +803,20 @@ class ShopViewSet(mixins.ListModelMixin,
                 all_product_incomplete = True
                 break
 
+        # 变动清单待处理产品
+        shops_set = Shop.objects.filter(user__id=request.user.id)
+        remove_items_count = 0
+        if request.user.is_superuser:
+            remove_items_count = ShipItemRemove.objects.filter(handle=0).count()
+        else:
+            for i in shops_set:
+                remove_items_count += ShipItemRemove.objects.filter(handle=0).filter(belong_shop=i.name).count()
+
         return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
                          'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num,
                          'pack_num': pack_num, 'overtime_ship': overtime_ship, 'need_book': need_book,
-                         'income_confirm': income_confirm, 'all_product_incomplete': all_product_incomplete},
+                         'income_confirm': income_confirm, 'all_product_incomplete': all_product_incomplete,
+                         'remove_items_count': remove_items_count},
                         status=status.HTTP_200_OK)
 
     # 店铺信息
@@ -1314,6 +1324,7 @@ class ShipViewSet(mixins.ListModelMixin,
         'shop': ['exact'],
         's_status': ['exact', 'in'],
         'target': ['exact'],
+        'batch': ['exact'],
         'ship_type': ['exact'],
         'carrier': ['exact'],
         'user_id': ['exact', 'in'],
@@ -2376,6 +2387,30 @@ class ShipViewSet(mixins.ListModelMixin,
         return Response({'is_exist': is_exist, 'qty': qty, 'desc': desc},
                         status=status.HTTP_200_OK)
 
+    # 检查运单是否已被编辑
+    @action(methods=['post'], detail=False, url_path='check_if_ship_edit')
+    def check_if_ship_edit(self, request):
+        ship_id = request.data['ship_id']
+        time_flag = request.data['time_flag']
+        ship_changed = False
+
+        # 查出最新修改的日志
+        log = MLOperateLog.objects.filter(op_module='SHIP', target_id=ship_id).filter(
+            Q(op_type='EDIT') | Q(op_type='DEL')).first()
+
+        if not log:
+            return Response({'time_flag': '', 'ship_changed': ship_changed}, status=status.HTTP_200_OK)
+
+        if log:
+            latest_time = log.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            if not time_flag:
+                time_flag = latest_time
+            else:
+                if time_flag != latest_time:
+                    ship_changed = True
+
+        return Response({'time_flag': time_flag, 'ship_changed': ship_changed}, status=status.HTTP_200_OK)
+
     # 重写
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -3437,6 +3472,11 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     ml_order.receive_fund = receive_fund
                     ml_order.profit = profit
                     ml_order.save()
+
+                    # 如果订单是取消状态，库存增加回来
+                    if order_status == 'CANCEL':
+                        shop_stock.qty += qty
+                        shop_stock.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 

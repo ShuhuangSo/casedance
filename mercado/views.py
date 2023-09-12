@@ -3027,6 +3027,7 @@ class TransStockViewSet(mixins.ListModelMixin,
             target='FBM',
             batch=batch,
             logi_fee_clear=True,
+            user_id=request.user.id,
             sent_time=datetime.now()
         )
         ship.save()

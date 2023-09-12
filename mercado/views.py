@@ -612,6 +612,13 @@ class MLProductViewSet(mixins.ListModelMixin,
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()
 
+        is_ship_exist = ShipDetail.objects.filter(sku=product.sku).count()
+        is_stock_exist = ShopStock.objects.filter(sku=product.sku).count()
+        is_purchase_exist = PurchaseManage.objects.filter(sku=product.sku).count()
+        if is_ship_exist or is_stock_exist or is_purchase_exist:
+            return Response({'msg': '产品已被引用，无法删除', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
         # 创建操作日志
         log = MLOperateLog()
         log.op_module = 'PRODUCT'
@@ -624,7 +631,7 @@ class MLProductViewSet(mixins.ListModelMixin,
 
         product.delete()
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
 
 class PackingViewSet(mixins.ListModelMixin,
@@ -2141,7 +2148,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     sh['P' + str(num + 2)] = ''
                     sh['Q' + str(num + 2)] = ''
                     sh['R' + str(num + 2)] = ''
-                    sh['S' + str(num + 2)] = '否'
+                    sh['S' + str(num + 2)] = '是' if i.is_elec else '否'
                     sh['T' + str(num + 2)] = '否'
                     sh['U' + str(num + 2)] = ''
                     sh['V' + str(num + 2)] = ''
@@ -2365,26 +2372,19 @@ class ShipViewSet(mixins.ListModelMixin,
         log.save()
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
-    # 检查发货运单数量变动
+    # 检查变动清单待处理产品
     @action(methods=['get'], detail=False, url_path='check_ship_change')
     def check_ship_change(self, request):
-        is_exist = False
-        qty = 0
-        queryset = ShipItemRemove.objects.filter(ship__user_id=request.user.id).filter(
-            Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
-        num_list = []
-        if queryset:
-            is_exist = True
-            for i in queryset:
-                if i.ship.envio_number not in num_list:
-                    num_list.append(i.ship.envio_number)
-        qty = len(num_list)
-        num_value = ''
-        if qty:
-            num_value = ','.join(num_list)
-        desc = '运单号 {value} 有发货数量变动，请注意核查'.format(value=num_value)
+        # 变动清单待处理产品
+        shops_set = Shop.objects.filter(user__id=request.user.id)
+        remove_items_count = 0
+        if request.user.is_superuser:
+            remove_items_count = ShipItemRemove.objects.filter(handle=0).count()
+        else:
+            for i in shops_set:
+                remove_items_count += ShipItemRemove.objects.filter(handle=0).filter(belong_shop=i.name).count()
 
-        return Response({'is_exist': is_exist, 'qty': qty, 'desc': desc},
+        return Response({'remove_items_count': remove_items_count},
                         status=status.HTTP_200_OK)
 
     # 检查运单是否已被编辑

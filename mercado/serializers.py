@@ -577,6 +577,14 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
     total_rec_qty = serializers.SerializerMethodField()
     is_checked = serializers.SerializerMethodField()
     packing_id = serializers.SerializerMethodField()
+    item_remove_status = serializers.SerializerMethodField()
+
+    def get_item_remove_status(self, obj):
+        remove_handle = 100
+        sir = ShipItemRemove.objects.filter(sku=obj.sku).filter(Q(handle=0) | Q(handle=3)).first()
+        if sir:
+            remove_handle = sir.handle
+        return remove_handle
 
     def get_need_qty(self, obj):
         qty = 0
@@ -617,7 +625,7 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
             'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
-            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc')
+            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc', 'item_remove_status')
 
 
 class UPCSerializer(serializers.ModelSerializer):

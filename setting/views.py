@@ -446,6 +446,15 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '数据权限: 查看全部店铺(没打勾仅查看本人店铺)'
+        mp_c.component = 'purchase_allShopCheck'
+        mp_c.order_num = 13
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         mp = MLUserPermission()
         mp.module_name = '补货推荐'
         mp.component = 'refill'

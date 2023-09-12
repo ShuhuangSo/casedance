@@ -1942,6 +1942,11 @@ class ShipViewSet(mixins.ListModelMixin,
     def in_warehouse(self, request):
         ship_id = request.data['id']
 
+        # 检查是否重复操作
+        is_exist = Ship.objects.filter(id=ship_id, s_status='BOOKED').count()
+        if not is_exist:
+            return Response({'msg': '运单状态已变动，请检查!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
         ship = Ship.objects.filter(id=ship_id).first()
 
         if ship.target == 'FBM':
@@ -3008,6 +3013,12 @@ class TransStockViewSet(mixins.ListModelMixin,
                 current_box_count = box_number_set.count(i['box_number'])
                 if box_count != current_box_count:
                     return Response({'msg': '拼箱货品需同时出库！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
+        # 检查产品是否已出库
+        for i in data:
+            ts_check = TransStock.objects.filter(id=i['id'], is_out=False).first()
+            if not ts_check:
+                return Response({'msg': '产品状态已变动，请检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
         ship = Ship(
             s_status='SHIPPED',

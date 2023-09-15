@@ -2674,6 +2674,24 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
+    # 批量保留变动产品
+    @action(methods=['post'], detail=False, url_path='keep_items')
+    def keep_items(self, request):
+        product_list = request.data
+        for i in product_list:
+            item_remove = ShipItemRemove.objects.filter(id=i['id']).first()
+            item_remove.handle = 3
+            item_remove.handle_time = datetime.now()
+            item_remove.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.desc = '保留变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
+                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+            log.user = request.user
+            log.save()
+        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
 
 class ShipAttachmentViewSet(mixins.ListModelMixin,
                             mixins.CreateModelMixin,

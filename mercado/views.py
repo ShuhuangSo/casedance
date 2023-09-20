@@ -72,22 +72,9 @@ class ListingViewSet(mixins.ListModelMixin,
     # test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        # import time
-        # li = ['MLM1410524222', 'MLM1409963889', 'MLM1385889747', 'MLM1385475588', 'MLM1398690832', 'MLM1410689706', 'MLM1410689702', 'MLM1398684151', 'MLM1429665361']
-        # for i in li:
-        #     tasks.create_listing(i)
-        #     time.sleep(1)
-        # tasks.update_categories('MLM')
-        # from datetime import datetime, timedelta
-        # date = datetime.now() - timedelta(days=1)
-        #
-        # Keywords.objects.filter(categ_id='MLM').update(update_time=date)
+        batch_list = Ship.objects.filter(send_from='CN').values('batch').order_by('-batch').distinct()[:5]
 
-        tasks.calc_product_sales()  # 计算销量
-        dd = datetime.strptime('2023-03-22', '%Y-%m-%d')
-        delta = dd - datetime.now()
-        print(delta.days)
-        return Response({'msg': 'OK'}, status=status.HTTP_200_OK)
+        return Response({'batch_list': batch_list}, status=status.HTTP_200_OK)
 
     # 添加商品链接
     @action(methods=['post'], detail=False, url_path='create_listing')
@@ -1193,8 +1180,21 @@ class ShopStockViewSet(mixins.ListModelMixin,
         op_type = request.data['op_type']
 
         data = []
-        if op_type == 'ONWAY':
-            querySet = ShipDetail.objects.filter(sku=sku).filter(
+        if op_type == 'FBM_ONWAY':
+            querySet = ShipDetail.objects.filter(sku=sku, ship__target='FBM').filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            if querySet:
+                for i in querySet:
+                    data.append({
+                        'qty': i.qty,
+                        "s_status": i.ship.s_status,
+                        "book_date": i.ship.book_date,
+                        "tag_name": i.ship.tag_name,
+                        "tag_color": i.ship.tag_color,
+                        "batch": i.ship.batch,
+                    })
+        if op_type == 'TRANS_ONWAY':
+            querySet = ShipDetail.objects.filter(sku=sku, ship__target='TRANSIT').filter(
                 Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             if querySet:
                 for i in querySet:

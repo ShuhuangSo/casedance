@@ -196,7 +196,24 @@ class ShopStockSerializer(serializers.ModelSerializer):
     preparing_qty = serializers.SerializerMethodField()  # 运单备货数量
     p_onway_qty = serializers.SerializerMethodField()  # 采购在途数量
     p_rec_qty = serializers.SerializerMethodField()  # 采购到货数量
+    fbm_onway_qty = serializers.SerializerMethodField()  # fbm在途数量
+    trans_onway_qty = serializers.SerializerMethodField()  # 中转在途数量
 
+    def get_trans_onway_qty(self, obj):
+        qty = 0
+        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__target='TRANSIT').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+        for i in queryset:
+            qty += i.qty
+        return qty
+
+    def get_fbm_onway_qty(self, obj):
+        qty = 0
+        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__target='FBM').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+        for i in queryset:
+            qty += i.qty
+        return qty
+
+    # 备货中数量
     def get_preparing_qty(self, obj):
         qty = 0
         queryset = ShipDetail.objects.filter(sku=obj.sku, item_id=obj.item_id, ship__s_status='PREPARING')
@@ -204,6 +221,7 @@ class ShopStockSerializer(serializers.ModelSerializer):
             qty += i.qty
         return qty
 
+    # 采购中数量
     def get_p_onway_qty(self, obj):
         qty = 0
         queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
@@ -211,6 +229,7 @@ class ShopStockSerializer(serializers.ModelSerializer):
             qty += i.buy_qty
         return qty
 
+    # 采购到货数量
     def get_p_rec_qty(self, obj):
         qty = 0
         queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
@@ -225,7 +244,7 @@ class ShopStockSerializer(serializers.ModelSerializer):
         model = ShopStock
         fields = (
             'id', 'shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
-            'image', 'p_status', 'qty', 'onway_qty', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
+            'image', 'p_status', 'qty', 'fbm_onway_qty', 'trans_onway_qty', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
             'total_sold', 'unit_cost', 'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'total_profit',
             'total_weight', 'total_cbm', 'stock_value', 'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
             'note', 'create_time', 'is_active', 'is_collect', 'preparing_qty', 'p_onway_qty', 'p_rec_qty')

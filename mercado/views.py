@@ -20,13 +20,13 @@ from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings
+    RefillRecommend, RefillSettings, CarrierTrack
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
     ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
-    RefillRecommendSerializer, RefillSettingsSerializer
+    RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -1288,17 +1288,10 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        queryset = ShipItemRemove.objects.all()
-        for i in queryset:
-            p = MLProduct.objects.filter(sku=i.sku).first()
-            if p:
-                i.belong_shop = p.shop
-                i.handle = 1
-                i.handle_time = datetime.now()
-                i.save()
+        message = tasks.ship_tracking('910571230900148')
 
         return Response(
-            {'ok'},
+            {'message': message},
             status=status.HTTP_200_OK)
 
 
@@ -2628,7 +2621,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.op_module = 'SHIP'
                 log.op_type = 'DEL'
                 log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                        qty=i['move_qty'])
+                                                                            qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2648,7 +2641,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
                 log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                    qty=i['move_qty'])
+                                                                        qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2692,6 +2685,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+
 
 class ShipAttachmentViewSet(mixins.ListModelMixin,
                             mixins.CreateModelMixin,
@@ -4279,3 +4273,31 @@ class RefillSettingsViewSet(mixins.ListModelMixin,
     filter_fields = ('is_include_trans',)  # 配置过滤字段
     search_fields = ('fly_days',)  # 配置搜索字段
     ordering_fields = ('fly_days',)  # 配置排序字段
+
+
+class CarrierTrackViewSet(mixins.ListModelMixin,
+                          mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin,
+                          mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin,
+                          viewsets.GenericViewSet):
+    """
+    list:
+        运单物流跟踪列表,分页,过滤,搜索,排序
+    create:
+        运单物流跟踪新增
+    retrieve:
+        运单物流跟踪详情页
+    update:
+        运单物流跟踪修改
+    destroy:
+        运单物流跟踪删除
+    """
+    queryset = CarrierTrack.objects.all()
+    serializer_class = CarrierTrackSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('carrier_name', 'carrier_number')  # 配置过滤字段
+    search_fields = ('context',)  # 配置搜索字段
+    ordering_fields = ('create_time', 'time', 'optime')  # 配置排序字段

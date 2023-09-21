@@ -6,7 +6,7 @@ from django.db.models import Q
 from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
-    PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings
+    PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -678,4 +678,14 @@ class RefillSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RefillSettings
+        fields = "__all__"
+
+
+class CarrierTrackSerializer(serializers.ModelSerializer):
+    """
+    运单物流跟踪
+    """
+
+    class Meta:
+        model = CarrierTrack
         fields = "__all__"

@@ -616,6 +616,29 @@ class ShipAttachment(models.Model):
         return self.name
 
 
+class CarrierTrack(models.Model):
+    """
+    运单物流跟踪
+    """
+
+    carrier_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商名称', help_text='物流商名称')
+    carrier_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商单号', help_text='物流商单号')
+    context = models.CharField(null=True, blank=True, max_length=100, verbose_name='节点描述', help_text='节点描述')
+    location = models.CharField(null=True, blank=True, max_length=30, verbose_name='位置', help_text='位置')
+    status = models.CharField(null=True, blank=True, max_length=30, verbose_name='状态', help_text='状态')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    time = models.DateTimeField(null=True, blank=True, verbose_name='时间', help_text='时间')
+    optime = models.DateTimeField(null=True, blank=True, verbose_name='操作时间', help_text='操作时间')
+
+    class Meta:
+        verbose_name = '物流跟踪'
+        verbose_name_plural = verbose_name
+        ordering = ['create_time']
+
+    def __str__(self):
+        return self.carrier_number
+
+
 class Carrier(models.Model):
     """
     物流商

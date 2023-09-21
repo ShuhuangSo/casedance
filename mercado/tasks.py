@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct
+    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -430,6 +430,37 @@ def track_seller():
     task_log.save()
 
     return 'OK'
+
+
+# 跟踪运单物流运输
+@shared_task
+def ship_tracking(num):
+    url = 'https://client.morelink56.com/baiduroute/get_routeinfo'
+    carrier = 'SHENGDE'
+
+    resp = requests.post(url, {'num': num})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data['message'] == 'SUCCESS':
+            if len(data['data']):
+                for i in data['data']:
+                    is_exist = CarrierTrack.objects.filter(carrier_name=carrier, carrier_number=num, context=i['context']).first()
+                    if not is_exist:
+                        ct = CarrierTrack()
+                        ct.carrier_name = carrier
+                        ct.carrier_number = num
+                        ct.context = i['context']
+                        ct.location = i['location']
+                        if i['time']:
+                            ct.time = datetime.strptime(i['time'], '%Y-%m-%d %H:%M:%S')
+                        if i['optime']:
+                            ct.optime = datetime.strptime(i['optime'], '%Y-%m-%d %H:%M:%S')
+                        ct.save()
+                return 'SUCCESS'
+        else:
+            return data['message']
+    else:
+        return '网络异常'
 
 
 # 计算mercado产品销量

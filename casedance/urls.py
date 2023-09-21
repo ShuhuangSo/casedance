@@ -27,7 +27,7 @@ from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
     MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
     MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
-    UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet
+    UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet, CarrierTrackViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -165,6 +165,8 @@ router.register('ml_ship_detail', ShipDetailViewSet, basename='ml_ship_detail')
 router.register('ml_ship_item_remove', ShipItemRemoveViewSet, basename='ml_ship_item_remove')
 # 运单附件列表
 router.register('ml_ship_attachment', ShipAttachmentViewSet, basename='ml_ship_attachment')
+# 运单物流跟踪列表
+router.register('ml_ship_tracking', CarrierTrackViewSet, basename='ml_ship_tracking')
 # 头程包装箱列表
 router.register('ml_ship_box', ShipBoxViewSet, basename='ml_ship_box')
 # 物流商列表

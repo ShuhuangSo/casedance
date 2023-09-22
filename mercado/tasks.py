@@ -456,11 +456,30 @@ def ship_tracking(num):
                         if i['optime']:
                             ct.optime = datetime.strptime(i['optime'], '%Y-%m-%d %H:%M:%S')
                         ct.save()
+                    else:
+                        is_exist.create_time = datetime.now()
+                        is_exist.save()
                 return 'SUCCESS'
         else:
             return data['message']
     else:
         return '网络异常'
+
+
+# 批量更新运单物流运输跟踪
+@shared_task
+def bulk_ship_tracking():
+    queryset = Ship.objects.filter(send_from='CN').filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
+    for i in queryset:
+        if i.s_number:
+            ship_tracking(i.s_number)
+            time.sleep(0.5)
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 14
+    task_log.note = '美客多物流跟踪信息更新'
+    task_log.save()
+    return 'SUCCESS'
 
 
 # 计算mercado产品销量

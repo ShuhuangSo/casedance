@@ -307,6 +307,16 @@ class ShipSerializer(serializers.ModelSerializer):
     is_attach = serializers.SerializerMethodField()
     manager = serializers.SerializerMethodField()
     is_remove_items = serializers.SerializerMethodField()  # 是否有变动清单产品
+    latest_track = serializers.SerializerMethodField()  # 最新跟踪信息
+
+    def get_latest_track(self, obj):
+        msg = ''
+        if obj.s_number:
+            ct = CarrierTrack.objects.filter(carrier_number=obj.s_number).order_by('-time').first()
+            if ct:
+                msg = ct.context
+
+        return msg
 
     def get_is_remove_items(self, obj):
         is_exist = ShipItemRemove.objects.filter(ship=obj).count()
@@ -363,7 +373,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',
-            'is_attach', 'is_remove_items', 'ship_shipDetail')
+            'is_attach', 'is_remove_items', 'ship_shipDetail', 'latest_track')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

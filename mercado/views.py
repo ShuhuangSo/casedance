@@ -1288,7 +1288,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        message = tasks.ship_tracking('910571230900148')
+        message = 'runing'
+        tasks.bulk_ship_tracking.delay()
 
         return Response(
             {'message': message},
@@ -2408,6 +2409,40 @@ class ShipViewSet(mixins.ListModelMixin,
                     ship_changed = True
 
         return Response({'time_flag': time_flag, 'ship_changed': ship_changed}, status=status.HTTP_200_OK)
+
+    # 跟踪物流单号
+    @action(methods=['post'], detail=False, url_path='ship_tracking')
+    def ship_tracking(self, request):
+        track_num = request.data['track_num']
+        message = tasks.ship_tracking(track_num)
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.desc = '刷新物流跟踪-{message} 单号{track_num}'.format(track_num=track_num, message=message)
+        log.user = request.user
+        log.save()
+
+        if message != 'SUCCESS':
+            return Response({'msg': message, 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
+    # 批量更新物流跟踪信息
+    @action(methods=['get'], detail=False, url_path='bulk_update_tracking')
+    def bulk_update_tracking(self, request):
+        tasks.bulk_ship_tracking()
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.desc = '手动批量刷新运单物流跟踪信息'
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):

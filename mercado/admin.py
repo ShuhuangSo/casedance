@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
-    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings
+    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings, CarrierTrack
 
 
 @admin.register(Listing)
@@ -163,3 +163,10 @@ class RefillRecommendAdmin(admin.ModelAdmin):
 class RefillSettingsAdmin(admin.ModelAdmin):
     list_display = ['fly_days', 'fly_batch_period', 'is_include_trans']
     list_filter = ['is_include_trans']
+
+
+@admin.register(CarrierTrack)
+class CarrierTrackAdmin(admin.ModelAdmin):
+    list_display = ['carrier_number', 'context', 'time', 'create_time']
+    list_filter = ['carrier_name']
+    search_fields = ['carrier_number']

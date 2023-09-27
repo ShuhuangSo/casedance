@@ -72,9 +72,10 @@ class ListingViewSet(mixins.ListModelMixin,
     # test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        batch_list = Ship.objects.filter(send_from='CN').values('batch').order_by('-batch').distinct()[:5]
+        # 更新店铺信息
+        Shop.objects.update(platform='MERCADO')
 
-        return Response({'batch_list': batch_list}, status=status.HTTP_200_OK)
+        return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
     @action(methods=['post'], detail=False, url_path='create_listing')

@@ -310,6 +310,7 @@ class Shop(models.Model):
     """
 
     warehouse_type = models.CharField(max_length=30, verbose_name='仓库类型', help_text='仓库类型')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     name = models.CharField(max_length=30, verbose_name='店铺代号', help_text='店铺代号')
     shop_type = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺类型', help_text='店铺类型')
     seller_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='店铺ID', help_text='店铺ID')

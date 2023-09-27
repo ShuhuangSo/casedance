@@ -234,6 +234,7 @@ class MLProduct(models.Model):
                               help_text='产品图片')
     p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='ON_SALE', verbose_name='产品状态',
                                 help_text='产品状态')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     custom_code = models.CharField(null=True, blank=True, max_length=20, verbose_name='海关编码', help_text='海关编码')
     cn_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='中文品名', help_text='中文品名')
     en_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='英文品名', help_text='英文品名')
@@ -453,6 +454,7 @@ class Ship(models.Model):
     )
 
     s_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='运单编号', help_text='运单编号')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     batch = models.CharField(max_length=30, null=True, blank=True, verbose_name='批次号', help_text='批次号')
     s_status = models.CharField(max_length=10, choices=SHIP_STATUS, default='PREPARING', verbose_name='产品状态',
                                 help_text='产品状态')
@@ -665,6 +667,7 @@ class MLSite(models.Model):
     od_num = models.IntegerField(default=1, verbose_name='排序号', help_text='排序号')
     site_code = models.CharField(max_length=30, verbose_name='站点编号', help_text='站点编号')
     name = models.CharField(max_length=30, verbose_name='站点名称', help_text='站点名称')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
 
     class Meta:
         verbose_name = '站点'
@@ -699,6 +702,7 @@ class FBMWarehouse(models.Model):
     """
 
     country = models.CharField(max_length=30, null=True, blank=True, verbose_name='国家', help_text='国家')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     w_code = models.CharField(max_length=30, verbose_name='仓库代码', help_text='仓库代码')
     name = models.CharField(max_length=100, null=True, blank=True, verbose_name='仓库名称', help_text='仓库名称')
     address = models.CharField(max_length=300, null=True, blank=True, verbose_name='仓库地址', help_text='仓库地址')

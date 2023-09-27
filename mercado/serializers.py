@@ -160,6 +160,7 @@ class MLProductSerializer(serializers.ModelSerializer):
 
     def get_is_incomplete(self, obj):
         status = False
+
         if not (obj.site and obj.item_id and obj.unit_cost and obj.image and obj.shop):
             status = True
         if not (
@@ -176,7 +177,7 @@ class MLProductSerializer(serializers.ModelSerializer):
                   'unit_cost', 'is_elec', 'is_magnet', 'is_water',
                   'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
-                  'buy_url4', 'buy_url5', 'user_id', 'is_incomplete')
+                  'buy_url4', 'buy_url5', 'user_id', 'is_incomplete', 'platform')
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -369,7 +370,7 @@ class ShipSerializer(serializers.ModelSerializer):
         model = Ship
         fields = (
             'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type',
-            'shipping_fee', 'sent_time',
+            'shipping_fee', 'sent_time', 'platform',
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',

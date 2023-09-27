@@ -23,6 +23,9 @@ def product_edit_signal(sender, instance, created, **kwargs):
             create_log(instance.id, value, request.user)
             update_ship_product(instance.sku, 'p_name', instance.p_name, request.user)  # 更新未发货运单的产品参数
             update_purchase_product(instance.sku, 'p_name', instance.p_name)  # 更新采购管理的产品参数
+        if instance.__original_platform != instance.platform:
+            value = '平台: %s ===>> %s' % (instance.__original_platform, instance.platform)
+            create_log(instance.id, value, request.user)
         if instance.__original_label_code != instance.label_code:
             value = 'FBM条码: %s ===>> %s' % (instance.__original_label_code, instance.label_code)
             create_log(instance.id, value, request.user)
@@ -182,6 +185,7 @@ def product_init_signal(instance, **kwargs):
     instance.__original_is_checked = instance.is_checked
     instance.__original_label_title = instance.label_title
     instance.__original_label_option = instance.label_option
+    instance.__original_platform = instance.platform
 
 
 def create_log(pid, value, user):

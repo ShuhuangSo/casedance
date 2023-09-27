@@ -74,6 +74,41 @@ class ListingViewSet(mixins.ListModelMixin,
     def test(self, request):
         # 更新店铺信息
         Shop.objects.update(platform='MERCADO')
+        shop = Shop.objects.filter(site='KSA').first()
+        if shop:
+            shop.platform='NOON'
+            shop.save()
+        # 更新站点信息
+        MLSite.objects.update(platform='MERCADO')
+        s = MLSite.objects.filter(site_code='KSA').first()
+        if s:
+            s.platform = 'NOON'
+            s.save()
+        else:
+            site = MLSite()
+            site.od_num = 4
+            site.site_code = 'KSA'
+            site.name = '沙特'
+            site.platform = 'NOON'
+            site.save()
+        # 更新产品信息
+        MLProduct.objects.filter(site='MLM').update(platform='MERCADO')
+        # 更新仓库列表信息
+        FBMWarehouse.objects.update(platform='MERCADO')
+        fbm = FBMWarehouse.objects.filter(w_code='JED01').first()
+        if fbm:
+            fbm.platform = 'NOON'
+            fbm.save()
+        else:
+            fbm = FBMWarehouse()
+            fbm.country = '沙特KSA'
+            fbm.w_code = 'JED01'
+            fbm.name = '沙特JED01'
+            fbm.country = '沙特KSA'
+            fbm.save()
+
+        # 更新运单信息
+        Ship.objects.filter(carrier='盛德物流').update(platform='MERCADO')
 
         return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
 
@@ -464,7 +499,8 @@ class MLProductViewSet(mixins.ListModelMixin,
             return Response({'msg': '表格不能为空'}, status=status.HTTP_202_ACCEPTED)
 
         for cell_row in list(sheet)[1:]:
-            row_status = cell_row[0].value and cell_row[1].value and cell_row[2].value
+            # 检查1，2列是否为空，空则跳过
+            row_status = cell_row[0].value and cell_row[1].value
             if not row_status:
                 continue
 
@@ -472,7 +508,15 @@ class MLProductViewSet(mixins.ListModelMixin,
             is_exist = MLProduct.objects.filter(sku=cell_row[0].value.strip()).count()
             if is_exist:
                 continue
-
+            # 检查店铺是否存在
+            sp = Shop.objects.filter(name=cell_row[6].value.strip()).first()
+            if not sp:
+                continue
+            platform = sp.platform
+            # 检查对应平台upc列是否强制
+            if platform == 'MERCADO':
+                if not cell_row[2].value:
+                    continue
             sku = cell_row[0].value
             p_name = cell_row[1].value
             upc = cell_row[2].value
@@ -515,6 +559,7 @@ class MLProductViewSet(mixins.ListModelMixin,
             add_list.append(MLProduct(
                 sku=sku,
                 p_name=p_name,
+                platform=platform,
                 upc=upc,
                 item_id=item_id,
                 label_code=label_code,
@@ -731,7 +776,7 @@ class ShopViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('warehouse_type', 'shop_type', 'site', 'is_active', 'user')  # 配置过滤字段
+    filter_fields = ('warehouse_type', 'platform', 'shop_type', 'site', 'is_active', 'user')  # 配置过滤字段
     search_fields = ('name', 'seller_id', 'nickname')  # 配置搜索字段
     ordering_fields = ('create_time', 'total_profit', 'total_weight')  # 配置排序字段
 
@@ -787,7 +832,8 @@ class ShopViewSet(mixins.ListModelMixin,
         all_product_incomplete = False
         products = MLProduct.objects.filter(user_id=request.user.id).exclude(p_status='OFFLINE')
         for i in products:
-            if not (i.site and i.item_id and i.unit_cost and i.image and i.shop):
+
+            if not (i.site and i.unit_cost and i.image and i.shop and i.item_id):
                 all_product_incomplete = True
                 break
             if not (
@@ -1324,6 +1370,7 @@ class ShipViewSet(mixins.ListModelMixin,
     filterset_fields = {
         'book_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'shop': ['exact'],
+        'platform': ['exact'],
         's_status': ['exact', 'in'],
         'target': ['exact'],
         'batch': ['exact'],
@@ -1341,6 +1388,7 @@ class ShipViewSet(mixins.ListModelMixin,
         shop = request.data['shop']
         shop_obj = Shop.objects.filter(name=shop).first()
         shop_id = shop_obj.id
+        platform = request.data['platform']
         target = request.data['target']
         ship_type = request.data['ship_type']
         carrier = request.data['carrier']
@@ -1376,6 +1424,7 @@ class ShipViewSet(mixins.ListModelMixin,
         ship = Ship(
             s_status='PREPARING',
             send_from='CN',
+            platform=platform,
             batch=batch,
             shop=shop,
             target=target,
@@ -3230,7 +3279,7 @@ class FBMWarehouseViewSet(mixins.ListModelMixin,
     pagination_class = DefaultPagination  # 分页
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('country', 'is_active')  # 配置过滤字段
+    filter_fields = ('country', 'is_active', 'platform')  # 配置过滤字段
     search_fields = ('w_code', 'name', 'address')  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段
 

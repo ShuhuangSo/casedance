@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack
+    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -660,3 +660,218 @@ def get_shop_quota(shop_id):
 
     used_quota = total_amount + trans_amount + onway_amount
     return used_quota
+
+
+# 上传美客多订单
+@shared_task()
+def upload_mercado_order(shop_id, data):
+    import warnings
+    import re
+    import openpyxl
+    warnings.filterwarnings('ignore')
+
+    wb = openpyxl.load_workbook(data['excel'])
+    sheet = wb.active
+
+    month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+                  'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
+                  'diciembre': '12'}
+
+    shop = Shop.objects.filter(id=shop_id).first()
+    er = ExRate.objects.filter(currency=shop.currency).first()
+    ex_rate = er.value
+
+    # 模板格式检查
+    format_checked = True
+    if sheet['A3'].value != '# de venta':
+        format_checked = False
+    if sheet['B3'].value != 'Fecha de venta':
+        format_checked = False
+    if sheet['C3'].value != 'Estado':
+        format_checked = False
+    if sheet['I3'].value != 'Cargo por venta e impuestos':
+        format_checked = False
+    if sheet['J3'].value != 'Costos de envío':
+        format_checked = False
+    if sheet['L3'].value != 'Total (MXN)':
+        format_checked = False
+    if sheet['M3'].value != 'Venta por publicidad':
+        format_checked = False
+    if sheet['N3'].value != 'SKU':
+        format_checked = False
+    if sheet['O3'].value != '# de publicación':
+        format_checked = False
+    if sheet['R3'].value != 'Precio unitario de venta de la publicación (MXN)':
+        format_checked = False
+    if sheet['Y3'].value != 'Comprador':
+        format_checked = False
+    if sheet['AA3'].value != 'Domicilio':
+        format_checked = False
+    if sheet['AB3'].value != 'Municipio/Alcaldía':
+        format_checked = False
+    if sheet['AC3'].value != 'Estado':
+        format_checked = False
+    if sheet['AD3'].value != 'Código postal':
+        format_checked = False
+    if sheet['AE3'].value != 'País':
+        format_checked = False
+    if not format_checked:
+        return 'ERROR'
+
+    add_list = []
+    for cell_row in list(sheet)[3:]:
+        qty = cell_row[5].value
+        if not qty:
+            continue
+        sku = cell_row[13].value
+        item_id = cell_row[14].value[3:]
+
+        # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+        shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+        if not shop_stock:
+            continue
+        first_ship_cost = shop_stock.first_ship_cost
+        if not first_ship_cost:
+            first_ship_cost = 0
+
+        order_number = cell_row[0].value
+
+        t = cell_row[1].value
+        de_locate = [m.start() for m in re.finditer('de', t)]
+        day = t[:de_locate[0] - 1]
+        if int(day) < 10:
+            day = '0' + day
+        month = t[de_locate[0] + 3:de_locate[1] - 1]
+        year = t[de_locate[1] + 3:de_locate[1] + 7]
+        hour = t[de_locate[1] + 8:de_locate[1] + 10]
+        min = t[de_locate[1] + 11:de_locate[1] + 13]
+        order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
+
+        bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+        order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+        price = cell_row[17].value if cell_row[17].value else 0
+        fees = cell_row[8].value if cell_row[8].value else 0
+        postage = cell_row[9].value if cell_row[9].value else 0
+        receive_fund = cell_row[11].value if cell_row[11].value else 0
+        is_ad = True if cell_row[12].value == 'Sí' else False
+
+        buyer_name = cell_row[24].value
+        buyer_address = cell_row[26].value
+        buyer_city = cell_row[27].value
+        buyer_state = cell_row[28].value
+        buyer_postcode = cell_row[29].value
+        buyer_country = cell_row[30].value
+
+        profit = (float(
+            receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
+        profit_rate = profit / (price * ex_rate)
+        if profit_rate < 0:
+            profit_rate = 0
+
+        order_status = 'FINISHED'
+        if cell_row[2].value == 'Cancelada por el comprador':
+            order_status = 'CANCEL'
+        if cell_row[2].value == 'Paquete cancelado por Mercado Libre':
+            order_status = 'CANCEL'
+        if cell_row[2].value == 'Devolución en camino':
+            order_status = 'RETURN'
+        if cell_row[2].value == 'Reclamo cerrado con reembolso al comprador':
+            order_status = 'CASE'
+        if cell_row[2].value[:8] == 'Devuelto':
+            order_status = 'RETURN'
+
+        # 检查同一店铺订单编号是否存在
+        ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+        if not ml_order:
+            add_list.append(MLOrder(
+                shop=shop,
+                order_number=order_number,
+                order_status=order_status,
+                order_time=order_time,
+                order_time_bj=order_time_bj,
+                qty=qty,
+                currency=shop.currency,
+                ex_rate=ex_rate,
+                price=price,
+                fees=fees,
+                postage=postage,
+                receive_fund=receive_fund,
+                is_ad=is_ad,
+                sku=sku,
+                p_name=shop_stock.p_name,
+                item_id=item_id,
+                image=shop_stock.image,
+                unit_cost=shop_stock.unit_cost * qty,
+                first_ship_cost=first_ship_cost * qty,
+                profit=profit,
+                profit_rate=profit_rate,
+                buyer_name=buyer_name,
+                buyer_address=buyer_address,
+                buyer_city=buyer_city,
+                buyer_state=buyer_state,
+                buyer_postcode=buyer_postcode,
+                buyer_country=buyer_country,
+            ))
+            shop_stock.qty -= qty
+            shop_stock.save()
+        else:
+            if ml_order.order_status != order_status:
+                ml_order.order_status = order_status
+                ml_order.receive_fund = receive_fund
+                ml_order.profit = profit
+                ml_order.save()
+
+                # 如果订单是取消状态，库存增加回来
+                if order_status == 'CANCEL':
+                    shop_stock.qty += qty
+                    shop_stock.save()
+    if len(add_list):
+        MLOrder.objects.bulk_create(add_list)
+
+    return 'SUCESS'
+
+
+# 上传NOON订单
+@shared_task()
+def upload_noon_order(shop_id, data):
+    import warnings
+    import re
+    import openpyxl
+    warnings.filterwarnings('ignore')
+
+    wb = openpyxl.load_workbook(data['excel'])
+    sheet = wb.active
+
+    shop = Shop.objects.filter(id=shop_id).first()
+    er = ExRate.objects.filter(currency=shop.currency).first()
+    ex_rate = er.value
+
+    # 模板格式检查
+    format_checked = True
+    if sheet['A1'].value != 'item_nr':
+        format_checked = False
+    if sheet['B1'].value != 'partner_sku':
+        format_checked = False
+    if sheet['C1'].value != 'sku_config':
+        format_checked = False
+    if sheet['L1'].value != 'country_code':
+        format_checked = False
+    if sheet['M1'].value != 'item_status':
+        format_checked = False
+    if sheet['Q1'].value != 'ordered_date':
+        format_checked = False
+    if sheet['W1'].value != 'currency_code':
+        format_checked = False
+    if sheet['AC1'].value != 'offer_price':
+        format_checked = False
+    if sheet['AG1'].value != 'fee_commission':
+        format_checked = False
+    if sheet['AU1'].value != 'fee_outbound_fbn_v2':
+        format_checked = False
+    if sheet['AW1'].value != 'payment_due':
+        format_checked = False
+    if not format_checked:
+        return 'ERROR'
+
+    return 'SUCESS'

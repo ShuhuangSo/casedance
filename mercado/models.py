@@ -850,6 +850,7 @@ class PurchaseManage(models.Model):
         ('USED', '已出库'),
     )
     p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='WAITBUY', verbose_name='采购单状态', help_text='采购单状态')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     s_type = models.CharField(max_length=10, verbose_name='货品类型', help_text='货品类型')
     create_type = models.CharField(max_length=10, verbose_name='创建方式', help_text='创建方式')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')

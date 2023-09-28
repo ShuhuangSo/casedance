@@ -655,7 +655,7 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
             'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
             'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
             'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
-            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc', 'item_remove_status')
+            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc', 'item_remove_status', 'platform')
 
 
 class UPCSerializer(serializers.ModelSerializer):

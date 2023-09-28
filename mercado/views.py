@@ -109,6 +109,16 @@ class ListingViewSet(mixins.ListModelMixin,
 
         # 更新运单信息
         Ship.objects.filter(carrier='盛德物流').update(platform='MERCADO')
+        # 更新采购信息
+        PurchaseManage.objects.update(platform='MERCADO')
+        # 更新汇率
+        er = ExRate.objects.filter(currency='SAR').first()
+        if not er:
+            er = ExRate()
+            er.currency = 'SAR'
+            er.value = 1.9
+            er.update_time = datetime.now()
+            er.save()
 
         return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
 
@@ -3605,6 +3615,39 @@ class MLOrderViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
+    # 订单上传测试
+    @action(methods=['post'], detail=False, url_path='bulk_upload2')
+    def bulk_upload2(self, request):
+        data = request.data
+        shop_id = data['id']
+        shop = Shop.objects.filter(id=shop_id).first()
+        msg = ''
+        if not shop:
+            return Response({'msg': '店铺状态异常', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        if shop.platform == 'MERCADO':
+            msg = tasks.upload_mercado_order(shop_id, data)
+        if shop.platform == 'NOON':
+            msg = tasks.upload_noon_order(shop_id, data)
+        if msg == 'ERROR':
+            return Response({'msg': '模板格式有误，请检查!', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
+        # 计算产品销量
+        tasks.calc_product_sales.delay()
+        # 统计过去30天每天销量
+        tasks.calc_shop_sale.delay()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'ORDER'
+        log.op_type = 'CREATE'
+        log.target_type = 'ORDER'
+        log.desc = '销售订单导入 店铺: {name}'.format(name=shop.name)
+        log.user = request.user
+        log.save()
+        return Response({'msg': '成功上传', 'status': 'success'}, status=status.HTTP_200_OK)
+
 
 class MLOperateLogViewSet(mixins.ListModelMixin,
                           mixins.CreateModelMixin,
@@ -3699,6 +3742,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     # filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_urgent')  # 配置过滤字段
     filterset_fields = {
         'buy_qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'platform': ['exact'],
         'p_status': ['exact'],
         'shop': ['exact'],
         's_type': ['exact'],
@@ -3761,13 +3805,14 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 total_ship_qty = 0
                 for item in sd_set:
                     total_ship_qty += item.qty
-
+                    
                 shop = Shop.objects.filter(name=i.target_FBM).first()
                 purchase_manage = PurchaseManage(
                     p_status='WAITBUY',
                     s_type=i.s_type,
                     create_type='SYS',
                     from_batch=i.ship.batch,
+                    platform=i.ship.platform,
                     sku=i.sku,
                     p_name=i.p_name,
                     item_id=i.item_id,
@@ -3858,6 +3903,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             buy_pm = PurchaseManage.objects.filter(id=i['id']).first()
             purchase_manage = PurchaseManage(
                 p_status='RECEIVED',
+                platform=buy_pm.platform,
                 s_type=buy_pm.s_type,
                 create_type=buy_pm.create_type,
                 sku=buy_pm.sku,
@@ -3920,6 +3966,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             if not pack_sku:
                 purchase_manage = PurchaseManage(
                     p_status='PACKED',
+                    platform=rec_pm.platform,
                     s_type=rec_pm.s_type,
                     create_type=rec_pm.create_type,
                     sku=rec_pm.sku,

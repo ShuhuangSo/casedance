@@ -119,7 +119,21 @@ class ListingViewSet(mixins.ListModelMixin,
             er.value = 1.9
             er.update_time = datetime.now()
             er.save()
-
+        refill = RefillSettings.objects.all()
+        for i in refill:
+            if not i.platform:
+                i.platform = 'MERCADO'
+                i.save()
+        rfs = RefillSettings.objects.filter(platform='NOON').count()
+        if not rfs:
+            rfs = RefillSettings()
+            rfs.fly_days = 7
+            rfs.sea_days = 30
+            rfs.is_include_trans = True
+            rfs.fly_batch_period = 3
+            rfs.sea_batch_period = 7
+            rfs.platform = 'NOON'
+            rfs.save()
         return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -4238,7 +4252,7 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
         b_num = end_date.replace('-', '')[2:]
         batch = 'P{time_str}'.format(time_str=b_num)
 
-        refill_setting = RefillSettings.objects.first()
+        refill_setting = RefillSettings.objects.filter(platform=shop.platform).first()
         if not refill_setting:
             return Response({'msg': '补货参数未初始化!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
         # 获取设置参数

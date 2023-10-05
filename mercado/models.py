@@ -964,6 +964,7 @@ class RefillSettings(models.Model):
     fly_batch_period = models.IntegerField(default=0, verbose_name='空运批次周期', help_text='空运批次周期')
     sea_batch_period = models.IntegerField(default=0, verbose_name='海运批次周期', help_text='海运批次周期')
     is_include_trans = models.BooleanField(default=True, verbose_name='是否包含中转仓数量', help_text='是否包含中转仓数量')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
 
     class Meta:
         verbose_name = '补货推荐设置'

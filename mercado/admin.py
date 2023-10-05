@@ -161,7 +161,7 @@ class RefillRecommendAdmin(admin.ModelAdmin):
 
 @admin.register(RefillSettings)
 class RefillSettingsAdmin(admin.ModelAdmin):
-    list_display = ['fly_days', 'fly_batch_period', 'is_include_trans']
+    list_display = ['fly_days', 'fly_batch_period', 'is_include_trans', 'platform']
     list_filter = ['is_include_trans']
 
 

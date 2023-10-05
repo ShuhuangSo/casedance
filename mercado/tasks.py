@@ -469,11 +469,11 @@ def ship_tracking(num):
 # 批量更新运单物流运输跟踪
 @shared_task
 def bulk_ship_tracking():
-    queryset = Ship.objects.filter(send_from='CN').filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
+    queryset = Ship.objects.filter(send_from='CN', carrier='盛德物流').filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
     for i in queryset:
         if i.s_number:
             ship_tracking(i.s_number)
-            time.sleep(0.5)
+            time.sleep(0.2)
     # 记录执行日志
     task_log = TaskLog()
     task_log.task_type = 14

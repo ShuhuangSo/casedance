@@ -74,9 +74,21 @@ class ListingViewSet(mixins.ListModelMixin,
     def test(self, request):
         # 更新店铺信息
         Shop.objects.update(platform='MERCADO')
-        shop = Shop.objects.filter(site='KSA').first()
+        shop = Shop.objects.filter(name='SA店铺1').first()
         if shop:
-            shop.platform='NOON'
+            shop.platform = 'NOON'
+            shop.save()
+        else:
+            shop = Shop()
+            shop.warehouse_type = 'FBM'
+            shop.seller_id = 'PRJ80299'
+            shop.name = 'SA店铺1'
+            shop.nickname = 'Suke沙特Noon店铺'
+            shop.shop_type = 'CHINA'
+            shop.site = 'KSA'
+            shop.currency = 'SAR'
+            shop.platform = 'NOON'
+            shop.name_color = '#606c5b'
             shop.save()
         # 更新站点信息
         MLSite.objects.update(platform='MERCADO')
@@ -2159,6 +2171,7 @@ class ShipViewSet(mixins.ListModelMixin,
     def export_logistic_decl(self, request):
         ship_id = request.data['id']
         logistic_name = request.data['name']
+        ship = Ship.objects.filter(id=ship_id).first()
         from openpyxl.drawing.image import Image
 
         if logistic_name == 'SHENGDE':
@@ -2237,7 +2250,6 @@ class ShipViewSet(mixins.ListModelMixin,
                     box_tag = 0
                     num += 1
                 box_num += 1
-            ship = Ship.objects.filter(id=ship_id).first()
             wb.save('media/export/盛德物流申报-' + ship.shop + '.xlsx')
             url = BASE_URL + '/media/export/盛德物流申报-' + ship.shop + '.xlsx'
 
@@ -2248,6 +2260,133 @@ class ShipViewSet(mixins.ListModelMixin,
             log.target_type = 'SHIP'
             log.target_id = ship.id
             log.desc = '导出盛德申报单'
+            log.user = request.user
+            log.save()
+        if logistic_name == 'WEICAO':
+            from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
+
+            alignment = Alignment(horizontal='center', vertical='center')
+            v_alignment = Alignment(vertical='center')
+            title_font = Font(name='微软雅黑', sz=10, b=True)
+            border = Border(
+                left=Side(border_style='thin', color='000000'),
+                right=Side(border_style='thin', color='000000'),
+                top=Side(style='thin', color='000000'),
+                bottom=Side(style='thin', color='000000'))
+            wb = openpyxl.Workbook()
+            boxes = ShipBox.objects.filter(ship__id=ship_id)
+            n = 0
+            for b in boxes:
+                n += 1
+                if n == 1:
+                    sh = wb.active
+                    sh.title = '第1箱'
+                else:
+                    sh = wb.create_sheet('第' + str(n) + '箱', n)
+
+                sh.column_dimensions['A'].width = 30
+                sh.column_dimensions['B'].width = 30
+                sh.column_dimensions['F'].width = 30
+                sh.column_dimensions['G'].width = 30
+                sh.row_dimensions[1].height = 30
+                sh.row_dimensions[2].height = 30
+                sh.row_dimensions[3].height = 30
+                sh.row_dimensions[4].height = 30
+                sh.row_dimensions[5].height = 30
+                sh['A1'] = '发货人公司名称（填写英文）：'
+                sh['B1'] = 'Shenzhen Suke Technology Co., Ltd'
+                sh['F1'] = '收货人名/送仓地址（英文）：'
+                sh['A2'] = '地址（英文）：'
+                sh['B2'] = 'Room 820, 8th Floor, Aihua Building, No. 2038, Shennan Middle Road, Fuqiang Community, Huaqiangbei Street, Futian District, Shenzhen'
+                sh['F2'] = '地址（英文）'
+                sh['A3'] = '联系电话：'
+                sh['B3'] = '13823289200'
+                sh['F3'] = '联系电话：'
+                sh['A4'] = 'Amazon Reference ID:'
+                sh['F4'] = 'shipment ID'
+                sh['A5'] = '图片'
+                sh['B5'] = '英文品名'
+                sh['C5'] = '中文品名'
+                sh['D5'] = '申报单价（USD）'
+                sh['E5'] = '数量（个）'
+                sh['F5'] = 'SKU'
+                sh['G5'] = '申报总金额（USD）'
+
+                sh.merge_cells('B1:E1')
+                sh.merge_cells('B2:E2')
+                sh.merge_cells('B3:E3')
+                sh.merge_cells('B4:E4')
+
+                area = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+                for i in area:
+                    sh[i + '1'].border = border
+                    sh[i + '2'].border = border
+                    sh[i + '3'].border = border
+                    sh[i + '4'].border = border
+
+                    sh[i + '5'].font = title_font
+                    sh[i + '5'].border = border
+                    sh[i + '5'].alignment = alignment
+
+                num = 0
+                all_qty = 0
+                ship_detail = ShipDetail.objects.filter(ship__id=ship_id, box_number=b.box_number)
+                for i in ship_detail:
+                    sh.row_dimensions[num + 6].height = 100
+
+                    img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
+                    img.width, img.height = 80, 80
+                    sh.add_image(img, 'A' + str(num + 6))
+                    sh['A' + str(num + 6)].border = border
+
+                    sh['B' + str(num + 6)] = i.en_name
+                    sh['B' + str(num + 6)].border = border
+                    sh['B' + str(num + 6)].alignment = alignment
+                    sh['C' + str(num + 6)] = i.cn_name
+                    sh['C' + str(num + 6)].border = border
+                    sh['C' + str(num + 6)].alignment = alignment
+                    sh['D' + str(num + 6)] = i.declared_value
+                    sh['D' + str(num + 6)].border = border
+                    sh['D' + str(num + 6)].alignment = alignment
+                    sh['E' + str(num + 6)] = i.qty
+                    sh['E' + str(num + 6)].border = border
+                    sh['E' + str(num + 6)].alignment = alignment
+                    sh['F' + str(num + 6)] = i.sku
+                    sh['F' + str(num + 6)].border = border
+                    sh['F' + str(num + 6)].alignment = alignment
+                    sh['G' + str(num + 6)] = i.declared_value * i.qty
+                    sh['G' + str(num + 6)].border = border
+                    sh['G' + str(num + 6)].alignment = alignment
+
+                    num += 1
+                    all_qty += i.qty
+                sh['A' + str(num + 6)] = '总计'
+                sh['A' + str(num + 6)].font = title_font
+                sh['A' + str(num + 6)].border = border
+                sh['A' + str(num + 6)].alignment = alignment
+                sh['B' + str(num + 6)] = all_qty
+                sh['B' + str(num + 6)].border = border
+                sh['B' + str(num + 6)].alignment = alignment
+                sh.row_dimensions[num + 6].height = 30
+                sh.row_dimensions[num + 7].height = 30
+                sh['A' + str(num + 7)] = '这里填这箱子尺寸及重量'
+                sh['A' + str(num + 7)].font = title_font
+                sh['A' + str(num + 7)].border = border
+                sh['A' + str(num + 7)].alignment = alignment
+                sh['B' + str(num + 7)] = '{w}kg / {l}x{h}x{k}cm'.format(w=b.weight, l=b.length, h=b.heigth, k=b.width)
+                sh['B' + str(num + 7)].border = border
+                sh['B' + str(num + 7)].alignment = alignment
+
+            wb.save('media/export/微草空运-' + ship.shop + '.xlsx')
+            url = BASE_URL + '/media/export/微草空运-' + ship.shop + '.xlsx'
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'CREATE'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '导出微草空运申报单'
             log.user = request.user
             log.save()
 

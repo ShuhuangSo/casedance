@@ -747,6 +747,7 @@ class MLOrder(models.Model):
                               help_text='产品图片')
     unit_cost = models.FloatField(null=True, default=0, verbose_name='均摊成本价', help_text='均摊成本价')
     first_ship_cost = models.FloatField(null=True, default=0, verbose_name='均摊头程运费', help_text='均摊头程运费')
+    buyer_id = models.CharField(max_length=100, null=True, blank=True, verbose_name='买家id', help_text='买家id')
     buyer_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='买家姓名', help_text='买家姓名')
     buyer_address = models.CharField(max_length=500, null=True, blank=True, verbose_name='买家街道',
                                      help_text='买家街道')
@@ -756,6 +757,12 @@ class MLOrder(models.Model):
                                       help_text='买家邮编')
     buyer_country = models.CharField(max_length=20, null=True, blank=True, verbose_name='买家国家',
                                      help_text='买家国家')
+    shipped_date = models.DateTimeField(null=True, blank=True, verbose_name='发货时间', help_text='发货时间')
+    delivered_date = models.DateTimeField(null=True, blank=True, verbose_name='送达时间', help_text='送达时间')
+    VAT = models.FloatField(null=True, default=0, verbose_name='税价', help_text='税价')
+    invoice_price = models.FloatField(null=True, default=0, verbose_name='成交价', help_text='成交价')
+    promo_coupon = models.FloatField(null=True, default=0, verbose_name='优惠金额', help_text='优惠金额')
+    platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
 
     class Meta:

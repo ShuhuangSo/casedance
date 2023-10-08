@@ -146,6 +146,9 @@ class ListingViewSet(mixins.ListModelMixin,
             rfs.sea_batch_period = 7
             rfs.platform = 'NOON'
             rfs.save()
+
+        # 更新订单平台信息
+        MLOrder.objects.filter(shop__platform='MERCADO').update(platform='MERCADO')
         return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -3788,6 +3791,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
 
         # 计算产品销量
         tasks.calc_product_sales.delay()
+
         # 统计过去30天每天销量
         tasks.calc_shop_sale.delay()
 

@@ -499,7 +499,12 @@ class MLOrderSerializer(serializers.ModelSerializer):
     sale_url = serializers.SerializerMethodField()
 
     def get_sale_url(self, obj):
-        url = 'https://articulo.mercadolibre.com.mx/' + obj.shop.site + '-' + obj.item_id
+        url = ''
+        if obj.shop.platform == 'MERCADO':
+            url = 'https://articulo.mercadolibre.com.mx/' + obj.shop.site + '-' + obj.item_id
+        if obj.shop.platform == 'NOON':
+            if obj.shop.site == 'KSA':
+                url = 'https://www.noon.com/saudi-en/product/{item_id}/p/?o={item_id}-1'.format(item_id=obj.item_id)
         return url
 
     class Meta:
@@ -507,7 +512,8 @@ class MLOrderSerializer(serializers.ModelSerializer):
         fields = ('id', 'order_number', 'order_status', 'order_time', 'order_time_bj', 'qty', 'currency', 'ex_rate',
                   'price', 'fees', 'postage', 'receive_fund', 'profit', 'profit_rate', 'is_ad', 'sku', 'p_name',
                   'item_id', 'image', 'unit_cost', 'first_ship_cost', 'buyer_name', 'buyer_address', 'buyer_city',
-                  'buyer_state', 'buyer_postcode', 'buyer_country', 'create_time', 'shop', 'sale_url')
+                  'buyer_state', 'buyer_postcode', 'buyer_country', 'create_time', 'shop', 'sale_url', 'platform',
+                  'buyer_id', 'shipped_date', 'delivered_date', 'VAT', 'invoice_price', 'promo_coupon')
 
 
 class FinanceSerializer(serializers.ModelSerializer):

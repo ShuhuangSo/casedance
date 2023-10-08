@@ -786,6 +786,7 @@ def upload_mercado_order(shop_id, data):
         if not ml_order:
             add_list.append(MLOrder(
                 shop=shop,
+                platform='MERCADO',
                 order_number=order_number,
                 order_status=order_status,
                 order_time=order_time,
@@ -847,31 +848,177 @@ def upload_noon_order(shop_id, data):
     er = ExRate.objects.filter(currency=shop.currency).first()
     ex_rate = er.value
 
-    # 模板格式检查
-    format_checked = True
-    if sheet['A1'].value != 'item_nr':
-        format_checked = False
-    if sheet['B1'].value != 'partner_sku':
-        format_checked = False
-    if sheet['C1'].value != 'sku_config':
-        format_checked = False
-    if sheet['L1'].value != 'country_code':
-        format_checked = False
-    if sheet['M1'].value != 'item_status':
-        format_checked = False
-    if sheet['Q1'].value != 'ordered_date':
-        format_checked = False
-    if sheet['W1'].value != 'currency_code':
-        format_checked = False
-    if sheet['AC1'].value != 'offer_price':
-        format_checked = False
-    if sheet['AG1'].value != 'fee_commission':
-        format_checked = False
-    if sheet['AU1'].value != 'fee_outbound_fbn_v2':
-        format_checked = False
-    if sheet['AW1'].value != 'payment_due':
-        format_checked = False
-    if not format_checked:
-        return 'ERROR'
+    # 如果是invoice表
+    if sheet['A1'].value == 'Invoice Nr':
+        # 模板格式检查
+        format_checked = True
+        if sheet['A1'].value != 'Invoice Nr':
+            format_checked = False
+        if sheet['C1'].value != 'Invoice Date':
+            format_checked = False
+        if sheet['G1'].value != 'Source Document Type':
+            format_checked = False
+        if sheet['K1'].value != 'Vat Amount':
+            format_checked = False
+        if sheet['L1'].value != 'Price incl tax':
+            format_checked = False
+        if sheet['N1'].value != 'Item Nr':
+            format_checked = False
+        if sheet['O1'].value != 'SKU':
+            format_checked = False
+        if sheet['P1'].value != 'Partner SKU':
+            format_checked = False
+        if sheet['S1'].value != 'Customer ID':
+            format_checked = False
+        if sheet['T1'].value != 'Customer Name':
+            format_checked = False
+        if sheet['U1'].value != 'Customer City':
+            format_checked = False
+        if sheet['V1'].value != 'Customer Country':
+            format_checked = False
+        if not format_checked:
+            return 'ERROR'
+
+        add_list = []
+        for cell_row in list(sheet)[1:]:
+            row_type = cell_row[6].value
+            # 检查行类型
+            if row_type != 'Customer order':
+                continue
+            if not row_type:
+                break
+
+            sku = cell_row[15].value
+            item_id = cell_row[14].value[:-2]
+
+            # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+            if not shop_stock:
+                continue
+            first_ship_cost = shop_stock.first_ship_cost
+            if not first_ship_cost:
+                first_ship_cost = 0
+
+            order_number = cell_row[13].value
+            order_time = cell_row[2].value + ' 00:00:00'
+
+            buyer_name = cell_row[19].value
+            buyer_id = cell_row[18].value
+            buyer_city = cell_row[20].value
+            buyer_country = cell_row[21].value
+            VAT = cell_row[10].value
+            invoice_price = cell_row[11].value
+            order_status = 'UNCHECK'
+
+            # 检查同一店铺订单编号是否存在
+            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+            if not ml_order:
+                add_list.append(MLOrder(
+                    shop=shop,
+                    platform='NOON',
+                    order_number=order_number,
+                    order_status=order_status,
+                    order_time=order_time,
+                    qty=1,
+                    currency=shop.currency,
+                    ex_rate=ex_rate,
+                    VAT=VAT,
+                    invoice_price=invoice_price,
+                    sku=sku,
+                    p_name=shop_stock.p_name,
+                    item_id=item_id,
+                    image=shop_stock.image,
+                    unit_cost=shop_stock.unit_cost * 1,
+                    first_ship_cost=first_ship_cost * 1,
+                    buyer_name=buyer_name,
+                    buyer_id=buyer_id,
+                    buyer_city=buyer_city,
+                    buyer_country=buyer_country,
+                ))
+                shop_stock.qty -= 1
+                shop_stock.save()
+        if len(add_list):
+            MLOrder.objects.bulk_create(add_list)
+        return 'SUCCESS'
+
+    if sheet['A1'].value == 'item_nr':
+        # 模板格式检查
+        format_checked = True
+        if sheet['A1'].value != 'item_nr':
+            format_checked = False
+        if sheet['B1'].value != 'partner_sku':
+            format_checked = False
+        if sheet['C1'].value != 'sku_config':
+            format_checked = False
+        if sheet['L1'].value != 'country_code':
+            format_checked = False
+        if sheet['M1'].value != 'item_status':
+            format_checked = False
+        if sheet['Q1'].value != 'ordered_date':
+            format_checked = False
+        if sheet['W1'].value != 'currency_code':
+            format_checked = False
+        if sheet['AC1'].value != 'offer_price':
+            format_checked = False
+        if sheet['AG1'].value != 'fee_commission':
+            format_checked = False
+        if sheet['AU1'].value != 'fee_outbound_fbn_v2':
+            format_checked = False
+        if sheet['AW1'].value != 'payment_due':
+            format_checked = False
+        if not format_checked:
+            return 'ERROR'
+        for cell_row in list(sheet)[1:]:
+            order_number = cell_row[0].value
+            if not order_number:
+                break
+
+            # 检查同一店铺订单编号是否存在
+            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+            if ml_order:
+                order_status = cell_row[12].value
+                price = cell_row[28].value if cell_row[28].value else 0
+                promo_coupon = cell_row[29].value if cell_row[29].value else 0
+                fees = cell_row[32].value if cell_row[32].value else 0
+                postage = cell_row[46].value if cell_row[46].value else 0
+                receive_fund = cell_row[48].value if cell_row[48].value else 0
+                shipped_date = ''
+                delivered_date = ''
+                if cell_row[17].value:
+                    shipped_date = cell_row[17].value + ' 00:00:00'
+                if cell_row[18].value:
+                    delivered_date = cell_row[18].value + ' 00:00:00'
+
+                # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+                shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()
+                if not shop_stock:
+                    continue
+                first_ship_cost = shop_stock.first_ship_cost
+                if not first_ship_cost:
+                    first_ship_cost = 0
+
+                if ml_order.order_status == 'UNCHECK':
+                    if order_status == 'delivered':
+                        ml_order.order_status = 'FINISHED'
+                        ml_order.price = price
+                        ml_order.promo_coupon = promo_coupon
+                        ml_order.postage = postage
+                        ml_order.fees = fees
+                        ml_order.receive_fund = receive_fund
+                        if shipped_date:
+                            ml_order.shipped_date = shipped_date
+                        if delivered_date:
+                            ml_order.delivered_date = delivered_date
+
+                        profit = (float(
+                            receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                        profit_rate = profit / (price * ex_rate)
+                        if profit_rate < 0:
+                            profit_rate = 0
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+            else:
+                continue
 
     return 'SUCESS'

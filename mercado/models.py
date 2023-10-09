@@ -400,6 +400,27 @@ class ShopStock(models.Model):
         return self.sku
 
 
+class StockLog(models.Model):
+    shop_stock = models.ForeignKey(ShopStock, related_name='shop_stock_log', on_delete=models.CASCADE,
+                                   verbose_name='所属库存',
+                                   help_text='所属库存')
+    current_stock = models.IntegerField(default=0, verbose_name='当前库存', help_text='当前库存')
+    qty = models.IntegerField(default=0, verbose_name='变动数量', help_text='变动数量')
+    in_out = models.CharField(max_length=5, verbose_name='库存出入', help_text='库存出入')
+    action = models.CharField(max_length=10, verbose_name='变动来源', help_text='变动来源')
+    desc = models.CharField(max_length=100, verbose_name='描述', help_text='描述')
+    user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='操作人id', help_text='操作人id')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '库存日志'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.action
+
+
 class TransStock(models.Model):
     """
     中转仓库存
@@ -857,7 +878,8 @@ class PurchaseManage(models.Model):
         ('PACKED', '已打包'),
         ('USED', '已出库'),
     )
-    p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='WAITBUY', verbose_name='采购单状态', help_text='采购单状态')
+    p_status = models.CharField(max_length=10, choices=PRODUCT_STATUS, default='WAITBUY', verbose_name='采购单状态',
+                                help_text='采购单状态')
     platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     s_type = models.CharField(max_length=10, verbose_name='货品类型', help_text='货品类型')
     create_type = models.CharField(max_length=10, verbose_name='创建方式', help_text='创建方式')

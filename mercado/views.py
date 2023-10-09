@@ -20,13 +20,13 @@ from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings, CarrierTrack
+    RefillRecommend, RefillSettings, CarrierTrack, StockLog
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
     ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
-    RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer
+    RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer, StockLogSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -95,6 +95,7 @@ class ListingViewSet(mixins.ListModelMixin,
             shop.exc_currency = 'USD'
             shop.platform = 'NOON'
             shop.name_color = '#606c5b'
+            shop.quota = 100000
             shop.save()
         # 更新站点信息
         MLSite.objects.update(platform='MERCADO')
@@ -1347,6 +1348,18 @@ class ShopStockViewSet(mixins.ListModelMixin,
         shop_stock.qty = new_qty
         shop_stock.save()
 
+        changed_qty = new_qty - old_qty
+        # 创建库存日志
+        stock_log = StockLog()
+        stock_log.shop_stock = shop_stock
+        stock_log.current_stock = shop_stock.qty
+        stock_log.qty = abs(changed_qty)
+        stock_log.in_out = 'IN' if changed_qty > 0 else 'OUT'
+        stock_log.action = 'TAKING'
+        stock_log.desc = '库存盘点, 理由: ' + reason
+        stock_log.user_id = request.user.id
+        stock_log.save()
+
         # 创建操作日志
         log = MLOperateLog()
         log.op_module = 'FBM'
@@ -1354,8 +1367,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
-                                                                                         old_qty=old_qty,
-                                                                                         new_qty=new_qty, reason=reason)
+                                                                                 old_qty=old_qty,
+                                                                                 new_qty=new_qty, reason=reason)
         log.user = request.user
         log.save()
 
@@ -1381,8 +1394,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
-                                                                                old_status=old_status,
-                                                                                new_status=new_status)
+                                                                          old_status=old_status,
+                                                                          new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1663,7 +1676,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
                     log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                        qty=i['qty'])
+                                                                   qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -2072,6 +2085,17 @@ class ShipViewSet(mixins.ListModelMixin,
                     shop_stock.width = i.width
                     shop_stock.heigth = i.heigth
                     shop_stock.save()
+
+                    # 创建库存日志
+                    stock_log = StockLog()
+                    stock_log.shop_stock = shop_stock
+                    stock_log.current_stock = shop_stock.qty
+                    stock_log.qty = i.qty
+                    stock_log.in_out = 'IN'
+                    stock_log.action = 'INBOUND'
+                    stock_log.desc = '补货入仓, 入仓批次: ' + ship.batch
+                    stock_log.user_id = request.user.id
+                    stock_log.save()
                 else:
                     shop_stock = ShopStock()
                     shop = Shop.objects.filter(name=ship.shop).first()
@@ -2096,6 +2120,17 @@ class ShipViewSet(mixins.ListModelMixin,
                     shop_stock.first_ship_cost = i.avg_ship_fee
                     shop_stock.sale_url = url
                     shop_stock.save()
+
+                    # 创建库存日志
+                    stock_log = StockLog()
+                    stock_log.shop_stock = shop_stock
+                    stock_log.current_stock = i.qty
+                    stock_log.qty = i.qty
+                    stock_log.in_out = 'IN'
+                    stock_log.action = 'INBOUND'
+                    stock_log.desc = '首次入仓, 入仓批次: ' + ship.batch
+                    stock_log.user_id = request.user.id
+                    stock_log.save()
         else:
             # 入仓中转仓
             ship_detail = ShipDetail.objects.filter(ship=ship)
@@ -2197,6 +2232,13 @@ class ShipViewSet(mixins.ListModelMixin,
         logistic_name = request.data['name']
         ship = Ship.objects.filter(id=ship_id).first()
         from openpyxl.drawing.image import Image
+
+        sd_set = ShipDetail.objects.filter(ship__id=ship_id)
+        # 检查货品装箱情况
+        for i in sd_set:
+            if not i.box_number:
+                return Response({'msg': '有货品未装箱，请装箱后再导出!', 'status': 'error'},
+                                status=status.HTTP_202_ACCEPTED)
 
         if logistic_name == 'SHENGDE':
             wb = openpyxl.Workbook()
@@ -2321,7 +2363,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 sh['B1'] = 'Shenzhen Suke Technology Co., Ltd'
                 sh['F1'] = '收货人名/送仓地址（英文）：'
                 sh['A2'] = '地址（英文）：'
-                sh['B2'] = 'Room 820, 8th Floor, Aihua Building, No. 2038, Shennan Middle Road, Fuqiang Community, Huaqiangbei Street, Futian District, Shenzhen'
+                sh[
+                    'B2'] = 'Room 820, 8th Floor, Aihua Building, No. 2038, Shennan Middle Road, Fuqiang Community, Huaqiangbei Street, Futian District, Shenzhen'
                 sh['F2'] = '地址（英文）'
                 sh['A3'] = '联系电话：'
                 sh['B3'] = '13823289200'
@@ -2414,7 +2457,7 @@ class ShipViewSet(mixins.ListModelMixin,
             log.user = request.user
             log.save()
 
-        return Response({'url': url}, status=status.HTTP_200_OK)
+        return Response({'url': url, 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 导出采购单
     @action(methods=['post'], detail=False, url_path='export_purchase')
@@ -2879,7 +2922,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
                 log.desc = '迁入产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                    qty=i['move_qty'])
+                                                               qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2893,7 +2936,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.op_module = 'SHIP'
                 log.op_type = 'DEL'
                 log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                            qty=i['move_qty'])
+                                                                   qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2913,7 +2956,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
                 log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                        qty=i['move_qty'])
+                                                                 qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2934,7 +2977,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.op_module = 'SHIP'
             log.op_type = 'DEL'
             log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+                                                               qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
@@ -2953,7 +2996,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.op_module = 'SHIP'
             log.op_type = 'EDIT'
             log.desc = '保留变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+                                                               qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
@@ -3566,8 +3609,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
         log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
-                                                                                           exchange=finance.exchange,
-                                                                                           income=finance.income_rmb)
+                                                                             exchange=finance.exchange,
+                                                                             income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -3609,7 +3652,8 @@ class FinanceViewSet(mixins.ListModelMixin,
 
         rest_income = income_fund - exchange_fund
 
-        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income, 'default_currency': shop.exc_currency},
+        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income,
+                         'default_currency': shop.exc_currency},
                         status=status.HTTP_200_OK)
 
 
@@ -3813,10 +3857,10 @@ class MLOrderViewSet(mixins.ListModelMixin,
                             status=status.HTTP_202_ACCEPTED)
 
         # 计算产品销量
-        # tasks.calc_product_sales.delay()
+        tasks.calc_product_sales.delay()
 
         # 统计过去30天每天销量
-        # tasks.calc_shop_sale.delay()
+        tasks.calc_shop_sale.delay()
 
         # 创建操作日志
         log = MLOperateLog()
@@ -3985,7 +4029,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 total_ship_qty = 0
                 for item in sd_set:
                     total_ship_qty += item.qty
-                    
+
                 shop = Shop.objects.filter(name=i.target_FBM).first()
                 purchase_manage = PurchaseManage(
                     p_status='WAITBUY',
@@ -4613,3 +4657,31 @@ class CarrierTrackViewSet(mixins.ListModelMixin,
     filter_fields = ('carrier_name', 'carrier_number')  # 配置过滤字段
     search_fields = ('context',)  # 配置搜索字段
     ordering_fields = ('create_time', 'time', 'optime')  # 配置排序字段
+
+
+class MLStockLogViewSet(mixins.ListModelMixin,
+                        mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
+    """
+    list:
+        库存日志列表,分页,过滤,搜索,排序
+    create:
+        库存日志新增
+    retrieve:
+        库存日志详情页
+    update:
+        库存日志修改
+    destroy:
+        库存日志删除
+    """
+    queryset = StockLog.objects.all()
+    serializer_class = StockLogSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('shop_stock', 'in_out', 'action', 'user_id')  # 配置过滤字段
+    search_fields = ('desc',)  # 配置搜索字段
+    ordering_fields = ('create_time',)  # 配置排序字段

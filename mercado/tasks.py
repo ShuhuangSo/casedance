@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate
+    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -816,6 +816,17 @@ def upload_mercado_order(shop_id, data):
             ))
             shop_stock.qty -= qty
             shop_stock.save()
+
+            # 创建库存日志
+            stock_log = StockLog()
+            stock_log.shop_stock = shop_stock
+            stock_log.current_stock = shop_stock.qty
+            stock_log.qty = qty
+            stock_log.in_out = 'OUT'
+            stock_log.action = 'SALE'
+            stock_log.desc = '销售出库, 订单号: ' + order_number
+            stock_log.user_id = 0
+            stock_log.save()
         else:
             if ml_order.order_status != order_status:
                 ml_order.order_status = order_status
@@ -827,6 +838,17 @@ def upload_mercado_order(shop_id, data):
                 if order_status == 'CANCEL':
                     shop_stock.qty += qty
                     shop_stock.save()
+
+                    # 创建库存日志
+                    stock_log = StockLog()
+                    stock_log.shop_stock = shop_stock
+                    stock_log.current_stock = shop_stock.qty
+                    stock_log.qty = qty
+                    stock_log.in_out = 'IN'
+                    stock_log.action = 'CANCEL'
+                    stock_log.desc = '取消订单, 订单号: ' + order_number
+                    stock_log.user_id = 0
+                    stock_log.save()
     if len(add_list):
         MLOrder.objects.bulk_create(add_list)
 
@@ -937,6 +959,17 @@ def upload_noon_order(shop_id, data):
                 ))
                 shop_stock.qty -= 1
                 shop_stock.save()
+
+                # 创建库存日志
+                stock_log = StockLog()
+                stock_log.shop_stock = shop_stock
+                stock_log.current_stock = shop_stock.qty
+                stock_log.qty = 1
+                stock_log.in_out = 'OUT'
+                stock_log.action = 'SALE'
+                stock_log.desc = '销售出库, 订单号: ' + order_number
+                stock_log.user_id = 0
+                stock_log.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
         return 'SUCCESS'

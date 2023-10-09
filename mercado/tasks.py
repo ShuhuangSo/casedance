@@ -906,7 +906,7 @@ def upload_noon_order(shop_id, data):
             buyer_id = cell_row[18].value
             buyer_city = cell_row[20].value
             buyer_country = cell_row[21].value
-            VAT = cell_row[10].value
+            VAT = -abs(cell_row[10].value) if cell_row[10].value else 0
             invoice_price = cell_row[11].value
             order_status = 'UNCHECK'
 
@@ -981,7 +981,8 @@ def upload_noon_order(shop_id, data):
                 promo_coupon = cell_row[29].value if cell_row[29].value else 0
                 fees = cell_row[32].value if cell_row[32].value else 0
                 postage = cell_row[46].value if cell_row[46].value else 0
-                receive_fund = cell_row[48].value if cell_row[48].value else 0
+                payment_due = cell_row[48].value if cell_row[48].value else 0
+                receive_fund = round(payment_due + ml_order.VAT, 2)
                 shipped_date = ''
                 delivered_date = ''
                 if cell_row[17].value:

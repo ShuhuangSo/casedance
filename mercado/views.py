@@ -73,10 +73,15 @@ class ListingViewSet(mixins.ListModelMixin,
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         # 更新店铺信息
-        Shop.objects.update(platform='MERCADO')
+        shop_set = Shop.objects.all()
+        for i in shop_set:
+            i.platform = 'MERCADO'
+            i.exc_currency = i.currency
+            i.save()
         shop = Shop.objects.filter(name='SA店铺1').first()
         if shop:
             shop.platform = 'NOON'
+            shop.exc_currency = 'USD'
             shop.save()
         else:
             shop = Shop()
@@ -87,6 +92,7 @@ class ListingViewSet(mixins.ListModelMixin,
             shop.shop_type = 'CHINA'
             shop.site = 'KSA'
             shop.currency = 'SAR'
+            shop.exc_currency = 'USD'
             shop.platform = 'NOON'
             shop.name_color = '#606c5b'
             shop.save()
@@ -654,6 +660,10 @@ class MLProductViewSet(mixins.ListModelMixin,
         product.save()
 
         pic_org = Image.open(path)
+        # 修改保存图片大小
+        pic_ori_new = pic_org.resize((800, 800), Image.ANTIALIAS)
+        pic_ori_new.save(path)
+        # 增加小图
         pic_new = pic_org.resize((100, 100), Image.ANTIALIAS)
         pic_new.save('media/ml_product/' + product.sku + '_100x100.jpg')
 
@@ -1148,6 +1158,11 @@ class ShopStockViewSet(mixins.ListModelMixin,
                 shop_stock.save()
             else:
                 ml_product = MLProduct.objects.filter(sku=sku, item_id=item_id).first()
+                url = ''
+                if shop.platform == 'MERCADO':
+                    url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + ml_product.item_id
+                if shop.platform == 'NOON':
+                    url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=ml_product.item_id)
                 if ml_product:
                     shop_stock = ShopStock()
                     shop_stock.shop = shop
@@ -1164,6 +1179,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
                     shop_stock.heigth = ml_product.heigth
                     shop_stock.unit_cost = ml_product.unit_cost
                     shop_stock.first_ship_cost = ml_product.first_ship_cost
+                    shop_stock.sale_url = url
                     shop_stock.save()
 
         if shop:
@@ -2059,6 +2075,11 @@ class ShipViewSet(mixins.ListModelMixin,
                 else:
                     shop_stock = ShopStock()
                     shop = Shop.objects.filter(name=ship.shop).first()
+                    url = ''
+                    if shop.platform == 'MERCADO':
+                        url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
+                    if shop.platform == 'NOON':
+                        url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=i.item_id)
                     shop_stock.shop = shop
                     shop_stock.sku = i.sku
                     shop_stock.p_name = i.p_name
@@ -2073,7 +2094,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     shop_stock.heigth = i.heigth
                     shop_stock.unit_cost = i.unit_cost
                     shop_stock.first_ship_cost = i.avg_ship_fee
-                    shop_stock.sale_url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
+                    shop_stock.sale_url = url
                     shop_stock.save()
         else:
             # 入仓中转仓
@@ -3497,7 +3518,7 @@ class FinanceViewSet(mixins.ListModelMixin,
         shop = Shop.objects.filter(id=shop_id).first()
         finance = Finance()
         finance.shop = shop
-        finance.currency = shop.currency
+        finance.currency = shop.exc_currency
         finance.income = data['income']
         finance.wd_date = data['wd_date']
         finance.f_type = 'WD'
@@ -3558,6 +3579,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         data = request.data
         shop_id = data['shop']
 
+        shop = Shop.objects.filter(id=shop_id).first()
+
         # 在途外汇
         sum_onway_fund = Finance.objects.filter(shop__id=shop_id, is_received=False, f_type='WD').aggregate(
             Sum('income'))
@@ -3586,7 +3609,7 @@ class FinanceViewSet(mixins.ListModelMixin,
 
         rest_income = income_fund - exchange_fund
 
-        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income},
+        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income, 'default_currency': shop.exc_currency},
                         status=status.HTTP_200_OK)
 
 
@@ -3790,10 +3813,10 @@ class MLOrderViewSet(mixins.ListModelMixin,
                             status=status.HTTP_202_ACCEPTED)
 
         # 计算产品销量
-        tasks.calc_product_sales.delay()
+        # tasks.calc_product_sales.delay()
 
         # 统计过去30天每天销量
-        tasks.calc_shop_sale.delay()
+        # tasks.calc_shop_sale.delay()
 
         # 创建操作日志
         log = MLOperateLog()

@@ -318,6 +318,7 @@ class Shop(models.Model):
     nickname = models.CharField(max_length=50, null=True, blank=True, verbose_name='店铺名称', help_text='店铺名称')
     site = models.CharField(max_length=20, null=True, blank=True, verbose_name='站点', help_text='站点')
     currency = models.CharField(max_length=10, null=True, blank=True, verbose_name='币种', help_text='币种')
+    exc_currency = models.CharField(max_length=5, null=True, blank=True, verbose_name='结算币种', help_text='结算币种')
     url = models.CharField(null=True, blank=True, max_length=300, verbose_name='店铺链接', help_text='店铺链接')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')

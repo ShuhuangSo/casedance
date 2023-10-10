@@ -1003,3 +1003,25 @@ class RefillSettings(models.Model):
 
     def __str__(self):
         return str(self.fly_days)
+
+
+class FileUploadNotify(models.Model):
+    """
+    文件上传通知
+    """
+    shop = models.ForeignKey(Shop, null=True, related_name='shop_file_upload',
+                             on_delete=models.CASCADE,
+                             verbose_name='店铺', help_text='店铺')
+    upload_status = models.CharField(max_length=10, verbose_name='上传状态', help_text='上传状态')
+    upload_type = models.CharField(max_length=10, verbose_name='上传类型', help_text='上传类型')
+    desc = models.CharField(max_length=100, null=True, blank=True, verbose_name='描述', help_text='描述')
+    user_id = models.IntegerField(default=0, null=True, blank=True, verbose_name='操作人id', help_text='操作人id')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+
+    class Meta:
+        verbose_name = '文件上传通知'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_time']
+
+    def __str__(self):
+        return self.upload_status

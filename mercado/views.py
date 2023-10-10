@@ -20,13 +20,14 @@ from casedance.settings import BASE_URL
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings, CarrierTrack, StockLog
+    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
     ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
-    RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer, StockLogSerializer
+    RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer, StockLogSerializer, \
+    FileUploadNotifySerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -1356,7 +1357,7 @@ class ShopStockViewSet(mixins.ListModelMixin,
         stock_log.qty = abs(changed_qty)
         stock_log.in_out = 'IN' if changed_qty > 0 else 'OUT'
         stock_log.action = 'TAKING'
-        stock_log.desc = '库存盘点, 理由: ' + reason
+        stock_log.desc = '盘点理由: ' + reason
         stock_log.user_id = request.user.id
         stock_log.save()
 
@@ -3841,20 +3842,37 @@ class MLOrderViewSet(mixins.ListModelMixin,
     # 订单上传测试
     @action(methods=['post'], detail=False, url_path='bulk_upload2')
     def bulk_upload2(self, request):
+
         data = request.data
         shop_id = data['id']
         shop = Shop.objects.filter(id=shop_id).first()
+
         msg = ''
         if not shop:
             return Response({'msg': '店铺状态异常', 'status': 'error'},
                             status=status.HTTP_202_ACCEPTED)
+
+        # 保存上传excel文件
+        path = 'media/upload_file/order_excel_' + shop_id + '.xlsx'
+        excel = data['excel']
+        content = excel.chunks()
+        with open(path, 'wb') as f:
+            for i in content:
+                f.write(i)
+
+        # 创建上传通知
+        file_upload = FileUploadNotify()
+        file_upload.shop = shop
+        file_upload.user_id = request.user.id
+        file_upload.upload_type = 'ORDER'
+        file_upload.upload_status = 'LOADING'
+        file_upload.desc = '订单正在上传中...'
+        file_upload.save()
+
         if shop.platform == 'MERCADO':
-            msg = tasks.upload_mercado_order(shop_id, data)
+            tasks.upload_mercado_order.delay(shop_id, file_upload.id)
         if shop.platform == 'NOON':
-            msg = tasks.upload_noon_order(shop_id, data)
-        if msg == 'ERROR':
-            return Response({'msg': '模板格式有误，请检查!', 'status': 'error'},
-                            status=status.HTTP_202_ACCEPTED)
+            tasks.upload_noon_order.delay(shop_id, file_upload.id)
 
         # 计算产品销量
         tasks.calc_product_sales.delay()
@@ -3870,7 +3888,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
         log.desc = '销售订单导入 店铺: {name}'.format(name=shop.name)
         log.user = request.user
         log.save()
-        return Response({'msg': '成功上传', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({'msg': '文件已上传，后台处理中，稍微刷新查看结果', 'status': 'success'}, status=status.HTTP_200_OK)
 
 
 class MLOperateLogViewSet(mixins.ListModelMixin,
@@ -4685,3 +4703,48 @@ class MLStockLogViewSet(mixins.ListModelMixin,
     filter_fields = ('shop_stock', 'in_out', 'action', 'user_id')  # 配置过滤字段
     search_fields = ('desc',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
+
+
+class FileUploadNotifyViewSet(mixins.ListModelMixin,
+                              mixins.CreateModelMixin,
+                              mixins.UpdateModelMixin,
+                              mixins.DestroyModelMixin,
+                              mixins.RetrieveModelMixin,
+                              viewsets.GenericViewSet):
+    """
+    list:
+        文件上传通知列表,分页,过滤,搜索,排序
+    create:
+        文件上传通知新增
+    retrieve:
+        文件上传通知详情页
+    update:
+        文件上传通知修改
+    destroy:
+        文件上传通知删除
+    """
+    queryset = FileUploadNotify.objects.all()
+    serializer_class = FileUploadNotifySerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('shop', 'upload_status', 'upload_type', 'user_id')  # 配置过滤字段
+    search_fields = ('desc',)  # 配置搜索字段
+    ordering_fields = ('create_time',)  # 配置排序字段
+
+    # 订单上传测试
+    @action(methods=['post'], detail=False, url_path='get_upload_result')
+    def get_upload_result(self, request):
+        data = request.data
+        shop_id = data['id']
+        shop = Shop.objects.filter(id=shop_id).first()
+
+        res = FileUploadNotify.objects.filter(shop=shop).first()
+        if not res:
+            return Response({'msg': '无记录！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
+        return Response({
+                         'upload_status': res.upload_status,
+                         'create_time': res.create_time,
+                         'desc': res.desc,
+                         'status': 'success'}, status=status.HTTP_200_OK)

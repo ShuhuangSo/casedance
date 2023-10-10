@@ -11,8 +11,10 @@ from django.utils import dateparse
 from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
+from casedance.settings import MEDIA_ROOT
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
-    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog
+    MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog, \
+    FileUploadNotify
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -596,8 +598,6 @@ def calc_shop_sale():
                 qty += item.qty
                 amount += item.price
                 profit += item.profit
-            if s.id == 2:
-                print(qty, amount)
 
             sr = ShopReport.objects.filter(calc_date=date, shop=s).first()
             if sr:
@@ -664,13 +664,15 @@ def get_shop_quota(shop_id):
 
 # 上传美客多订单
 @shared_task()
-def upload_mercado_order(shop_id, data):
+def upload_mercado_order(shop_id, notify_id):
     import warnings
     import re
     import openpyxl
+
     warnings.filterwarnings('ignore')
 
-    wb = openpyxl.load_workbook(data['excel'])
+    data = MEDIA_ROOT + '/upload_file/order_excel_' + shop_id + '.xlsx'
+    wb = openpyxl.load_workbook(data)
     sheet = wb.active
 
     month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
@@ -716,6 +718,11 @@ def upload_mercado_order(shop_id, data):
     if sheet['AE3'].value != 'País':
         format_checked = False
     if not format_checked:
+        # 修改上传通知
+        file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+        file_upload.upload_status = 'ERROR'
+        file_upload.desc = '模板格式有误，请检查!'
+        file_upload.save()
         return 'ERROR'
 
     add_list = []
@@ -824,7 +831,7 @@ def upload_mercado_order(shop_id, data):
             stock_log.qty = qty
             stock_log.in_out = 'OUT'
             stock_log.action = 'SALE'
-            stock_log.desc = '销售出库, 订单号: ' + order_number
+            stock_log.desc = '销售订单号: ' + order_number
             stock_log.user_id = 0
             stock_log.save()
         else:
@@ -846,24 +853,30 @@ def upload_mercado_order(shop_id, data):
                     stock_log.qty = qty
                     stock_log.in_out = 'IN'
                     stock_log.action = 'CANCEL'
-                    stock_log.desc = '取消订单, 订单号: ' + order_number
+                    stock_log.desc = '取消订单入库, 订单号: ' + order_number
                     stock_log.user_id = 0
                     stock_log.save()
     if len(add_list):
         MLOrder.objects.bulk_create(add_list)
+
+    # 修改上传通知
+    file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+    file_upload.upload_status = 'SUCCESS'
+    file_upload.desc = '上传成功!'
+    file_upload.save()
 
     return 'SUCESS'
 
 
 # 上传NOON订单
 @shared_task()
-def upload_noon_order(shop_id, data):
+def upload_noon_order(shop_id, notify_id):
     import warnings
-    import re
     import openpyxl
     warnings.filterwarnings('ignore')
 
-    wb = openpyxl.load_workbook(data['excel'])
+    data = MEDIA_ROOT + '/upload_file/order_excel_' + shop_id + '.xlsx'
+    wb = openpyxl.load_workbook(data)
     sheet = wb.active
 
     shop = Shop.objects.filter(id=shop_id).first()
@@ -899,6 +912,11 @@ def upload_noon_order(shop_id, data):
         if sheet['V1'].value != 'Customer Country':
             format_checked = False
         if not format_checked:
+            # 修改上传通知
+            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+            file_upload.upload_status = 'ERROR'
+            file_upload.desc = '模板格式有误，请检查!'
+            file_upload.save()
             return 'ERROR'
 
         add_list = []
@@ -967,12 +985,11 @@ def upload_noon_order(shop_id, data):
                 stock_log.qty = 1
                 stock_log.in_out = 'OUT'
                 stock_log.action = 'SALE'
-                stock_log.desc = '销售出库, 订单号: ' + order_number
+                stock_log.desc = '销售订单号: ' + order_number
                 stock_log.user_id = 0
                 stock_log.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
-        return 'SUCCESS'
 
     if sheet['A1'].value == 'item_nr':
         # 模板格式检查
@@ -1054,5 +1071,9 @@ def upload_noon_order(shop_id, data):
                         ml_order.save()
             else:
                 continue
-
+    # 修改上传通知
+    file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+    file_upload.upload_status = 'SUCCESS'
+    file_upload.desc = '上传成功!'
+    file_upload.save()
     return 'SUCESS'

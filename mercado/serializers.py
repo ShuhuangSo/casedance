@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
@@ -6,7 +7,8 @@ from django.db.models import Q
 from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
-    PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack, StockLog
+    PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack, StockLog, \
+    FileUploadNotify
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -255,10 +257,16 @@ class StockLogSerializer(serializers.ModelSerializer):
     """
     库存日志
     """
+    user_name = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+        User = get_user_model()
+        user = User.objects.filter(id=obj.user_id).first()
+        return user.first_name if user else 'System'
 
     class Meta:
         model = StockLog
-        fields = "__all__"
+        fields = ('id', 'shop_stock', 'current_stock', 'qty', 'in_out', 'action', 'desc', 'user_name', 'create_time')
 
 
 class ShipDetailSerializer(serializers.ModelSerializer):
@@ -714,4 +722,14 @@ class CarrierTrackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CarrierTrack
+        fields = "__all__"
+
+
+class FileUploadNotifySerializer(serializers.ModelSerializer):
+    """
+    文件上传通知
+    """
+
+    class Meta:
+        model = FileUploadNotify
         fields = "__all__"

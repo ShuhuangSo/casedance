@@ -27,7 +27,8 @@ from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
     MLProductViewSet, ShopViewSet, ShopStockViewSet, ShipViewSet, ShipDetailViewSet, ShipBoxViewSet, CarrierViewSet, \
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
     MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
-    UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet, CarrierTrackViewSet, MLStockLogViewSet
+    UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet, CarrierTrackViewSet, MLStockLogViewSet, \
+    FileUploadNotifyViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -197,6 +198,8 @@ router.register('ml_refill_settings', RefillSettingsViewSet, basename='ml_refill
 router.register('ml_refill', RefillRecommendViewSet, basename='ml_refill')
 # 库存日志列表,
 router.register('ml_stock_log', MLStockLogViewSet, basename='ml_stock_log')
+# 文件上传通知列表,
+router.register('ml_file_upload_notify', FileUploadNotifyViewSet, basename='ml_file_upload_notify')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

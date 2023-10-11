@@ -923,16 +923,19 @@ class ShopViewSet(mixins.ListModelMixin,
         total_sku = 0  # 在售产品
         total_amount = 0  # 库存金额
         total_qty = 0  # 库存数量
+        out_stock = 0  # 缺货产品
         for i in ss:
             if i.p_status != 'OFFLINE' and i.qty > 0:
                 total_sku += 1
                 total_qty += i.qty
                 total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
+            if i.p_status != 'OFFLINE' and i.qty <= 0:
+                out_stock += 1
 
         used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
         return Response(
             {'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
-             'quota': shop.quota, 'used_quota': used_quota},
+             'quota': shop.quota, 'out_stock': out_stock, 'used_quota': used_quota},
             status=status.HTTP_200_OK)
 
     # 店铺收支管理
@@ -4741,7 +4744,7 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin,
 
         res = FileUploadNotify.objects.filter(shop=shop).first()
         if not res:
-            return Response({'msg': '无记录！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({'status': '无记录！'}, status=status.HTTP_200_OK)
 
         return Response({
                          'upload_status': res.upload_status,

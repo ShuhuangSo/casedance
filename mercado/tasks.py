@@ -834,6 +834,8 @@ def upload_mercado_order(shop_id, notify_id):
             stock_log.desc = '销售订单号: ' + order_number
             stock_log.user_id = 0
             stock_log.save()
+            stock_log.create_time = order_time  # order_time
+            stock_log.save()
         else:
             if ml_order.order_status != order_status:
                 ml_order.order_status = order_status
@@ -988,10 +990,12 @@ def upload_noon_order(shop_id, notify_id):
                 stock_log.desc = '销售订单号: ' + order_number
                 stock_log.user_id = 0
                 stock_log.save()
+                stock_log.create_time = order_time  # order_time
+                stock_log.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 
-    if sheet['A1'].value == 'item_nr':
+    elif sheet['A1'].value == 'item_nr':
         # 模板格式检查
         format_checked = True
         if sheet['A1'].value != 'item_nr':
@@ -1071,6 +1075,13 @@ def upload_noon_order(shop_id, notify_id):
                         ml_order.save()
             else:
                 continue
+    else:
+        # 修改上传通知
+        file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+        file_upload.upload_status = 'ERROR'
+        file_upload.desc = '模板格式有误，请检查!'
+        file_upload.save()
+        return 'ERROR'
     # 修改上传通知
     file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
     file_upload.upload_status = 'SUCCESS'

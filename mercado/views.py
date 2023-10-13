@@ -3695,7 +3695,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
     search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price', 'profit')  # 配置排序字段
 
-    # ML订单批量上传
+    # ML订单批量上传(旧)
     @action(methods=['post'], detail=False, url_path='bulk_upload')
     def bulk_upload(self, request):
         import warnings
@@ -3783,6 +3783,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
             if not ml_order:
                 add_list.append(MLOrder(
                     shop=shop,
+                    platform='MERCADO',
                     order_number=order_number,
                     order_status=order_status,
                     order_time=order_time,
@@ -3812,6 +3813,19 @@ class MLOrderViewSet(mixins.ListModelMixin,
                 ))
                 shop_stock.qty -= qty
                 shop_stock.save()
+
+                # 创建库存日志
+                stock_log = StockLog()
+                stock_log.shop_stock = shop_stock
+                stock_log.current_stock = shop_stock.qty
+                stock_log.qty = qty
+                stock_log.in_out = 'OUT'
+                stock_log.action = 'SALE'
+                stock_log.desc = '销售订单号: ' + order_number
+                stock_log.user_id = 0
+                stock_log.save()
+                stock_log.create_time = order_time  # order_time
+                stock_log.save()
             else:
                 if ml_order.order_status != order_status:
                     ml_order.order_status = order_status
@@ -3823,6 +3837,17 @@ class MLOrderViewSet(mixins.ListModelMixin,
                     if order_status == 'CANCEL':
                         shop_stock.qty += qty
                         shop_stock.save()
+
+                        # 创建库存日志
+                        stock_log = StockLog()
+                        stock_log.shop_stock = shop_stock
+                        stock_log.current_stock = shop_stock.qty
+                        stock_log.qty = qty
+                        stock_log.in_out = 'IN'
+                        stock_log.action = 'CANCEL'
+                        stock_log.desc = '取消订单入库, 订单号: ' + order_number
+                        stock_log.user_id = 0
+                        stock_log.save()
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 
@@ -3842,7 +3867,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 
-    # 订单上传测试
+    # 订单上传接口2
     @action(methods=['post'], detail=False, url_path='bulk_upload2')
     def bulk_upload2(self, request):
 
@@ -3850,7 +3875,6 @@ class MLOrderViewSet(mixins.ListModelMixin,
         shop_id = data['id']
         shop = Shop.objects.filter(id=shop_id).first()
 
-        msg = ''
         if not shop:
             return Response({'msg': '店铺状态异常', 'status': 'error'},
                             status=status.HTTP_202_ACCEPTED)
@@ -4735,7 +4759,7 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin,
     search_fields = ('desc',)  # 配置搜索字段
     ordering_fields = ('create_time',)  # 配置排序字段
 
-    # 订单上传测试
+    # 获取订单上传记录
     @action(methods=['post'], detail=False, url_path='get_upload_result')
     def get_upload_result(self, request):
         data = request.data

@@ -9,3 +9,11 @@ class VisitLimitMiddleWare(MiddlewareMixin):
         # 系统关闭维护
         if settings.SITE_CLOSE:
             return HttpResponse(content="系统关闭", status=503)
+
+        # 客户端要求最低版本
+        required_app_ver = 131
+        app_ver = request.META.get("HTTP_APP_VER")
+
+        if app_ver:
+            if int(app_ver) < required_app_ver:
+                return HttpResponse(content="app版本过低", status=555)

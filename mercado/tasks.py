@@ -942,7 +942,10 @@ def upload_noon_order(shop_id, notify_id):
                 first_ship_cost = 0
 
             order_number = cell_row[13].value
-            order_time = cell_row[2].value + ' 00:00:00'
+            order_time = cell_row[2].value
+            # 该字段可能有datetime和str 2种类型, 需要进行判断
+            if type(cell_row[2].value) == 'str':
+                order_time = cell_row[2].value + ' 00:00:00'
 
             buyer_name = cell_row[19].value
             buyer_id = cell_row[18].value
@@ -1040,9 +1043,14 @@ def upload_noon_order(shop_id, notify_id):
                 shipped_date = ''
                 delivered_date = ''
                 if cell_row[17].value:
-                    shipped_date = cell_row[17].value + ' 00:00:00'
+                    shipped_date = cell_row[17].value
+                    # 该字段可能有datetime和str 2种类型, 需要进行判断
+                    if type(cell_row[17].value) == 'str':
+                        shipped_date = cell_row[17].value + ' 00:00:00'
                 if cell_row[18].value:
-                    delivered_date = cell_row[18].value + ' 00:00:00'
+                    delivered_date = cell_row[18].value
+                    if type(cell_row[17].value) == 'str':
+                        delivered_date = cell_row[18].value + ' 00:00:00'
 
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
                 shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()

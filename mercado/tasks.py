@@ -1060,8 +1060,9 @@ def upload_noon_order(shop_id, notify_id):
                 if not first_ship_cost:
                     first_ship_cost = 0
 
-                if ml_order.order_status == 'UNCHECK':
-                    if order_status == 'delivered':
+                if order_status == 'delivered':
+                    # 订单送达
+                    if ml_order.order_status != 'FINISHED':
                         ml_order.order_status = 'FINISHED'
                         ml_order.price = price
                         ml_order.promo_coupon = promo_coupon
@@ -1081,6 +1082,32 @@ def upload_noon_order(shop_id, notify_id):
                         ml_order.profit = profit
                         ml_order.profit_rate = profit_rate
                         ml_order.save()
+                elif order_status == 'returned':
+                    # 订单退货
+                    if ml_order.order_status != 'RETURN':
+                        ml_order.order_status = 'RETURN'
+                        ml_order.VAT = 0
+                        ml_order.price = price
+                        ml_order.promo_coupon = promo_coupon
+                        ml_order.postage = postage
+                        ml_order.fees = fees
+                        ml_order.receive_fund = payment_due
+                        if shipped_date:
+                            ml_order.shipped_date = shipped_date
+                        if delivered_date:
+                            ml_order.delivered_date = delivered_date
+
+                        profit = (float(
+                            payment_due) * 0.99) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                        profit_rate = profit / (price * ex_rate)
+                        if profit_rate < 0:
+                            profit_rate = 0
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+
+                else:
+                    continue
             else:
                 continue
     else:

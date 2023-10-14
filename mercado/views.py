@@ -73,91 +73,26 @@ class ListingViewSet(mixins.ListModelMixin,
     # test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        # 更新店铺信息
-        shop_set = Shop.objects.all()
-        for i in shop_set:
-            i.platform = 'MERCADO'
-            i.exc_currency = i.currency
-            i.save()
-        shop = Shop.objects.filter(name='SA店铺1').first()
-        if shop:
-            shop.platform = 'NOON'
-            shop.exc_currency = 'USD'
-            shop.save()
-        else:
-            shop = Shop()
-            shop.warehouse_type = 'FBM'
-            shop.seller_id = 'PRJ80299'
-            shop.name = 'SA店铺1'
-            shop.nickname = 'Suke沙特Noon店铺'
-            shop.shop_type = 'CHINA'
-            shop.site = 'KSA'
-            shop.currency = 'SAR'
-            shop.exc_currency = 'USD'
-            shop.platform = 'NOON'
-            shop.name_color = '#606c5b'
-            shop.quota = 100000
-            shop.save()
-        # 更新站点信息
-        MLSite.objects.update(platform='MERCADO')
-        s = MLSite.objects.filter(site_code='KSA').first()
-        if s:
-            s.platform = 'NOON'
-            s.save()
-        else:
-            site = MLSite()
-            site.od_num = 4
-            site.site_code = 'KSA'
-            site.name = '沙特'
-            site.platform = 'NOON'
-            site.save()
-        # 更新产品信息
-        MLProduct.objects.filter(site='MLM').update(platform='MERCADO')
-        # 更新仓库列表信息
-        FBMWarehouse.objects.update(platform='MERCADO')
-        fbm = FBMWarehouse.objects.filter(w_code='JED01').first()
-        if fbm:
-            fbm.platform = 'NOON'
-            fbm.save()
-        else:
-            fbm = FBMWarehouse()
-            fbm.country = '沙特KSA'
-            fbm.w_code = 'JED01'
-            fbm.name = '沙特JED01'
-            fbm.country = '沙特KSA'
-            fbm.save()
-
-        # 更新运单信息
-        Ship.objects.filter(carrier='盛德物流').update(platform='MERCADO')
-        # 更新采购信息
-        PurchaseManage.objects.update(platform='MERCADO')
-        # 更新汇率
-        er = ExRate.objects.filter(currency='SAR').first()
-        if not er:
-            er = ExRate()
-            er.currency = 'SAR'
-            er.value = 1.9
-            er.update_time = datetime.now()
-            er.save()
-        refill = RefillSettings.objects.all()
-        for i in refill:
-            if not i.platform:
-                i.platform = 'MERCADO'
-                i.save()
-        rfs = RefillSettings.objects.filter(platform='NOON').count()
-        if not rfs:
-            rfs = RefillSettings()
-            rfs.fly_days = 7
-            rfs.sea_days = 30
-            rfs.is_include_trans = True
-            rfs.fly_batch_period = 3
-            rfs.sea_batch_period = 7
-            rfs.platform = 'NOON'
-            rfs.save()
-
-        # 更新订单平台信息
-        MLOrder.objects.filter(shop__platform='MERCADO').update(platform='MERCADO')
-        return Response({'batch_list': 'OK'}, status=status.HTTP_200_OK)
+        url = 'http://client.sanstar.net.cn/console/Report/shippingmark'
+        data = [{
+            "operNo": "1057123102042",
+            "dsid": "8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC",
+            "type": 1,
+            "proc": "client_add_BigWaybill_warehousereceipt",
+            "TheCompany": "10571",
+            "country": "墨西哥",
+            "repottype": "pdf",
+            "EntrustType": "空运",
+            "serialno": 0,
+            "new_num": 0
+        }]
+        headers = {
+            'Content-Type': 'multipart/form-data; boundary=--------------------------717043318089462405514640',
+            'Cookie': 'Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=kcNf; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b;'
+        }
+        resp = requests.post(url, data={'param': data}, headers=headers)
+        print(resp.json())
+        return Response({'batch_list': resp.json()}, status=status.HTTP_200_OK)
 
     # 添加商品链接
     @action(methods=['post'], detail=False, url_path='create_listing')
@@ -1371,8 +1306,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
-                                                                                 old_qty=old_qty,
-                                                                                 new_qty=new_qty, reason=reason)
+                                                                                         old_qty=old_qty,
+                                                                                         new_qty=new_qty, reason=reason)
         log.user = request.user
         log.save()
 
@@ -1398,8 +1333,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.target_id = sid
         log.target_type = 'FBM'
         log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
-                                                                          old_status=old_status,
-                                                                          new_status=new_status)
+                                                                                old_status=old_status,
+                                                                                new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1680,7 +1615,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
                     log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                   qty=i['qty'])
+                                                                        qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -2926,7 +2861,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
                 log.desc = '迁入产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                               qty=i['move_qty'])
+                                                                    qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2940,7 +2875,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.op_module = 'SHIP'
                 log.op_type = 'DEL'
                 log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                   qty=i['move_qty'])
+                                                                            qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2960,7 +2895,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
                 log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                 qty=i['move_qty'])
+                                                                        qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -2981,7 +2916,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.op_module = 'SHIP'
             log.op_type = 'DEL'
             log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                               qty=item_remove.plan_qty - item_remove.send_qty)
+                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
@@ -3000,7 +2935,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log.op_module = 'SHIP'
             log.op_type = 'EDIT'
             log.desc = '保留变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                               qty=item_remove.plan_qty - item_remove.send_qty)
+                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
@@ -3613,8 +3548,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
         log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
-                                                                             exchange=finance.exchange,
-                                                                             income=finance.income_rmb)
+                                                                                           exchange=finance.exchange,
+                                                                                           income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -3915,7 +3850,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
         log.desc = '销售订单导入 店铺: {name}'.format(name=shop.name)
         log.user = request.user
         log.save()
-        return Response({'msg': '文件已上传，后台处理中，稍微刷新查看结果', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({'msg': '文件已上传，后台处理中，稍微刷新查看结果', 'status': 'success'},
+                        status=status.HTTP_200_OK)
 
 
 class MLOperateLogViewSet(mixins.ListModelMixin,
@@ -4771,7 +4707,7 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin,
             return Response({'status': '无记录！'}, status=status.HTTP_200_OK)
 
         return Response({
-                         'upload_status': res.upload_status,
-                         'create_time': res.create_time,
-                         'desc': res.desc,
-                         'status': 'success'}, status=status.HTTP_200_OK)
+            'upload_status': res.upload_status,
+            'create_time': res.create_time,
+            'desc': res.desc,
+            'status': 'success'}, status=status.HTTP_200_OK)

@@ -73,26 +73,33 @@ class ListingViewSet(mixins.ListModelMixin,
     # test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        url = 'http://client.sanstar.net.cn/console/Report/shippingmark'
-        data = [{
-            "operNo": "1057123102042",
-            "dsid": "8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC",
-            "type": 1,
-            "proc": "client_add_BigWaybill_warehousereceipt",
-            "TheCompany": "10571",
-            "country": "墨西哥",
-            "repottype": "pdf",
-            "EntrustType": "空运",
-            "serialno": 0,
-            "new_num": 0
-        }]
-        headers = {
-            'Content-Type': 'multipart/form-data; boundary=--------------------------717043318089462405514640',
-            'Cookie': 'Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=kcNf; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b;'
+        # 获取盛德标签
+        # url = 'http://client.sanstar.net.cn/console/Report/shippingmark'
+        # data = {'param': '[{"operNo":"1057123102042","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'}
+
+        # 盛德获获fbm仓库信息
+        # url = ' http://client.sanstar.net.cn/console/customer_order/fbawarehousecodedata'
+        # data = {
+        #     'country': '墨西哥',
+        #     'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
+        #     'somrequest': '',
+        # }
+
+        url = 'http://client.sanstar.net.cn/console/customer_order/get_order_list'
+        data = {
+            'thecompany': 'SO',
+            'operNo': '910571231002402',
+            'op': 1,
         }
-        resp = requests.post(url, data={'param': data}, headers=headers)
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Cookie': 'ASP.NET_SessionId=5qpklgblwxxsw0fgvitke2g4;Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=qFTS; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b; linkid=5115388e-bbc3-4545-94dd-de5587ce4a91'
+        }
+        resp = requests.post(url, data=data, headers=headers)
         print(resp.json())
-        return Response({'batch_list': resp.json()}, status=status.HTTP_200_OK)
+        print('success' in resp.json())
+        # return Response({'batch_list': resp.json()[0]['tb'][0]}, status=status.HTTP_200_OK)
+        return Response({'batch_list': 'ok'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
     @action(methods=['post'], detail=False, url_path='create_listing')
@@ -2662,6 +2669,69 @@ class ShipViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
+    # 盛德标签
+    @action(methods=['post'], detail=False, url_path='carrier_label')
+    def carrier_label(self, request):
+        label_type = request.data['label_type']  # 箱唛：BOX 交运单：RECEIPT
+        s_number = request.data['s_number']
+
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Cookie': 'ASP.NET_SessionId=5qpklgblwxxsw0fgvitke2g4;Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=qFTS; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b; linkid=5115388e-bbc3-4545-94dd-de5587ce4a91'
+        }
+
+        # 查询运单详情，获取operNo
+        url_1 = 'http://client.sanstar.net.cn/console/customer_order/get_order_list'
+        data_1 = {
+            'thecompany': 'SO',
+            'operNo': s_number,
+            'op': 1,
+        }
+        resp = requests.post(url_1, data=data_1, headers=headers)
+
+        if 'success' in resp.json():
+            # 查询运单异常情况
+            return Response({'msg': resp.json()['msg'], 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
+        # 查到运单（已受理）
+        if resp.json()[0]['tb']:
+            ship_order = resp.json()[0]['tb'][0]
+            oper_no = ship_order['operNo']
+
+            # 箱唛标签
+            url_2 = ''
+            data_2 = {}
+            if label_type == 'BOX':
+                url_2 = 'http://client.sanstar.net.cn/console/Report/shippingmark'
+                data_2 = {
+                    'param': '[{"operNo":' + oper_no + ',"dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'}
+
+            # 交运单
+            if label_type == 'RECEIPT':
+                url_2 = 'http://client.sanstar.net.cn/console/Report/getwarehousereceipt'
+                data_2 = {
+                    'param': '[{"type":1,"operNo":"' + oper_no + '","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","proc":"cliect_交仓单","warehouseid":"0200","regionid":30,"repottype":"pdf"}]'}
+
+            # 获取标签链接
+            resp2 = requests.post(url_2, data=data_2, headers=headers)
+            if 'success' in resp2.json():
+                if resp2.json()['success']:
+                    # 创建操作日志
+                    log = MLOperateLog()
+                    log.op_module = 'SHIP'
+                    log.op_type = 'EDIT'
+                    log.target_type = 'SHIP'
+                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(track_num=s_number, message='箱唛' if label_type == 'BOX' else '交运单')
+                    log.user = request.user
+                    log.save()
+                    return Response({'link': resp2.json()['msg'], 'status': 'success'}, status=status.HTTP_200_OK)
+
+        else:
+            return Response({'msg': '运单待受理，无法生成标签', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
+        return Response({'msg': '生成标签异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
     # 重写
     def destroy(self, request, *args, **kwargs):

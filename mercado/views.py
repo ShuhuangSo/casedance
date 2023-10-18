@@ -3356,10 +3356,15 @@ class TransStockViewSet(mixins.ListModelMixin,
             if not ts_check:
                 return Response({'msg': '产品状态已变动，请检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
+        shop_obj = Shop.objects.filter(name=shop).first()
+        platform = ''
+        if shop_obj:
+            platform = shop_obj.platform
         ship = Ship(
             s_status='SHIPPED',
             send_from='LOCAL',
             shop=shop,
+            platform=platform,
             target='FBM',
             batch=batch,
             logi_fee_clear=True,

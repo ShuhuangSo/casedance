@@ -39,27 +39,34 @@ def product_edit_signal(sender, instance, created, **kwargs):
         if instance.__original_custom_code != instance.custom_code:
             value = '海关编码: %s ===>> %s' % (instance.__original_custom_code, instance.custom_code)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'custom_code', instance.custom_code, request.user)  # 更新未发货运单的产品参数
         if instance.__original_cn_name != instance.cn_name:
             value = '中文品名: %s ===>> %s' % (instance.__original_cn_name, instance.cn_name)
             create_log(instance.id, value, request.user)
         if instance.__original_en_name != instance.en_name:
             value = '英文品名: %s ===>> %s' % (instance.__original_en_name, instance.en_name)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'en_name', instance.en_name, request.user)  # 更新未发货运单的产品参数
         if instance.__original_brand != instance.brand:
             value = '品牌: %s ===>> %s' % (instance.__original_brand, instance.brand)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'brand', instance.brand, request.user)  # 更新未发货运单的产品参数
         if instance.__original_declared_value != instance.declared_value:
             value = '申报价值: %s ===>> %s' % (instance.__original_declared_value, instance.declared_value)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'declared_value', instance.declared_value, request.user)  # 更新未发货运单的产品参数
         if instance.__original_cn_material != instance.cn_material:
             value = '中文材质: %s ===>> %s' % (instance.__original_cn_material, instance.cn_material)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'cn_material', instance.cn_material, request.user)  # 更新未发货运单的产品参数
         if instance.__original_en_material != instance.en_material:
             value = '英文材质: %s ===>> %s' % (instance.__original_en_material, instance.en_material)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'en_material', instance.en_material, request.user)  # 更新未发货运单的产品参数
         if instance.__original_use != instance.use:
             value = '用途: %s ===>> %s' % (instance.__original_use, instance.use)
             create_log(instance.id, value, request.user)
+            update_ship_product(instance.sku, 'use', instance.use, request.user)  # 更新未发货运单的产品参数
         if instance.__original_is_elec != instance.is_elec:
             value = '是否带电: %s ===>> %s' % (instance.__original_is_elec, instance.is_elec)
             create_log(instance.id, value, request.user)
@@ -244,6 +251,48 @@ def update_ship_product(sku, field, value, user):
             i.heigth = value
             i.save()
             log_value = '同步更新%s的高cm' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'custom_code':
+            i.custom_code = value
+            i.save()
+            log_value = '同步更新%s的海关编码' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'en_name':
+            i.en_name = value
+            i.save()
+            log_value = '同步更新%s的英文品名' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'brand':
+            i.brand = value
+            i.save()
+            log_value = '同步更新%s的品牌' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'declared_value':
+            i.declared_value = value
+            i.save()
+            log_value = '同步更新%s的申报价值' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'cn_material':
+            i.cn_material = value
+            i.save()
+            log_value = '同步更新%s的中文材质' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'en_material':
+            i.en_material = value
+            i.save()
+            log_value = '同步更新%s的英文材质' % sku
+            create_ship_log(i.ship.id, log_value, user)
+            continue
+        if field == 'use':
+            i.use = value
+            i.save()
+            log_value = '同步更新%s的用途' % sku
             create_ship_log(i.ship.id, log_value, user)
             continue
         if field == 'packing':

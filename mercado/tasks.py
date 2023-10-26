@@ -6,15 +6,16 @@ import time
 import json
 import urllib
 import hashlib
+import os
 from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 
-from casedance.settings import MEDIA_ROOT
+from casedance.settings import MEDIA_ROOT, BASE_DIR
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
     MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog, \
-    FileUploadNotify
+    FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -1122,4 +1123,247 @@ def upload_noon_order(shop_id, notify_id):
     file_upload.upload_status = 'SUCCESS'
     file_upload.desc = '上传成功!'
     file_upload.save()
+    return 'SUCESS'
+
+
+# 盛德交运运单
+@shared_task()
+def sd_place_order(ship_id, data):
+    ship = Ship.objects.filter(id=ship_id).first()
+    if not ship:
+        return {'status': 'error', 'msg': '运单不存在！'}
+    if ship.carrier != '盛德物流':
+        return {'status': 'error', 'msg': '仅支持盛德物流交运！'}
+    if not ship.envio_number:
+        return {'status': 'error', 'msg': 'envio号不能为空！'}
+
+    # 交运数据
+    payload = {
+        'txtconsigneephoto': 'undefined',
+        'operNo': '',
+        'hkremarks': '',
+        'country_code': '墨西哥',
+        'd_code': data['d_code'],  # fbm仓库代码
+        'fbano': '',
+        'address1': data['address1'], # fbm仓库地址
+        'zip_code': data['zip_code'],  # fbm仓库邮编
+        'channelcode': '',
+        'delivertype': '卡派',
+        'warehousename': '深圳石岩仓(必须预约)',
+        'channeltype2': '墨西哥极速达',
+        'jfunit': 'kg',
+        'postcode': 'mx',
+        'reserveid': data['reserveid'],  # 预约id
+        'apptdate': data['apptdate'],  # 预约日期
+        'ckyyservice': 1,
+        'rsum': 1,
+        'invoicelink': '',
+        'cargoagency': '',
+        'EntrustType': data['EntrustType'],  # 空运
+        'tihuotype': '自送货',
+        'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',  # 公司id,固定
+        'khchannel_id': '2498F847-EA54-44EE-9EFF-797BF44AAEF6',  # 不知道，固定
+        'warehouseid': data['warehouseid'],  # 仓库id
+        'DeliveryTime': data['DeliveryTime'],  # 预约送仓时间
+        'LoadingDriver': '',
+        'channelway': '',
+        'kimsvolume': '',
+        'ConsignorContacts': '钟生',
+        'ConsignorPhone': '13823289200',
+        'ConsignorAddress': '深圳市 福田区 赛格科技园 4栋西  703E',
+        'extendoperno': '',
+        'khremarks': '',
+        'isbx': '否',
+        'insure_currency': '',
+        'xmai': '',
+        'isOtherImporter': 0,
+        'importername': '',
+        'destination': '',
+        'eori': '',
+        'address': '',
+        'importerid': '',
+        'isfba': 'FBM',
+        'sellerid': data['sellerid'],  # Seller ID
+        'envio': data['envio'],  # fbm入仓号
+        'intowarehouseweeks': '',
+        'shop': '',
+        'cwremark': '',
+        'fbl': '',
+        'buildtime': '',
+        'shippingdate': '',
+        'companyname': '',
+        'consignee': '',
+        'telephone': '',
+        'province': '',
+        'city': '',
+        'yyno': '',
+        'po': '',
+        'consigneephoto': '',
+        'ftype': '箱唛',  # 上传文件类型
+        'product': data['product'],  # 品名
+        'ProductNature': data['ProductNature'],  # 产品性质，可能多个
+        'vat_clear_customs': '无',
+        'GoodsNum': ship.total_box,  # 预计箱数
+        'yjweight': ship.weight,  # 预计重量
+        'yjvolume': round(ship.cbm, 4),  # 预计体积
+        'CustomsDeclaration': '无单证',
+        'fruit': 1,
+        'quantity': ship.total_qty,  # 产品总数量
+        'rcid': 'EBCF9B79-2504-49D7-AD07-BE325670DE22',  # 待查看
+        'bxjine': 0.00,
+        'email': '',
+        'valtype': 1,
+        'somrequest': '',
+        'vat': '',
+        'vat_company': '',
+        'vat_address': '',
+        'vat_contact': '',
+        'vat_companyphone': '',
+        'eroi': '',
+        'eoricompany': '',
+        'eoriaddr': '',
+        'iskims': '否',
+    }
+    # 上传附件
+    files = {}
+    f_id = time.strftime('%Y%m%d%H%M%S')  # 箱唛附件编号
+
+    f_name = ''  #  pdf文件名
+    sa_set = ShipAttachment.objects.filter(ship=ship, a_type='BOX_LABEL')
+    for i in sa_set:
+        extension = i.name.split(".")[-1]
+        if extension == 'pdf':
+            f_name = i.name
+    path = '{batch}_{id}/{name}'.format(batch=ship.batch, id=ship.id, name=f_name)
+    book_file = MEDIA_ROOT + '/ml_ships/' + path
+    files['txtupload' + f_id] = open(book_file, 'rb')  # 上传箱唛附件
+
+    # 箱唛附件描述信息
+    payload['filegrid'] = json.dumps(
+        [{"id": f_id, "filename": f_name, "filetype": "箱唛", "size": "2.805KB", "fileurl": ""}],
+        ensure_ascii=False)
+
+    p_list = []  # 运单产品列表
+    boxes = ShipBox.objects.filter(ship=ship)
+    box_num = 0
+    num = 0
+    for b in boxes:
+        sd_set = ShipDetail.objects.filter(ship=ship, box_number=b.box_number)
+        box_tag = 1
+        for i in sd_set:
+            product_pic = MEDIA_ROOT + '/ml_product/' + i.sku + '_100x100.jpg'
+            # 上传产品图片
+            files['txtimg' + str(num + 1)] = open(product_pic, 'rb')
+
+            p_list.append({
+                'ContainerNo': i.ship.batch + '/' + str(box_num + 1),  # 货箱编号
+                'ContaineNum': box_tag,  # 件数
+                'ContainerWeight': '0.00',
+                'ContainerLength': '0.00',
+                'ContainerWidth': '0.00',
+                'ContainerHeight': '0.00',
+                'GoodsSKU': i.brand,  # 品牌
+                'EnglishProduct': i.en_name,  # 英文品名
+                'ChineseProduct': i.cn_name,  # 中文品名
+                'DeclaredValue': i.declared_value,  # 单个产品申报价值(usd)
+                'DeclaredNum': i.qty,  # 单箱申报数量
+                'Material': i.cn_material,  # 材质
+                'Purpose': i.use,  # 用途
+                'CustomsCode': i.custom_code,  # 海关编码
+                'SalesWebsite': 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id,  # 销售网址
+                'SellingPice': '0.00',
+                "PicturesLink": "1",
+                "ProductWeight": "0.00",
+                "ProductSize": "",
+                "ASIN": "无",
+                "FNSKU": "无",
+                "model": "",
+                "netweight": "0.00",
+                "roughweight": "0.00",
+                "english_material": i.cn_material,  # 英文材质
+                "id": num + 1,
+                "isdd": "",
+                "isdc": "",
+                "GoodsSKUtype": "",
+                "custom1": "",
+                "custom2": "",
+                "custom3": "",
+                "custom4": "",
+                "custom5": ""
+            })
+            box_tag = 0
+            num += 1
+        box_num += 1
+    payload['tb_GoodsInfo2'] = json.dumps(p_list, ensure_ascii=False)  # 产品列表
+
+    c_path = os.path.join(BASE_DIR, "site_config.json")
+    with open(c_path, "r", encoding="utf-8") as f:
+        data = json.load(f)  # 加载配置数据
+    header = {'Cookie': data['sd_cookies']}
+    url = 'http://client.sanstar.net.cn/console/customer_order/newadd?somrequest='
+
+    resp = requests.post(url, files=files, data=payload, headers=header)
+
+    if 'success' in resp.json():
+        if resp.json()['success']:
+            # 交运成功
+            ship.s_number = resp.json()['sono']
+            ship.carrier_order_status = 'WAIT'
+            ship.carrier_rec_check = 'UNCHECK'
+            ship.carrier_order_time = datetime.now()
+            ship.save()
+
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '盛德交运成功，获取运单号-{track_num}'.format(track_num=ship.s_number)
+            log.save()
+            return {'status': 'success', 'msg': resp.json()['msg']}
+        else:
+            return {'status': 'error', 'msg': resp.json()['msg']}
+
+    return 'SUCESS'
+
+
+# 查询盛德运单受理状态
+@shared_task()
+def query_sd_order_status():
+    payload = {
+        'model': '下单日期',
+        'stime': datetime.now().date() - timedelta(days=14),
+        'etime': datetime.now().date(),
+        'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
+    }
+    c_path = os.path.join(BASE_DIR, "site_config.json")
+    with open(c_path, "r", encoding="utf-8") as f:
+        data = json.load(f)  # 加载配置数据
+    header = {'Cookie': data['sd_cookies']}
+    url = 'http://client.sanstar.net.cn/Common/IDATA_MK?type=list&proc=cliect_select_BigWaybill'
+
+    resp = requests.post(url, data=payload, headers=header)
+    data = []
+    if resp.json():
+        if 'rows' in resp.json():
+            data = resp.json()['rows']
+
+    if len(data):
+        ship_set = Ship.objects.filter(s_status='PREPARING', carrier_order_status='WAIT')
+        for i in ship_set:
+            for d in data:
+                if i.s_number == d['sono']:
+                    i.carrier_order_status = 'ACCEPTED'
+                    i.save()
+
+                    # 创建操作日志
+                    log = MLOperateLog()
+                    log.op_module = 'SHIP'
+                    log.op_type = 'EDIT'
+                    log.target_type = 'SHIP'
+                    log.target_id = i.id
+                    log.desc = '盛德运单已受理'
+                    log.save()
+
     return 'SUCESS'

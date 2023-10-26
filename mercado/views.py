@@ -7,7 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import requests
 import openpyxl
-import time
+import time, os
 import random
 import json
 import urllib
@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.db.models import Q
 
-from casedance.settings import BASE_URL
+from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
@@ -73,32 +73,24 @@ class ListingViewSet(mixins.ListModelMixin,
     # test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
-        # 获取盛德标签
-        # url = 'http://client.sanstar.net.cn/console/Report/shippingmark'
-        # data = {'param': '[{"operNo":"1057123102042","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'}
 
-        # 盛德获获fbm仓库信息
-        # url = ' http://client.sanstar.net.cn/console/customer_order/fbawarehousecodedata'
-        # data = {
-        #     'country': '墨西哥',
-        #     'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
-        #     'somrequest': '',
-        # }
-
-        url = 'http://client.sanstar.net.cn/console/customer_order/get_order_list'
-        data = {
-            'thecompany': 'SO',
-            'operNo': '910571231002402',
-            'op': 1,
-        }
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Cookie': 'ASP.NET_SessionId=5qpklgblwxxsw0fgvitke2g4;Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=qFTS; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b; linkid=5115388e-bbc3-4545-94dd-de5587ce4a91'
-        }
-        resp = requests.post(url, data=data, headers=headers)
-        print(resp.json())
-        print('success' in resp.json())
-        # return Response({'batch_list': resp.json()[0]['tb'][0]}, status=status.HTTP_200_OK)
+        set = FBMWarehouse.objects.all()
+        for i in set:
+            if i.w_code == 'MXRC02':
+                i.zip = '54616'
+                i.save()
+            if i.w_code == 'MXRCO1 RC':
+                i.zip = '54803'
+                i.save()
+        fbm = FBMWarehouse.objects.filter(w_code='Traslada la etiqueta').first()
+        if not fbm:
+            wh = FBMWarehouse()
+            wh.country = '墨西哥MX'
+            wh.w_code = 'Traslada la etiqueta'
+            wh.address = 'SANSTAR'
+            wh.platform = 'MERCADO'
+            wh.name = '盛德中转仓(墨西哥)'
+            wh.save()
         return Response({'batch_list': 'ok'}, status=status.HTTP_200_OK)
 
     # 添加商品链接
@@ -2676,10 +2668,10 @@ class ShipViewSet(mixins.ListModelMixin,
         label_type = request.data['label_type']  # 箱唛：BOX 交运单：RECEIPT
         s_number = request.data['s_number']
 
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Cookie': 'ASP.NET_SessionId=5qpklgblwxxsw0fgvitke2g4;Hm_lvt_ede28e34ab455ba02719948c0d116b49=1686561175; ASP.NET_SessionId=dmpw5bq0hbvnpsfssvqgoqo4; valid=qFTS; wxuid=e51132fedac450943dafa6357ffd8157ff289d18d4838e410326f69106cd29ac228825f3aeae6b1ec13c19e577004b04b1c54ab06dfd73cb3d704482fbefde32a64b8cb69dac61a0022ebe53a1e73e6b; linkid=5115388e-bbc3-4545-94dd-de5587ce4a91'
-        }
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            data = json.load(f)  # 加载配置数据
+        header = {'Cookie': data['sd_cookies']}
 
         # 查询运单详情，获取operNo
         url_1 = 'http://client.sanstar.net.cn/console/customer_order/get_order_list'
@@ -2688,7 +2680,7 @@ class ShipViewSet(mixins.ListModelMixin,
             'operNo': s_number,
             'op': 1,
         }
-        resp = requests.post(url_1, data=data_1, headers=headers)
+        resp = requests.post(url_1, data=data_1, headers=header)
 
         if 'success' in resp.json():
             # 查询运单异常情况
@@ -2715,7 +2707,7 @@ class ShipViewSet(mixins.ListModelMixin,
                     'param': '[{"type":1,"operNo":"' + oper_no + '","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","proc":"cliect_交仓单","warehouseid":"0200","regionid":30,"repottype":"pdf"}]'}
 
             # 获取标签链接
-            resp2 = requests.post(url_2, data=data_2, headers=headers)
+            resp2 = requests.post(url_2, data=data_2, headers=header)
             if 'success' in resp2.json():
                 if resp2.json()['success']:
                     # 创建操作日志
@@ -2723,7 +2715,8 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.op_module = 'SHIP'
                     log.op_type = 'EDIT'
                     log.target_type = 'SHIP'
-                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(track_num=s_number, message='箱唛' if label_type == 'BOX' else '交运单')
+                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(track_num=s_number,
+                                                                               message='箱唛' if label_type == 'BOX' else '交运单')
                     log.user = request.user
                     log.save()
                     return Response({'link': resp2.json()['msg'], 'status': 'success'}, status=status.HTTP_200_OK)
@@ -2732,6 +2725,68 @@ class ShipViewSet(mixins.ListModelMixin,
             return Response({'msg': '运单待受理，无法生成标签', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
         return Response({'msg': '生成标签异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
+    # 盛德交运运单
+    @action(methods=['post'], detail=False, url_path='carrier_place_order')
+    def carrier_place_order(self, request):
+        ship_id = request.data['ship_id']
+        d_code = request.data['d_code']
+        fbm = FBMWarehouse.objects.filter(w_code=d_code).first()
+        if not fbm:
+            return Response({'msg': 'fbm仓库不存在!', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        ship_data = {
+            'd_code': d_code,
+            'address1': fbm.address,
+            'zip_code': fbm.zip if fbm.zip else ' ',
+            'reserveid': request.data['reserveid'],
+            'apptdate': request.data['apptdate'],
+            'EntrustType': request.data['EntrustType'],
+            'warehouseid': request.data['warehouseid'],
+            'DeliveryTime': request.data['DeliveryTime'],
+            'sellerid': request.data['sellerid'],
+            'envio': request.data['envio'],
+            'product': request.data['product'],
+            'ProductNature': request.data['ProductNature'],
+        }
+
+        info = tasks.sd_place_order(ship_id, ship_data)
+        if info['status'] == 'error':
+            return Response({'msg': info['msg'], 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        return Response({'msg': info['msg'], 'status': 'success'}, status=status.HTTP_200_OK)
+
+    # 盛德交运前检查
+    @action(methods=['post'], detail=False, url_path='check_before_place_order')
+    def check_before_place_order(self, request):
+        ship_id = request.data['ship_id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        sd_set = ShipDetail.objects.filter(ship=ship)
+        is_packed = True  # 产品打包状态
+        is_declare = True  # 产品申报状态
+        is_file = False  # 箱唛附件
+        all_status = False  # 总状态
+        for i in sd_set:
+            if not i.box_number:
+                is_packed = False
+            if not i.custom_code or not i.en_name or not i.brand or not i.declared_value or not i.cn_material:
+                is_declare = False
+
+        sa_set = ShipAttachment.objects.filter(ship=ship, a_type='BOX_LABEL')
+        for i in sa_set:
+            extension = i.name.split(".")[-1]
+            if extension == 'pdf':
+                is_file = True
+
+        if is_packed and is_declare and is_file:
+            all_status = True
+        return Response({'is_packed': is_packed, 'is_declare': is_declare, 'is_file': is_file, 'all_status': all_status}, status=status.HTTP_200_OK)
+
+    # 查询盛德运单受理状态
+    @action(methods=['get'], detail=False, url_path='check_sd_order_status')
+    def check_sd_order_status(self, request):
+        tasks.query_sd_order_status()
+        return Response({'msg': '刷新成功！', 'status': 'success'}, status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):
@@ -3298,6 +3353,51 @@ class CarrierViewSet(mixins.ListModelMixin,
     filter_fields = ('name',)  # 配置过滤字段
     search_fields = ('name',)  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
+
+    # 获取盛德预约入仓时间
+    @action(methods=['post'], detail=False, url_path='get_sd_reserve')
+    def get_sd_reserve(self, request):
+        apptdate = request.data['apptdate']  # 预约日期
+        cid = '0200'
+        typeid = '612C36BE-4081-4F8D-9755-02C65B376B8D'
+
+        payload = {
+            'apptdate': apptdate,
+            'cid': cid,
+            'typeid': typeid,
+            'somrequest': '',
+        }
+        url = 'http://client.sanstar.net.cn/ashx/reservationdeliverysys/handler/idata_context.ashx?action=get_reserveinto'
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            data = json.load(f)  # 加载配置数据
+        header = {'Cookie': data['sd_cookies']}
+        resp = requests.post(url, data=payload, headers=header)
+        if 'success' in resp.json():
+            if resp.json()['success']:
+                return Response({'status': 'success', 'data': resp.json()['data']}, status=status.HTTP_200_OK)
+
+        return Response({'msg': '查询异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+
+    # 获取盛德fbm仓库信息
+    @action(methods=['get'], detail=False, url_path='get_fbm_warehouse')
+    def get_fbm_warehouse(self, request):
+        payload = {
+            'country': '墨西哥',
+            'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
+            'somrequest': '',
+        }
+        url = 'http://client.sanstar.net.cn/console/customer_order/fbawarehousecodedata'
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            data = json.load(f)  # 加载配置数据
+        header = {'Cookie': data['sd_cookies']}
+        resp = requests.post(url, data=payload, headers=header)
+        if 'success' in resp.json():
+            if resp.json()['success']:
+                return Response({'status': 'success', 'data': resp.json()['data']}, status=status.HTTP_200_OK)
+
+        return Response({'msg': '查询异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
 
 class TransStockViewSet(mixins.ListModelMixin,

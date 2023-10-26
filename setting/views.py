@@ -509,6 +509,15 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
 
         mp_c = MLUserPermission()
         mp_c.parent = mp
+        mp_c.module_name = '物流交运'
+        mp_c.component = 'ship_carrier_place'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
         mp_c.module_name = '运单打包'
         mp_c.component = 'ship_packing'
         mp_c.order_num = 5

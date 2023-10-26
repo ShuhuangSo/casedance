@@ -492,6 +492,16 @@ class Ship(models.Model):
     extra_fee = models.FloatField(null=True, default=0, verbose_name='额外费用', help_text='额外费用')
     products_cost = models.FloatField(null=True, default=0, verbose_name='货品成本', help_text='货品成本')
     carrier = models.CharField(max_length=30, null=True, blank=True, verbose_name='承运商', help_text='承运商')
+    carrier_order_status = models.CharField(max_length=10, null=True, blank=True, verbose_name='物流交运订单状态',
+                                            help_text='物流交运订单状态')
+    carrier_order_time = models.DateTimeField(null=True, blank=True, verbose_name='物流交运时间',
+                                              help_text='物流交运时间')
+    carrier_rec_check = models.CharField(max_length=10, null=True, blank=True, verbose_name='物流收货核查',
+                                         help_text='物流收货核查')
+    carrier_ckweight = models.FloatField(null=True, blank=True, verbose_name='收货重量', help_text='收货重量')
+    carrier_ckcbm = models.FloatField(null=True, blank=True, verbose_name='收货体积', help_text='收货体积')
+    carrier_ckvolume = models.FloatField(null=True, blank=True, verbose_name='计费重量', help_text='计费重量')
+    carrier_GoodsNum = models.IntegerField(default=0, verbose_name='收货箱数', help_text='收货箱数')
     end_date = models.DateField(null=True, blank=True, verbose_name='物流截单日期', help_text='物流截单日期')
     ship_date = models.DateField(null=True, blank=True, verbose_name='航班日期', help_text='航班日期')
     book_date = models.DateField(null=True, blank=True, verbose_name='FBM预约日期', help_text='FBM预约日期')
@@ -574,7 +584,8 @@ class ShipItemRemove(models.Model):
                              help_text='所属运单')
     item_type = models.CharField(max_length=10, verbose_name='遗弃类型', help_text='遗弃类型')
     sku = models.CharField(max_length=30, verbose_name='产品SKU', help_text='产品SKU')
-    belong_shop = models.CharField(null=True, blank=True, max_length=30, verbose_name='产品所属店铺', help_text='产品所属店铺')
+    belong_shop = models.CharField(null=True, blank=True, max_length=30, verbose_name='产品所属店铺',
+                                   help_text='产品所属店铺')
     p_name = models.CharField(max_length=80, verbose_name='产品名称', help_text='产品名称')
     item_id = models.CharField(max_length=30, null=True, blank=True, verbose_name='链接编号', help_text='链接编号')
     image = models.ImageField(null=True, blank=True, upload_to='ml_product', max_length=200, verbose_name='产品图片',
@@ -646,8 +657,10 @@ class CarrierTrack(models.Model):
     运单物流跟踪
     """
 
-    carrier_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商名称', help_text='物流商名称')
-    carrier_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商单号', help_text='物流商单号')
+    carrier_name = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商名称',
+                                    help_text='物流商名称')
+    carrier_number = models.CharField(null=True, blank=True, max_length=30, verbose_name='物流商单号',
+                                      help_text='物流商单号')
     context = models.CharField(null=True, blank=True, max_length=100, verbose_name='节点描述', help_text='节点描述')
     location = models.CharField(null=True, blank=True, max_length=30, verbose_name='位置', help_text='位置')
     status = models.CharField(null=True, blank=True, max_length=30, verbose_name='状态', help_text='状态')
@@ -726,6 +739,7 @@ class FBMWarehouse(models.Model):
     country = models.CharField(max_length=30, null=True, blank=True, verbose_name='国家', help_text='国家')
     platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     w_code = models.CharField(max_length=30, verbose_name='仓库代码', help_text='仓库代码')
+    zip = models.CharField(max_length=10, null=True, blank=True, verbose_name='邮编', help_text='邮编')
     name = models.CharField(max_length=100, null=True, blank=True, verbose_name='仓库名称', help_text='仓库名称')
     address = models.CharField(max_length=300, null=True, blank=True, verbose_name='仓库地址', help_text='仓库地址')
     note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
@@ -993,7 +1007,8 @@ class RefillSettings(models.Model):
     sea_days = models.IntegerField(default=0, verbose_name='海运物流及上架时间', help_text='海运物流及上架时间')
     fly_batch_period = models.IntegerField(default=0, verbose_name='空运批次周期', help_text='空运批次周期')
     sea_batch_period = models.IntegerField(default=0, verbose_name='海运批次周期', help_text='海运批次周期')
-    is_include_trans = models.BooleanField(default=True, verbose_name='是否包含中转仓数量', help_text='是否包含中转仓数量')
+    is_include_trans = models.BooleanField(default=True, verbose_name='是否包含中转仓数量',
+                                           help_text='是否包含中转仓数量')
     platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
 
     class Meta:

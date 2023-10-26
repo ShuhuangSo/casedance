@@ -392,7 +392,7 @@ class ShipSerializer(serializers.ModelSerializer):
             'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
             'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
             'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',
-            'is_attach', 'is_remove_items', 'ship_shipDetail', 'latest_track')
+            'is_attach', 'is_remove_items', 'ship_shipDetail', 'latest_track', 'carrier_order_status', 'carrier_rec_check')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

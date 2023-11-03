@@ -778,6 +778,8 @@ def upload_mercado_order(shop_id, notify_id):
             profit_rate = 0
 
         order_status = 'FINISHED'
+        if cell_row[2].value == 'Procesando en la bodega':
+            order_status = 'PROCESS'
         if cell_row[2].value == 'Cancelada por el comprador':
             order_status = 'CANCEL'
         if cell_row[2].value == 'Paquete cancelado por Mercado Libre':
@@ -841,6 +843,7 @@ def upload_mercado_order(shop_id, notify_id):
             if ml_order.order_status != order_status:
                 ml_order.order_status = order_status
                 ml_order.receive_fund = receive_fund
+                ml_order.fees = fees
                 ml_order.profit = profit
                 ml_order.save()
 

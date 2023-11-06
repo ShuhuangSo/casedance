@@ -845,6 +845,7 @@ def upload_mercado_order(shop_id, notify_id):
                 ml_order.receive_fund = receive_fund
                 ml_order.fees = fees
                 ml_order.profit = profit
+                ml_order.profit_rate = profit_rate
                 ml_order.save()
             # 如果订单状态更新
             if ml_order.order_status != order_status:
@@ -852,6 +853,7 @@ def upload_mercado_order(shop_id, notify_id):
                 ml_order.receive_fund = receive_fund
                 ml_order.fees = fees
                 ml_order.profit = profit
+                ml_order.profit_rate = profit_rate
                 ml_order.save()
 
                 # 如果订单是取消状态，库存增加回来

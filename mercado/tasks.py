@@ -840,6 +840,13 @@ def upload_mercado_order(shop_id, notify_id):
             stock_log.create_time = order_time  # order_time
             stock_log.save()
         else:
+            # 如果费用更新
+            if ml_order.fees != fees:
+                ml_order.receive_fund = receive_fund
+                ml_order.fees = fees
+                ml_order.profit = profit
+                ml_order.save()
+            # 如果订单状态更新
             if ml_order.order_status != order_status:
                 ml_order.order_status = order_status
                 ml_order.receive_fund = receive_fund

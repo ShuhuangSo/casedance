@@ -686,37 +686,37 @@ def upload_mercado_order(shop_id, notify_id):
 
     # 模板格式检查
     format_checked = True
-    if sheet['A3'].value != '# de venta':
+    if sheet['A6'].value != '# de venta':
         format_checked = False
-    if sheet['B3'].value != 'Fecha de venta':
+    if sheet['B6'].value != 'Fecha de venta':
         format_checked = False
-    if sheet['C3'].value != 'Estado':
+    if sheet['C6'].value != 'Estado':
         format_checked = False
-    if sheet['I3'].value != 'Cargo por venta e impuestos':
+    if sheet['I6'].value != 'Cargo por venta e impuestos':
         format_checked = False
-    if sheet['J3'].value != 'Costos de envío':
+    if sheet['J6'].value != 'Costos de envío':
         format_checked = False
-    if sheet['L3'].value != 'Total (MXN)':
+    if sheet['L6'].value != 'Total (MXN)':
         format_checked = False
-    if sheet['M3'].value != 'Venta por publicidad':
+    if sheet['M6'].value != 'Venta por publicidad':
         format_checked = False
-    if sheet['N3'].value != 'SKU':
+    if sheet['N6'].value != 'SKU':
         format_checked = False
-    if sheet['O3'].value != '# de publicación':
+    if sheet['O6'].value != '# de publicación':
         format_checked = False
-    if sheet['R3'].value != 'Precio unitario de venta de la publicación (MXN)':
+    if sheet['R6'].value != 'Precio unitario de venta de la publicación (MXN)':
         format_checked = False
-    if sheet['Y3'].value != 'Comprador':
+    if sheet['Y6'].value != 'Comprador':
         format_checked = False
-    if sheet['AA3'].value != 'Domicilio':
+    if sheet['AA6'].value != 'Domicilio':
         format_checked = False
-    if sheet['AB3'].value != 'Municipio/Alcaldía':
+    if sheet['AB6'].value != 'Municipio/Alcaldía':
         format_checked = False
-    if sheet['AC3'].value != 'Estado':
+    if sheet['AC6'].value != 'Estado':
         format_checked = False
-    if sheet['AD3'].value != 'Código postal':
+    if sheet['AD6'].value != 'Código postal':
         format_checked = False
-    if sheet['AE3'].value != 'País':
+    if sheet['AE6'].value != 'País':
         format_checked = False
     if not format_checked:
         # 修改上传通知
@@ -727,7 +727,7 @@ def upload_mercado_order(shop_id, notify_id):
         return 'ERROR'
 
     add_list = []
-    for cell_row in list(sheet)[3:]:
+    for cell_row in list(sheet)[6:]:
         qty = cell_row[5].value
         if not qty:
             continue
@@ -1011,59 +1011,59 @@ def upload_noon_order(shop_id, notify_id):
         if len(add_list):
             MLOrder.objects.bulk_create(add_list)
 
-    elif sheet['A1'].value == 'item_nr':
+    elif sheet['D1'].value == 'item_nr':
         # 模板格式检查
         format_checked = True
-        if sheet['A1'].value != 'item_nr':
+        if sheet['D1'].value != 'item_nr':
             format_checked = False
-        if sheet['B1'].value != 'partner_sku':
+        if sheet['H1'].value != 'partner_sku':
             format_checked = False
-        if sheet['C1'].value != 'sku_config':
+        if sheet['G1'].value != 'sku':
             format_checked = False
-        if sheet['L1'].value != 'country_code':
+        if sheet['O1'].value != 'country_code':
             format_checked = False
-        if sheet['M1'].value != 'item_status':
+        if sheet['N1'].value != 'item_status':
             format_checked = False
         if sheet['Q1'].value != 'ordered_date':
             format_checked = False
-        if sheet['W1'].value != 'currency_code':
+        if sheet['U1'].value != 'currency_code':
             format_checked = False
-        if sheet['AC1'].value != 'offer_price':
+        if sheet['AA1'].value != 'offer_price':
             format_checked = False
-        if sheet['AG1'].value != 'fee_commission':
+        if sheet['AF1'].value != 'fee_referral':
             format_checked = False
-        if sheet['AU1'].value != 'fee_outbound_fbn_v2':
+        if sheet['AG1'].value != 'fee_outbound_fbn':
             format_checked = False
-        if sheet['AW1'].value != 'payment_due':
+        if sheet['AU1'].value != 'total_payment':
             format_checked = False
         if not format_checked:
             return 'ERROR'
         for cell_row in list(sheet)[1:]:
-            order_number = cell_row[0].value
+            order_number = cell_row[3].value
             if not order_number:
                 break
 
             # 检查同一店铺订单编号是否存在
             ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
             if ml_order:
-                order_status = cell_row[12].value
-                price = cell_row[28].value if cell_row[28].value else 0
-                promo_coupon = cell_row[29].value if cell_row[29].value else 0
-                fees = cell_row[32].value if cell_row[32].value else 0
-                postage = cell_row[46].value if cell_row[46].value else 0
-                payment_due = cell_row[48].value if cell_row[48].value else 0
+                order_status = cell_row[13].value
+                price = cell_row[26].value if cell_row[26].value else 0
+                promo_coupon = cell_row[27].value if cell_row[27].value else 0
+                fees = cell_row[31].value if cell_row[31].value else 0
+                postage = cell_row[32].value if cell_row[32].value else 0
+                payment_due = cell_row[46].value if cell_row[46].value else 0
                 receive_fund = round(payment_due + ml_order.VAT, 2)
                 shipped_date = ''
                 delivered_date = ''
-                if cell_row[17].value:
-                    shipped_date = cell_row[17].value
+                if cell_row[16].value:
+                    shipped_date = cell_row[16].value
                     # 该字段可能有datetime和str 2种类型, 需要进行判断
+                    if type(cell_row[16].value) == 'str':
+                        shipped_date = cell_row[16].value + ' 00:00:00'
+                if cell_row[17].value:
+                    delivered_date = cell_row[17].value
                     if type(cell_row[17].value) == 'str':
-                        shipped_date = cell_row[17].value + ' 00:00:00'
-                if cell_row[18].value:
-                    delivered_date = cell_row[18].value
-                    if type(cell_row[17].value) == 'str':
-                        delivered_date = cell_row[18].value + ' 00:00:00'
+                        delivered_date = cell_row[17].value + ' 00:00:00'
 
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
                 shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()
@@ -1072,6 +1072,9 @@ def upload_noon_order(shop_id, notify_id):
                 first_ship_cost = shop_stock.first_ship_cost
                 if not first_ship_cost:
                     first_ship_cost = 0
+                # 如果没数据，跳出
+                if price == 0:
+                    continue
 
                 if order_status == 'delivered':
                     # 订单送达

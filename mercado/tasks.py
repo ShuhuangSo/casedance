@@ -686,37 +686,37 @@ def upload_mercado_order(shop_id, notify_id):
 
     # 模板格式检查
     format_checked = True
-    if sheet['A6'].value != '# de venta':
+    if sheet['A3'].value != '# de venta':
         format_checked = False
-    if sheet['B6'].value != 'Fecha de venta':
+    if sheet['B3'].value != 'Fecha de venta':
         format_checked = False
-    if sheet['C6'].value != 'Estado':
+    if sheet['C3'].value != 'Estado':
         format_checked = False
-    if sheet['I6'].value != 'Cargo por venta e impuestos':
+    if sheet['I3'].value != 'Cargo por venta e impuestos':
         format_checked = False
-    if sheet['J6'].value != 'Costos de envío':
+    if sheet['J3'].value != 'Costos de envío':
         format_checked = False
-    if sheet['L6'].value != 'Total (MXN)':
+    if sheet['L3'].value != 'Total (MXN)':
         format_checked = False
-    if sheet['M6'].value != 'Venta por publicidad':
+    if sheet['M3'].value != 'Venta por publicidad':
         format_checked = False
-    if sheet['N6'].value != 'SKU':
+    if sheet['N3'].value != 'SKU':
         format_checked = False
-    if sheet['O6'].value != '# de publicación':
+    if sheet['O3'].value != '# de publicación':
         format_checked = False
-    if sheet['R6'].value != 'Precio unitario de venta de la publicación (MXN)':
+    if sheet['R3'].value != 'Precio unitario de venta de la publicación (MXN)':
         format_checked = False
-    if sheet['Y6'].value != 'Comprador':
+    if sheet['Y3'].value != 'Comprador':
         format_checked = False
-    if sheet['AA6'].value != 'Domicilio':
+    if sheet['AA3'].value != 'Domicilio':
         format_checked = False
-    if sheet['AB6'].value != 'Municipio/Alcaldía':
+    if sheet['AB3'].value != 'Municipio/Alcaldía':
         format_checked = False
-    if sheet['AC6'].value != 'Estado':
+    if sheet['AC3'].value != 'Estado':
         format_checked = False
-    if sheet['AD6'].value != 'Código postal':
+    if sheet['AD3'].value != 'Código postal':
         format_checked = False
-    if sheet['AE6'].value != 'País':
+    if sheet['AE3'].value != 'País':
         format_checked = False
     if not format_checked:
         # 修改上传通知
@@ -727,7 +727,7 @@ def upload_mercado_order(shop_id, notify_id):
         return 'ERROR'
 
     add_list = []
-    for cell_row in list(sheet)[6:]:
+    for cell_row in list(sheet)[3:]:
         qty = cell_row[5].value
         if not qty:
             continue

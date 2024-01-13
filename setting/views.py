@@ -7,6 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 
 from .models import Tag, OperateLog, Menu, SysRefill, MLUserPermission
+from mercado.models import MLProduct, MLOperateLog, Ship, TransStock
 from .serializers import TagSerializer, OperateLogSerializer, MenuSerializer, UserSerializer, ALLMenuSerializer, \
     UserMenuSerializer, SysRefillSerializer, ALLMLUserPermissionSerializer, MLUserPermissionSerializer, \
     MLPermissionSerializer
@@ -252,6 +253,56 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         # 返回admin用户数据
         user = User.objects.get(username='admin')
         return MLUserPermission.objects.filter(user=user, parent=None)
+
+    # 归属权转移
+    @action(methods=['post'], detail=False, url_path='guishu')
+    def guishu(self, request):
+        from_id = request.data['from_id']
+        target_id = request.data['target_id']
+
+        products = MLProduct.objects.filter(user_id=from_id)
+        for i in products:
+            i.user_id = target_id
+            i.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PRODUCT'
+            log.op_type = 'EDIT'
+            log.target_type = 'PRODUCT'
+            log.target_id = i.id
+            log.desc = '转移产品归属权'
+            log.user = request.user
+            log.save()
+
+        ships = Ship.objects.filter(user_id=from_id)
+        for i in ships:
+            i.user_id = target_id
+            i.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = i.id
+            log.desc = '转移运单归属权'
+            log.user = request.user
+            log.save()
+
+        trans = TransStock.objects.filter(user_id=from_id)
+        for i in trans:
+            i.user_id = target_id
+            i.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'TRANS'
+            log.op_type = 'EDIT'
+            log.target_type = 'TRANS'
+            log.target_id = i.id
+            log.desc = '转移中转仓产品归属权'
+            log.user = request.user
+            log.save()
+        return Response({'msg': '操作成功!'},
+                        status=status.HTTP_200_OK)
 
     # 创建默认数据
     @action(methods=['get'], detail=False, url_path='create_default_data')

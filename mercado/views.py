@@ -1339,6 +1339,23 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
+    # 同步中转库存数量
+    @action(methods=['post'], detail=False, url_path='sycn_trans_stock')
+    def sycn_trans_stock(self, request):
+        shop_id = request.data['id']
+        queryset = ShopStock.objects.filter(shop__id=shop_id)
+        for i in queryset:
+            qty = 0
+            ts = TransStock.objects.filter(sku=i.sku, is_out=False)
+            for t in ts:
+                qty += t.qty
+            i.trans_qty = qty
+            i.save()
+
+        result = True
+        return Response({'result': result},
+                        status=status.HTTP_200_OK)
+
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         message = 'runing'
@@ -4727,6 +4744,13 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
                     own_qty += p.rec_qty
                 if p.p_status == 'PACKED':
                     own_qty += p.pack_qty
+
+            # fbm在途库存数量
+            fbm_onway_qty = 0
+            sd_set = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            for sst in sd_set:
+                fbm_onway_qty += sst.qty
+
             add_list.append(RefillRecommend(
                 shop=shop,
                 sku=i.sku,
@@ -4741,7 +4765,7 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
                 days15_sold=i.day15_sold,
                 days7_sold=i.day7_sold,
                 fbm_qty=i.qty,
-                onway_qty=i.onway_qty,
+                onway_qty=fbm_onway_qty,
                 trans_qty=trans_qty,
                 trans_onway_qty=trans_onway_qty,
                 prepare_qty=prepare_qty,

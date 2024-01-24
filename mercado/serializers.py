@@ -201,6 +201,14 @@ class ShopStockSerializer(serializers.ModelSerializer):
     p_rec_qty = serializers.SerializerMethodField()  # 采购到货数量
     fbm_onway_qty = serializers.SerializerMethodField()  # fbm在途数量
     trans_onway_qty = serializers.SerializerMethodField()  # 中转在途数量
+    trans_qty_new = serializers.SerializerMethodField()  # 中转库存数量
+
+    def get_trans_qty_new(self, obj):
+        qty = 0
+        queryset = TransStock.objects.filter(sku=obj.sku, is_out=False)
+        for i in queryset:
+            qty += i.qty
+        return qty
 
     def get_trans_onway_qty(self, obj):
         qty = 0
@@ -247,7 +255,7 @@ class ShopStockSerializer(serializers.ModelSerializer):
         model = ShopStock
         fields = (
             'id', 'shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
-            'image', 'p_status', 'qty', 'fbm_onway_qty', 'trans_onway_qty', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
+            'image', 'p_status', 'qty', 'fbm_onway_qty', 'trans_onway_qty', 'trans_qty_new', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
             'total_sold', 'unit_cost', 'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'total_profit',
             'total_weight', 'total_cbm', 'stock_value', 'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
             'note', 'create_time', 'is_active', 'is_collect', 'preparing_qty', 'p_onway_qty', 'p_rec_qty')

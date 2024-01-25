@@ -2805,6 +2805,77 @@ class ShipViewSet(mixins.ListModelMixin,
         tasks.query_sd_order_status()
         return Response({'msg': '刷新成功！', 'status': 'success'}, status=status.HTTP_200_OK)
 
+    # 盛德对账查询
+    @action(methods=['post'], detail=False, url_path='bill_check')
+    def bill_check(self, request):
+        ships = request.data['ships']
+        checked_ships = []
+        for i in ships:
+            sp = Ship.objects.filter(s_number=i['in_s_number'], envio_number=i['in_envio_number']).first()
+            in_weight = round(float(i['in_weight']), 2)
+            in_price = round(float(i['in_price']), 2)
+            if sp:
+                checked_ships.append({
+                    'in_s_number': i['in_s_number'],
+                    'in_envio_number': i['in_envio_number'],
+                    'in_total_box': i['in_total_box'],
+                    'in_weight': in_weight,
+                    'in_price': in_price,
+                    'in_shipping_fee': i['in_shipping_fee'],
+                    'id': sp.id,
+                    'total_box': sp.total_box,
+                    'weight': sp.weight,
+                    'batch': sp.batch,
+                    's_status': sp.s_status,
+                    'shop': sp.shop,
+                    'logi_fee_clear': sp.logi_fee_clear,
+                    'note': sp.note,
+                    'confirmed': False
+                })
+            else:
+                checked_ships.append({
+                    'in_s_number': i['in_s_number'],
+                    'in_envio_number': i['in_envio_number'],
+                    'in_total_box': i['in_total_box'],
+                    'in_weight': in_weight,
+                    'in_price': in_price,
+                    'in_shipping_fee': i['in_shipping_fee'],
+                    'id': 0,
+                    'total_box': '',
+                    'weight': '',
+                    'batch': '',
+                    's_status': '',
+                    'shop': '',
+                    'logi_fee_clear': '',
+                    'note': '',
+                    'confirmed': False
+                })
+        return Response({'ships': checked_ships}, status=status.HTTP_200_OK)
+
+    # 盛德对账提交
+    @action(methods=['post'], detail=False, url_path='bill_submit')
+    def bill_submit(self, request):
+        ships = request.data['ships']
+        for i in ships:
+            if i['confirmed'] and i['id']:
+                sp = Ship.objects.filter(id=i['id']).first()
+                sp.shipping_fee = i['in_shipping_fee']
+                sp.logi_fee_clear = True
+                sp.save()
+
+                i['logi_fee_clear'] = True
+
+                # 创建操作日志
+                log = MLOperateLog()
+                log.op_module = 'SHIP'
+                log.op_type = 'EDIT'
+                log.target_type = 'SHIP'
+                log.target_id = sp.id
+                log.desc = '物流费用已结算(对账),结算运费 {shipping_fee}'.format(shipping_fee=sp.shipping_fee)
+                log.user = request.user
+                log.save()
+        return Response({'ships': ships, 'msg': '操作成功！', 'status': 'success'}, status=status.HTTP_200_OK)
+
     # 重写
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

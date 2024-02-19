@@ -4522,6 +4522,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 p_status='WAITBUY',
                 s_type='REFILL',
                 create_type='MANUAL',
+                platform=product.platform,
                 sku=product.sku,
                 p_name=product.p_name,
                 item_id=product.item_id,
@@ -4574,6 +4575,75 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         product.is_checked = data['is_checked']
         product.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 迁移sku查询
+    @action(methods=['post'], detail=False, url_path='move_check')
+    def move_check(self, request):
+        sku = request.data['sku']
+        product = MLProduct.objects.filter(sku=sku).first()
+        if not product:
+            return Response({'msg': '产品不存在，请检查sku是否正确！', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        url = '{base_url}/media/ml_product/{sku}.jpg'.format(base_url=BASE_URL, sku=product.sku)
+        p = {
+            'sku': product.sku,
+            'p_name': product.p_name,
+            'image': url if product.image else '',
+            'shop': product.shop,
+        }
+
+        return Response({'product': p}, status=status.HTTP_200_OK)
+
+    # 迁移sku
+    @action(methods=['post'], detail=False, url_path='move_sku')
+    def move_sku(self, request):
+        data = request.data
+        product = MLProduct.objects.filter(sku=data['target_sku']).first()
+        shop = Shop.objects.filter(name=product.shop).first()
+        packing = Packing.objects.filter(id=product.packing_id).first()
+        purchase_manage = PurchaseManage(
+            p_status='RECEIVED',
+            s_type='REFILL',
+            create_type='MOVE',
+            platform=product.platform,
+            sku=product.sku,
+            p_name=product.p_name,
+            item_id=product.item_id,
+            label_code=product.label_code,
+            image=product.image,
+            unit_cost=product.unit_cost,
+            weight=product.weight,
+            length=product.length,
+            width=product.width,
+            heigth=product.heigth,
+            rec_qty=data['move_qty'],
+            pack_qty=data['move_qty'],
+            shop=shop.name,
+            shop_color=shop.name_color,
+            packing_size=packing.size if packing else '',
+            packing_name=packing.name if packing else '',
+            rec_time=datetime.now(),
+            create_time=datetime.now()
+        )
+        purchase_manage.save()
+
+        pm = PurchaseManage.objects.filter(id=data['from_id']).first()
+        if data['move_qty'] < data['from_qty']:
+            pm.rec_qty -= data['move_qty']
+            pm.pack_qty -= data['move_qty']
+            pm.save()
+        else:
+            pm.delete()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'PURCHASE'
+        log.op_type = 'CREATE'
+        log.target_type = 'PURCHASE'
+        log.desc = '迁移 {from_sku} 数量{move_qty}个至 {target_sku}'.format(from_sku=data['from_sku'], move_qty=data['move_qty'], target_sku=data['target_sku'])
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功', 'code': 'success'}, status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):

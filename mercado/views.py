@@ -2163,6 +2163,44 @@ class ShipViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '入仓成功!'}, status=status.HTTP_200_OK)
 
+    # 转入异常
+    @action(methods=['post'], detail=False, url_path='mark_error')
+    def mark_error(self, request):
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship.s_status = 'ERROR'
+        ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '将运单转入异常状态'
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
+    # 转出异常
+    @action(methods=['post'], detail=False, url_path='mark_out_error')
+    def mark_out_error(self, request):
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship.s_status = 'SHIPPED'
+        ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '将运单从异常状态转出'
+        log.user = request.user
+        log.save()
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
     # 计算运单数量
     @action(methods=['get'], detail=False, url_path='calc_ships')
     def calc_ships(self, request):
@@ -4071,6 +4109,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
 
         data = request.data
         shop_id = data['id']
+        mel_row = data['mel_row']
         shop = Shop.objects.filter(id=shop_id).first()
 
         if not shop:
@@ -4095,7 +4134,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
         file_upload.save()
 
         if shop.platform == 'MERCADO':
-            tasks.upload_mercado_order.delay(shop_id, file_upload.id)
+            tasks.upload_mercado_order.delay(shop_id, file_upload.id, mel_row)
         if shop.platform == 'NOON':
             tasks.upload_noon_order.delay(shop_id, file_upload.id)
 

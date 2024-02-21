@@ -665,7 +665,7 @@ def get_shop_quota(shop_id):
 
 # 上传美客多订单
 @shared_task()
-def upload_mercado_order(shop_id, notify_id):
+def upload_mercado_order(shop_id, notify_id, mel_row):
     import warnings
     import re
     import openpyxl
@@ -686,37 +686,37 @@ def upload_mercado_order(shop_id, notify_id):
 
     # 模板格式检查
     format_checked = True
-    if sheet['A3'].value != '# de venta':
+    if sheet['A' + mel_row].value != '# de venta':
         format_checked = False
-    if sheet['B3'].value != 'Fecha de venta':
+    if sheet['B' + mel_row].value != 'Fecha de venta':
         format_checked = False
-    if sheet['C3'].value != 'Estado':
+    if sheet['C' + mel_row].value != 'Estado':
         format_checked = False
-    if sheet['I3'].value != 'Cargo por venta e impuestos':
+    if sheet['I' + mel_row].value != 'Cargo por venta e impuestos':
         format_checked = False
-    if sheet['J3'].value != 'Costos de envío':
+    if sheet['J' + mel_row].value != 'Costos de envío':
         format_checked = False
-    if sheet['L3'].value != 'Total (MXN)':
+    if sheet['L' + mel_row].value != 'Total (MXN)':
         format_checked = False
-    if sheet['M3'].value != 'Venta por publicidad':
+    if sheet['M' + mel_row].value != 'Venta por publicidad':
         format_checked = False
-    if sheet['N3'].value != 'SKU':
+    if sheet['N' + mel_row].value != 'SKU':
         format_checked = False
-    if sheet['O3'].value != '# de publicación':
+    if sheet['O' + mel_row].value != '# de publicación':
         format_checked = False
-    if sheet['R3'].value != 'Precio unitario de venta de la publicación (MXN)':
+    if sheet['R' + mel_row].value != 'Precio unitario de venta de la publicación (MXN)':
         format_checked = False
-    if sheet['Y3'].value != 'Comprador':
+    if sheet['Y' + mel_row].value != 'Comprador':
         format_checked = False
-    if sheet['AA3'].value != 'Domicilio':
+    if sheet['AA' + mel_row].value != 'Domicilio':
         format_checked = False
-    if sheet['AB3'].value != 'Municipio/Alcaldía':
+    if sheet['AB' + mel_row].value != 'Municipio/Alcaldía':
         format_checked = False
-    if sheet['AC3'].value != 'Estado':
+    if sheet['AC' + mel_row].value != 'Estado':
         format_checked = False
-    if sheet['AD3'].value != 'Código postal':
+    if sheet['AD' + mel_row].value != 'Código postal':
         format_checked = False
-    if sheet['AE3'].value != 'País':
+    if sheet['AE' + mel_row].value != 'País':
         format_checked = False
     if not format_checked:
         # 修改上传通知

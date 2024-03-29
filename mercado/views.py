@@ -477,7 +477,9 @@ class MLProductViewSet(mixins.ListModelMixin,
 
         add_list = []
         if sheet.max_row <= 1:
-            return Response({'msg': '表格不能为空'}, status=status.HTTP_202_ACCEPTED)
+            return Response({'msg': '表格不能为空', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        if sheet['V1'].value != '是否带电 1/0':
+            return Response({'msg': '表格有误，请下载最新模板', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
 
         for cell_row in list(sheet)[1:]:
             # 检查1，2列是否为空，空则跳过
@@ -501,6 +503,16 @@ class MLProductViewSet(mixins.ListModelMixin,
             sku = cell_row[0].value
             p_name = cell_row[1].value
             upc = cell_row[2].value
+            # 自动申请upc
+            if upc == 'AUTO_CREATE':
+                upc_num = UPC.objects.filter(is_used=False).first()
+                if upc_num:
+                    upc_num.is_used = True
+                    upc_num.user = request.user
+                    upc_num.use_time = datetime.now()
+                    upc_num.save()
+
+                    upc = upc_num.number
             item_id = cell_row[3].value
             label_code = cell_row[4].value
             site = cell_row[5].value
@@ -533,9 +545,19 @@ class MLProductViewSet(mixins.ListModelMixin,
             cn_material = cell_row[18].value
             en_material = cell_row[19].value
             use = cell_row[20].value
-            buy_url = cell_row[21].value
-            sale_url = cell_row[22].value
-            refer_url = cell_row[23].value
+            is_elec = cell_row[21].value
+            if is_elec == 1:
+                is_elec = True
+            else:
+                is_elec = False
+            is_water = cell_row[22].value
+            if is_water == 1:
+                is_water = True
+            else:
+                is_water = False
+            buy_url = cell_row[23].value
+            sale_url = cell_row[24].value
+            refer_url = cell_row[25].value
 
             add_list.append(MLProduct(
                 sku=sku,
@@ -560,6 +582,8 @@ class MLProductViewSet(mixins.ListModelMixin,
                 cn_material=cn_material,
                 en_material=en_material,
                 use=use,
+                is_elec=is_elec,
+                is_water=is_water,
                 buy_url=buy_url,
                 sale_url=sale_url,
                 refer_url=refer_url,

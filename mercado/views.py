@@ -2083,6 +2083,8 @@ class ShipViewSet(mixins.ListModelMixin,
                         url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
                     if shop.platform == 'NOON':
                         url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=i.item_id)
+                    if shop.platform == 'OZON':
+                        url = 'https://www.ozon.ru/product/{item_id}'.format(item_id=i.item_id)
                     shop_stock.shop = shop
                     shop_stock.sku = i.sku
                     shop_stock.p_name = i.p_name

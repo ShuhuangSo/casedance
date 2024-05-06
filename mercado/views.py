@@ -1599,7 +1599,18 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.fbm_warehouse = fbm_warehouse
         ship.ship_type = ship_type
         ship.carrier = carrier
-        ship.batch = batch
+
+        # 修改批次号
+        if ship.batch != batch:
+            # 判断是否有文件夹需要修改
+            path = 'media/ml_ships/'
+            head_path = '{path}{batch}_{id}'.format(path=path, batch=ship.batch, id=ship.id)
+            # 如果存在文件夹，则修改文件夹名称
+            if os.path.exists(head_path):
+                new_head_path = '{path}{batch}_{id}'.format(path=path, batch=batch, id=ship.id)
+                os.rename(head_path, new_head_path)
+            ship.batch = batch
+
         if end_date:
             ship.end_date = end_date
         if ship_date:
@@ -3844,6 +3855,32 @@ class FinanceViewSet(mixins.ListModelMixin,
 
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
+    # ML创建店铺费用
+    @action(methods=['post'], detail=False, url_path='create_fee')
+    def create_fee(self, request):
+        data = request.data
+        shop_id = data['shop']
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        finance = Finance()
+        finance.shop = shop
+        finance.currency = data['currency']
+        finance.income = data['income']
+        finance.wd_date = data['wd_date']
+        finance.f_type = 'FEE'
+        finance.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'FINANCE'
+        log.op_type = 'CREATE'
+        log.target_type = 'FINANCE'
+        log.desc = '新增店铺费用 店铺: {name}，费用类型: ${currency}，费用金额: ${income}'.format(name=shop.name, currency=finance.currency, income=finance.income)
+        log.user = request.user
+        log.save()
+
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
+
     # ML创建结汇
     @action(methods=['post'], detail=False, url_path='create_exc')
     def create_exc(self, request):
@@ -3885,6 +3922,7 @@ class FinanceViewSet(mixins.ListModelMixin,
     # 统计资金
     @action(methods=['post'], detail=False, url_path='calc_fund')
     def calc_fund(self, request):
+        from decimal import Decimal
         data = request.data
         shop_id = data['shop']
 
@@ -3916,7 +3954,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         if not income_fund:
             income_fund = 0
 
-        rest_income = income_fund - exchange_fund
+        # rest_income = income_fund - exchange_fund
+        rest_income = Decimal(income_fund).quantize(Decimal("0.00")) - Decimal(exchange_fund).quantize(Decimal("0.00"))
 
         return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income,
                          'default_currency': shop.exc_currency},

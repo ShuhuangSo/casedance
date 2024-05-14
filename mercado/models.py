@@ -800,6 +800,15 @@ class MLOrder(models.Model):
     promo_coupon = models.FloatField(null=True, default=0, verbose_name='优惠金额', help_text='优惠金额')
     platform = models.CharField(max_length=20, null=True, blank=True, verbose_name='平台', help_text='平台')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    dispatch_number = models.CharField(max_length=30, null=True, blank=True, verbose_name='发出编号', help_text='发出编号')
+    fee_rate = models.FloatField(default=0, null=True, blank=True, verbose_name='佣金率', help_text='佣金率')
+    fbo_fee = models.FloatField(default=0, null=True, blank=True, verbose_name='FBO费用', help_text='FBO费用')
+    last_mile_fee = models.FloatField(default=0, null=True, blank=True, verbose_name='最后一公里费用', help_text='最后一公里费用')
+    payment_fee = models.FloatField(default=0, null=True, blank=True, verbose_name='收单费用', help_text='收单费用')
+    finance_check1 = models.BooleanField(default=False, verbose_name='是否结算1', help_text='是否结算1')
+    finance_check2 = models.BooleanField(default=False, verbose_name='是否结算2', help_text='是否结算2')
+    sp_fee = models.FloatField(default=0, null=True, blank=True, verbose_name='服务商费用', help_text='服务商费用')
+    sp_fee_rate = models.FloatField(default=0, null=True, blank=True, verbose_name='服务商费率', help_text='服务商费率')
 
     class Meta:
         verbose_name = '销售订单'
@@ -827,6 +836,7 @@ class Finance(models.Model):
     f_type = models.CharField(max_length=10, null=True, blank=True, verbose_name='资金类型', help_text='资金类型')
     is_received = models.BooleanField(default=False, verbose_name='外汇是否收到', help_text='外汇是否收到')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间', help_text='创建时间')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
 
     class Meta:
         verbose_name = '财务管理'
@@ -1040,3 +1050,36 @@ class FileUploadNotify(models.Model):
 
     def __str__(self):
         return self.upload_status
+
+
+class GeneralSettings(models.Model):
+    """
+    通用数据设置
+    """
+
+    item_name = models.CharField(max_length=10, verbose_name='项目名称', help_text='项目名称')
+    update_time = models.DateTimeField(null=True, blank=True, verbose_name='更新时间', help_text='更新时间')
+    text1 = models.CharField(max_length=50, null=True, blank=True, verbose_name='文本字段1', help_text='文本字段1')
+    text2 = models.CharField(max_length=50, null=True, blank=True, verbose_name='文本字段2', help_text='文本字段2')
+    text3 = models.CharField(max_length=50, null=True, blank=True, verbose_name='文本字段3', help_text='文本字段3')
+    value1 = models.FloatField(null=True, blank=True, verbose_name='浮点字段1', help_text='浮点字段1')
+    value2 = models.FloatField(null=True, blank=True, verbose_name='浮点字段2', help_text='浮点字段2')
+    value3 = models.FloatField(null=True, blank=True, verbose_name='浮点字段3', help_text='浮点字段3')
+    num1 = models.IntegerField(default=0, null=True, blank=True, verbose_name='整数字段1', help_text='整数字段1')
+    num2 = models.IntegerField(default=0, null=True, blank=True, verbose_name='整数字段2', help_text='整数字段2')
+    num3 = models.IntegerField(default=0, null=True, blank=True, verbose_name='整数字段3', help_text='整数字段3')
+    sw1 = models.BooleanField(default=False, verbose_name='开关字段1', help_text='开关字段1')
+    sw2 = models.BooleanField(default=False, verbose_name='开关字段2', help_text='开关字段2')
+    sw3 = models.BooleanField(default=False, verbose_name='开关字段3', help_text='开关字段3')
+    d1 = models.DateTimeField(null=True, blank=True, verbose_name='日期字段1', help_text='日期字段1')
+    d2 = models.DateTimeField(null=True, blank=True, verbose_name='日期字段2', help_text='日期字段2')
+    d3 = models.DateTimeField(null=True, blank=True, verbose_name='日期字段3', help_text='日期字段3')
+    note = models.TextField(null=True, blank=True, default='', verbose_name='备注', help_text='备注')
+
+    class Meta:
+        verbose_name = '通用数据设置'
+        verbose_name_plural = verbose_name
+        ordering = ['update_time']
+
+    def __str__(self):
+        return self.item_name

@@ -925,6 +925,11 @@ class ShopViewSet(mixins.ListModelMixin,
                     # 统计中转运单中该店铺产品部分
                     if item.target_FBM == s.name:
                         total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
+            # 店铺费用支出统计
+            shop_fees = Finance.objects.filter(shop=s, f_type='FEE').filter(wd_date__gte=start_date,
+                                                                            wd_date__lte=end_date)
+            for i in shop_fees:
+                total_pay += i.income
 
             finance = Finance.objects.filter(shop=s, f_type='EXC').filter(exc_date__gte=start_date,
                                                                           exc_date__lte=end_date)
@@ -1009,6 +1014,33 @@ class ShopViewSet(mixins.ListModelMixin,
                     if product_cost + shipping_fee:
                         f_sheet['H' + str(num)] = Decimal(product_cost + shipping_fee).quantize(Decimal("0.00"))
                     num += 1
+
+        f_sheet = wb.create_sheet('其它费用')
+        f_sheet['A1'] = '产生日期'
+        f_sheet['B1'] = '店铺名称'
+        f_sheet['C1'] = '费用金额(RMB)'
+        f_sheet['D1'] = '说明'
+        shop_fees = Finance.objects.filter(shop=shop, f_type='FEE').filter(wd_date__gte=start_date,
+                                                                           wd_date__lte=end_date)
+        num = 2
+        fee_note = ''
+        for i in shop_fees:
+            total_pay += i.income
+            if i.currency == '1':
+                fee_note = '账号注册费用'
+            if i.currency == '2':
+                fee_note = '开发票'
+            if i.currency == '3':
+                fee_note = '物流相关杂费'
+            if i.currency == '4':
+                fee_note = '产品相关杂费'
+            if i.currency == '5':
+                fee_note = '其它杂费'
+            f_sheet['A' + str(num)] = i.wd_date
+            f_sheet['B' + str(num)] = shop.name
+            f_sheet['C' + str(num)] = Decimal(i.income).quantize(Decimal("0.00"))
+            f_sheet['D' + str(num)] = fee_note
+            num += 1
 
         f_sheet = wb.create_sheet('收入明细')
         f_sheet['A1'] = '结汇日期'
@@ -2872,7 +2904,9 @@ class ShipViewSet(mixins.ListModelMixin,
 
         if is_packed and is_declare and is_file:
             all_status = True
-        return Response({'is_packed': is_packed, 'is_declare': is_declare, 'is_file': is_file, 'all_status': all_status}, status=status.HTTP_200_OK)
+        return Response(
+            {'is_packed': is_packed, 'is_declare': is_declare, 'is_file': is_file, 'all_status': all_status},
+            status=status.HTTP_200_OK)
 
     # 查询盛德运单受理状态
     @action(methods=['get'], detail=False, url_path='check_sd_order_status')
@@ -3875,7 +3909,9 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺费用 店铺: {name}，费用类型: ${currency}，费用金额: ${income}'.format(name=shop.name, currency=finance.currency, income=finance.income)
+        log.desc = '新增店铺费用 店铺: {name}，费用类型: ${currency}，费用金额: ${income}'.format(name=shop.name,
+                                                                                                currency=finance.currency,
+                                                                                                income=finance.income)
         log.user = request.user
         log.save()
 
@@ -4202,12 +4238,15 @@ class MLOrderViewSet(mixins.ListModelMixin,
             tasks.upload_mercado_order.delay(shop_id, file_upload.id, mel_row)
         if shop.platform == 'NOON':
             tasks.upload_noon_order.delay(shop_id, file_upload.id)
+        if shop.platform == 'OZON':
+            # tasks.upload_ozon_order.delay(shop_id, file_upload.id)
+            tasks.upload_ozon_order(shop_id, file_upload.id)
 
         # 计算产品销量
-        tasks.calc_product_sales.delay()
+        # tasks.calc_product_sales.delay()
 
         # 统计过去30天每天销量
-        tasks.calc_shop_sale.delay()
+        # tasks.calc_shop_sale.delay()
 
         # 创建操作日志
         log = MLOperateLog()
@@ -4744,7 +4783,9 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         log.op_module = 'PURCHASE'
         log.op_type = 'CREATE'
         log.target_type = 'PURCHASE'
-        log.desc = '迁移 {from_sku} 数量{move_qty}个至 {target_sku}'.format(from_sku=data['from_sku'], move_qty=data['move_qty'], target_sku=data['target_sku'])
+        log.desc = '迁移 {from_sku} 数量{move_qty}个至 {target_sku}'.format(from_sku=data['from_sku'],
+                                                                            move_qty=data['move_qty'],
+                                                                            target_sku=data['target_sku'])
         log.user = request.user
         log.save()
         return Response({'msg': '操作成功', 'code': 'success'}, status=status.HTTP_200_OK)
@@ -4992,7 +5033,8 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
 
             # fbm在途库存数量
             fbm_onway_qty = 0
-            sd_set = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            sd_set = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             for sst in sd_set:
                 fbm_onway_qty += sst.qty
 

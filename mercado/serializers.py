@@ -530,6 +530,8 @@ class MLOrderSerializer(serializers.ModelSerializer):
             url = 'https://articulo.mercadolibre.com.mx/' + obj.shop.site + '-' + obj.item_id
         if obj.shop.platform == 'NOON':
             url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=obj.item_id)
+        if obj.shop.platform == 'OZON':
+            url = 'https://www.ozon.ru/product/{item_id}'.format(item_id=obj.item_id)
         return url
 
     class Meta:

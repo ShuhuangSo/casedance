@@ -2,7 +2,8 @@ from django.contrib import admin
 
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
-    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings, CarrierTrack
+    Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings, CarrierTrack, \
+    GeneralSettings
 
 
 @admin.register(Listing)
@@ -170,3 +171,9 @@ class CarrierTrackAdmin(admin.ModelAdmin):
     list_display = ['carrier_number', 'context', 'time', 'create_time']
     list_filter = ['carrier_name']
     search_fields = ['carrier_number']
+
+
+@admin.register(GeneralSettings)
+class GeneralSettingsAdmin(admin.ModelAdmin):
+    list_display = ['item_name', 'update_time']
+    search_fields = ['item_name']

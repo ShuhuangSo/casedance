@@ -1141,6 +1141,165 @@ def upload_noon_order(shop_id, notify_id):
     return 'SUCESS'
 
 
+# 上传OZON订单
+@shared_task()
+def upload_ozon_order(shop_id, notify_id):
+    import warnings
+    import openpyxl
+    warnings.filterwarnings('ignore')
+
+    data = MEDIA_ROOT + '/upload_file/order_excel_' + shop_id + '.xlsx'
+    wb = openpyxl.load_workbook(data)
+    sheet = wb.active
+
+    shop = Shop.objects.filter(id=shop_id).first()
+    er = ExRate.objects.filter(currency=shop.currency).first()
+    ex_rate = er.value
+
+    oz_row = 2  # 默认标题行
+    # 如果是订单表
+    if sheet['A' + str(oz_row)].value == 'Номер заказа' and sheet['B' + str(oz_row)].value == 'Номер отправления':
+        # 模板格式检查
+        format_checked = True
+        if sheet['C' + str(oz_row)].value != 'Принят в обработку':
+            format_checked = False
+        if sheet['E' + str(oz_row)].value != 'Статус':
+            format_checked = False
+        if sheet['G' + str(oz_row)].value != 'Фактическая дата передачи в доставку':
+            format_checked = False
+        if sheet['H' + str(oz_row)].value != 'Сумма отправления':
+            format_checked = False
+        if sheet['I' + str(oz_row)].value != 'Код валюты отправления':
+            format_checked = False
+        if sheet['K' + str(oz_row)].value != 'OZON id':
+            format_checked = False
+        if sheet['L' + str(oz_row)].value != 'Артикул':
+            format_checked = False
+        if sheet['Q' + str(oz_row)].value != 'Количество':
+            format_checked = False
+        if not format_checked:
+            # 修改上传通知
+            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+            file_upload.upload_status = 'ERROR'
+            file_upload.desc = '模板格式有误，请检查!'
+            file_upload.save()
+            return 'ERROR'
+
+        add_list = []
+        for cell_row in list(sheet)[oz_row:]:
+            row_type = cell_row[0].value
+            # 检查行是否有数据
+            if not row_type:
+                break
+
+            sku = cell_row[11].value
+            item_id = cell_row[10].value
+
+            # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+            if not shop_stock:
+                continue
+            first_ship_cost = shop_stock.first_ship_cost
+            if not first_ship_cost:
+                first_ship_cost = 0
+
+            order_number = cell_row[0].value
+            dispatch_number = cell_row[1].value
+            order_time = cell_row[2].value
+            qty = cell_row[16].value
+            price = cell_row[7].value
+
+            oz_status = cell_row[4].value
+            order_status = 'OTHERS'
+            if oz_status == 'Ожидает сборки':
+                order_status = 'WAIT_ASS'
+            if oz_status == 'Ожидает отгрузки':
+                order_status = 'WAIT_SHIP'
+            if oz_status == 'Доставляется':
+                order_status = 'DELIVERED'
+            if oz_status == 'Доставлен':
+                order_status = 'FINISHED'
+            if oz_status == 'Отменен':
+                order_status = 'CANCEL'
+
+            # 检查同一店铺订单编号是否存在
+            ml_order = MLOrder.objects.filter(order_number=order_number, dispatch_number=dispatch_number, shop=shop).first()
+            if not ml_order:
+                add_list.append(MLOrder(
+                    shop=shop,
+                    platform='OZON',
+                    order_number=order_number,
+                    dispatch_number=dispatch_number,
+                    order_status=order_status,
+                    order_time=order_time,
+                    qty=qty,
+                    currency=shop.currency,
+                    ex_rate=ex_rate,
+                    price=price,
+                    sku=sku,
+                    p_name=shop_stock.p_name,
+                    item_id=item_id,
+                    image=shop_stock.image,
+                    unit_cost=shop_stock.unit_cost * qty,
+                    first_ship_cost=first_ship_cost * qty,
+                ))
+                shop_stock.qty -= qty
+                shop_stock.save()
+
+                # 创建库存日志
+                stock_log = StockLog()
+                stock_log.shop_stock = shop_stock
+                stock_log.current_stock = shop_stock.qty
+                stock_log.qty = qty
+                stock_log.in_out = 'OUT'
+                stock_log.action = 'SALE'
+                stock_log.desc = '销售订单号: ' + order_number
+                stock_log.user_id = 0
+                stock_log.save()
+                stock_log.create_time = order_time  # order_time
+                stock_log.save()
+            else:
+                # 如果订单状态更新
+                if ml_order.order_status != order_status:
+                    ml_order.order_status = order_status
+                    ml_order.save()
+
+                    # 如果订单是取消状态，库存增加回来
+                    if order_status == 'CANCEL':
+                        shop_stock.qty += qty
+                        shop_stock.save()
+
+                        # 创建库存日志
+                        stock_log = StockLog()
+                        stock_log.shop_stock = shop_stock
+                        stock_log.current_stock = shop_stock.qty
+                        stock_log.qty = qty
+                        stock_log.in_out = 'IN'
+                        stock_log.action = 'CANCEL'
+                        stock_log.desc = '取消订单入库, 订单号: ' + order_number
+                        stock_log.user_id = 0
+                        stock_log.save()
+        if len(add_list):
+            MLOrder.objects.bulk_create(add_list)
+
+    # 如果是费用更新表
+    elif sheet['A' + str(oz_row)].value == 'Дата начисления' and sheet['B' + str(oz_row)].value == 'Тип начисления':
+        pass
+    else:
+        # 修改上传通知
+        file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+        file_upload.upload_status = 'ERROR'
+        file_upload.desc = '模板格式有误，请检查!'
+        file_upload.save()
+        return 'ERROR'
+    # 修改上传通知
+    file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+    file_upload.upload_status = 'SUCCESS'
+    file_upload.desc = '上传成功!'
+    file_upload.save()
+    return 'SUCESS'
+
+
 # 盛德交运运单
 @shared_task()
 def sd_place_order(ship_id, data):

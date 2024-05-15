@@ -540,7 +540,9 @@ class MLOrderSerializer(serializers.ModelSerializer):
                   'price', 'fees', 'postage', 'receive_fund', 'profit', 'profit_rate', 'is_ad', 'sku', 'p_name',
                   'item_id', 'image', 'unit_cost', 'first_ship_cost', 'buyer_name', 'buyer_address', 'buyer_city',
                   'buyer_state', 'buyer_postcode', 'buyer_country', 'create_time', 'shop', 'sale_url', 'platform',
-                  'buyer_id', 'shipped_date', 'delivered_date', 'VAT', 'invoice_price', 'promo_coupon')
+                  'buyer_id', 'shipped_date', 'delivered_date', 'VAT', 'invoice_price', 'promo_coupon', 'fee_rate',
+                  'fbo_fee', 'last_mile_fee', 'payment_fee', 'finance_check1', 'finance_check2', 'sp_fee', 'sp_fee_rate',
+                  'dispatch_number')
 
 
 class FinanceSerializer(serializers.ModelSerializer):
@@ -556,7 +558,7 @@ class FinanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Finance
         fields = ('id', 'shop', 'currency', 'income', 'wd_date', 'rec_date', 'exchange', 'income_rmb', 'exc_date',
-                  'f_type', 'is_received', 'create_time', 'shop_name')
+                  'f_type', 'is_received', 'create_time', 'shop_name', 'note')
 
 
 class PackingSerializer(serializers.ModelSerializer):

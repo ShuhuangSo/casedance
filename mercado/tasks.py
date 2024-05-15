@@ -15,7 +15,7 @@ from django.db.models import Sum, Avg, Q
 from casedance.settings import MEDIA_ROOT, BASE_DIR
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
     MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog, \
-    FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog
+    FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog, GeneralSettings
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -1283,8 +1283,92 @@ def upload_ozon_order(shop_id, notify_id):
             MLOrder.objects.bulk_create(add_list)
 
     # 如果是费用更新表
-    elif sheet['A' + str(oz_row)].value == 'Дата начисления' and sheet['B' + str(oz_row)].value == 'Тип начисления':
-        pass
+    elif sheet['A1'].value == 'Дата начисления' and sheet['B1'].value == 'Тип начисления':
+        # 模板格式检查
+        format_checked = True
+        if sheet['B1'].value != 'Тип начисления':
+            format_checked = False
+        if sheet['C1'].value != 'Номер отправления или идентификатор услуги':
+            format_checked = False
+        if sheet['G1'].value != 'Артикул':
+            format_checked = False
+        if sheet['K1'].value != 'Ставка комиссии':
+            format_checked = False
+        if sheet['L1'].value != 'Комиссия за продажу':
+            format_checked = False
+        if sheet['P1'].value != 'Последняя миля (разбивается по товарам пропорционально доле цены товара в сумме отправления)':
+            format_checked = False
+        if sheet['U1'].value != 'Логистика':
+            format_checked = False
+        if sheet['X1'].value != 'Итого':
+            format_checked = False
+        if not format_checked:
+            return 'ERROR'
+        for cell_row in list(sheet)[1:]:
+            item_number = cell_row[2].value
+            order_type = cell_row[1].value
+            fee_rate = cell_row[10].value
+            fees = cell_row[11].value
+            last_mile_fee = cell_row[15].value
+            fbo_fee = cell_row[20].value
+            payment_fee = cell_row[23].value
+            postage = round(fbo_fee + last_mile_fee, 2)  # 平台物流总费用
+            if not item_number:
+                break
+
+            # 检查账单项目
+            if order_type == 'Оплата эквайринга':
+                # 收单费用
+                # 检查同一店铺订单编号是否存在
+                ml_order = MLOrder.objects.filter(order_number=item_number, shop=shop).first()
+                if ml_order:
+                    # 保存收单费用
+                    if not ml_order.payment_fee:
+                        ml_order.payment_fee = payment_fee
+                        ml_order.save()
+            elif order_type == 'Доставка покупателю':
+                # 平台物流费用
+                ml_order = MLOrder.objects.filter(dispatch_number=item_number, shop=shop).first()
+                if not ml_order:
+                    continue
+                if ml_order.finance_check1:
+                    continue
+                # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+                shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()
+                if not shop_stock:
+                    continue
+                first_ship_cost = shop_stock.first_ship_cost
+                if not first_ship_cost:
+                    first_ship_cost = 0
+
+                # 计算收入资金
+                receive_fund = round(ml_order.price - abs(fees) - abs(postage) - abs(ml_order.payment_fee), 2)
+                # 计算服务商费用
+                sp = GeneralSettings.objects.filter(item_name='ozon_sp').first()
+                sp_fee = 0
+                sp_fee_rate = 0
+                if sp:
+                    sp_fee_rate = sp.value1
+                    sp_fee = receive_fund * sp_fee_rate
+                # 计算利润
+                profit = (receive_fund - sp_fee) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                profit_rate = profit / (ml_order.price * ex_rate)
+
+                # 保存数据
+                ml_order.fee_rate = fee_rate
+                ml_order.fees = fees
+                ml_order.last_mile_fee = last_mile_fee
+                ml_order.fbo_fee = fbo_fee
+                ml_order.postage = postage
+                ml_order.receive_fund = receive_fund
+                ml_order.sp_fee = sp_fee
+                ml_order.sp_fee_rate = sp_fee_rate
+                ml_order.profit = profit
+                ml_order.profit_rate = profit_rate
+                ml_order.finance_check1 = True
+                ml_order.save()
+            else:
+                continue
     else:
         # 修改上传通知
         file_upload = FileUploadNotify.objects.filter(id=notify_id).first()

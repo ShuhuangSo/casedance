@@ -1026,20 +1026,11 @@ class ShopViewSet(mixins.ListModelMixin,
         fee_note = ''
         for i in shop_fees:
             total_pay += i.income
-            if i.currency == '1':
-                fee_note = '账号注册费用'
-            if i.currency == '2':
-                fee_note = '开发票'
-            if i.currency == '3':
-                fee_note = '物流相关杂费'
-            if i.currency == '4':
-                fee_note = '产品相关杂费'
-            if i.currency == '5':
-                fee_note = '其它杂费'
+
             f_sheet['A' + str(num)] = i.wd_date
             f_sheet['B' + str(num)] = shop.name
             f_sheet['C' + str(num)] = Decimal(i.income).quantize(Decimal("0.00"))
-            f_sheet['D' + str(num)] = fee_note
+            f_sheet['D' + str(num)] = i.note
             num += 1
 
         f_sheet = wb.create_sheet('收入明细')
@@ -3898,7 +3889,7 @@ class FinanceViewSet(mixins.ListModelMixin,
         shop = Shop.objects.filter(id=shop_id).first()
         finance = Finance()
         finance.shop = shop
-        finance.currency = data['currency']
+        finance.note = data['note']
         finance.income = data['income']
         finance.wd_date = data['wd_date']
         finance.f_type = 'FEE'
@@ -3909,8 +3900,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺费用 店铺: {name}，费用类型: ${currency}，费用金额: ${income}'.format(name=shop.name,
-                                                                                                currency=finance.currency,
+        log.desc = '新增店铺费用 店铺: {name}，费用说明: ${currency}，费用金额: ${income}'.format(name=shop.name,
+                                                                                                currency=finance.note,
                                                                                                 income=finance.income)
         log.user = request.user
         log.save()
@@ -4239,14 +4230,13 @@ class MLOrderViewSet(mixins.ListModelMixin,
         if shop.platform == 'NOON':
             tasks.upload_noon_order.delay(shop_id, file_upload.id)
         if shop.platform == 'OZON':
-            # tasks.upload_ozon_order.delay(shop_id, file_upload.id)
-            tasks.upload_ozon_order(shop_id, file_upload.id)
+            tasks.upload_ozon_order.delay(shop_id, file_upload.id)
 
         # 计算产品销量
-        # tasks.calc_product_sales.delay()
+        tasks.calc_product_sales.delay()
 
         # 统计过去30天每天销量
-        # tasks.calc_shop_sale.delay()
+        tasks.calc_shop_sale.delay()
 
         # 创建操作日志
         log = MLOperateLog()

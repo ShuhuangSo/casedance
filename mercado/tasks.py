@@ -500,7 +500,7 @@ def calc_product_sales():
             sum_day7 = MLOrder.objects.filter(shop=s,
                                               sku=st.sku,
                                               item_id=st.item_id,
-                                              order_time_bj__gte=day7).aggregate(Sum('qty'))
+                                              order_time__gte=day7).aggregate(Sum('qty'))
             day7_sold = sum_day7['qty__sum']
 
             # 15天销量
@@ -508,7 +508,7 @@ def calc_product_sales():
             sum_day15 = MLOrder.objects.filter(shop=s,
                                                sku=st.sku,
                                                item_id=st.item_id,
-                                               order_time_bj__gte=day15).aggregate(Sum('qty'))
+                                               order_time__gte=day15).aggregate(Sum('qty'))
             day15_sold = sum_day15['qty__sum']
 
             # 30天销量
@@ -516,7 +516,7 @@ def calc_product_sales():
             sum_day30 = MLOrder.objects.filter(shop=s,
                                                sku=st.sku,
                                                item_id=st.item_id,
-                                               order_time_bj__gte=day30).aggregate(Sum('qty'))
+                                               order_time__gte=day30).aggregate(Sum('qty'))
             day30_sold = sum_day30['qty__sum']
 
             # 累计销量
@@ -579,18 +579,21 @@ def calc_product_sales():
 # 计算店铺30天每天累积总销量
 @shared_task()
 def calc_shop_sale():
-    q = Q()
-    q.connector = 'OR'
-    q.children.append(('order_status', 'FINISHED'))
-    q.children.append(('order_status', 'RETURN'))
-    q.children.append(('order_status', 'CASE'))
+    # 删除订单状态过滤
+    # q = Q()
+    # q.connector = 'OR'
+    # q.children.append(('order_status', 'FINISHED'))
+    # q.children.append(('order_status', 'RETURN'))
+    # q.children.append(('order_status', 'CASE'))
 
     shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
     for s in shops:
         add_list = []
         for i in range(30):
             date = datetime.now().date() - timedelta(days=i)
-            order_set = MLOrder.objects.filter(order_time__date=date, shop=s).filter(q)
+            # 删除订单状态过滤（弃用）
+            # order_set = MLOrder.objects.filter(order_time__date=date, shop=s).filter(q)
+            order_set = MLOrder.objects.filter(order_time__date=date, shop=s)
             qty = 0
             amount = 0.0
             profit = 0.0

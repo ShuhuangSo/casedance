@@ -1226,7 +1226,7 @@ def upload_ozon_order(shop_id, notify_id):
                 order_status = 'CANCEL'
 
             # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number, dispatch_number=dispatch_number, shop=shop).first()
+            ml_order = MLOrder.objects.filter(order_number=order_number, dispatch_number=dispatch_number, sku=sku, shop=shop).first()
             if not ml_order:
                 add_list.append(MLOrder(
                     shop=shop,
@@ -1310,20 +1310,21 @@ def upload_ozon_order(shop_id, notify_id):
         for cell_row in list(sheet)[1:]:
             item_number = cell_row[2].value
             order_type = cell_row[1].value
+            sku = cell_row[6].value
             fee_rate = cell_row[10].value
             fees = cell_row[11].value
             last_mile_fee = cell_row[15].value
             fbo_fee = cell_row[20].value
             payment_fee = cell_row[23].value
             postage = round(fbo_fee + last_mile_fee, 2)  # 平台物流总费用
-            if not item_number:
+            if not order_type:
                 break
 
             # 检查账单项目
             if order_type == 'Оплата эквайринга':
                 # 收单费用
                 # 检查同一店铺订单编号是否存在
-                ml_order = MLOrder.objects.filter(order_number=item_number, shop=shop).first()
+                ml_order = MLOrder.objects.filter(order_number=item_number, sku=sku, shop=shop).first()
                 if ml_order:
                     # 保存收单费用
                     if not ml_order.payment_fee:
@@ -1331,7 +1332,7 @@ def upload_ozon_order(shop_id, notify_id):
                         ml_order.save()
             elif order_type == 'Доставка покупателю':
                 # 平台物流费用
-                ml_order = MLOrder.objects.filter(dispatch_number=item_number, shop=shop).first()
+                ml_order = MLOrder.objects.filter(dispatch_number=item_number,sku=sku, shop=shop).first()
                 if not ml_order:
                     continue
                 if ml_order.finance_check1:

@@ -1211,19 +1211,19 @@ class ShopStockViewSet(mixins.ListModelMixin,
             onway_amount += i.products_cost
 
         date = datetime.now().date() - timedelta(days=30)
-        sum_qty = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('qty'))
+        sum_qty = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('qty'))
         sold_qty = sum_qty['qty__sum']
-        sum_amount = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('price'))
+        sum_amount = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('price'))
         sold_amount = sum_amount['price__sum']
-        sum_profit = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('profit'))
+        sum_profit = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('profit'))
         sold_profit = sum_profit['profit__sum']
 
-        sum_unit_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(Sum('unit_cost'))
+        sum_unit_cost = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('unit_cost'))
         total_unit_cost = sum_unit_cost['unit_cost__sum']
         if not total_unit_cost:
             total_unit_cost = 0
 
-        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time_bj__gte=date).aggregate(
+        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(
             Sum('first_ship_cost'))
         total_first_ship_cost = sum_first_ship_cost['first_ship_cost__sum']
         if not total_first_ship_cost:

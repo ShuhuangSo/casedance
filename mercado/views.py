@@ -4019,6 +4019,7 @@ class MLOrderViewSet(mixins.ListModelMixin,
         'shop': ['exact'],
         'is_ad': ['exact'],
         'order_status': ['exact'],
+        'finance_check1': ['exact'],
     }
     search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price', 'profit')  # 配置排序字段

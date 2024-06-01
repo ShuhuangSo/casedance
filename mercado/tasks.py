@@ -709,17 +709,17 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         format_checked = False
     if sheet['R' + mel_row].value != 'Precio unitario de venta de la publicación (MXN)':
         format_checked = False
-    if sheet['Y' + mel_row].value != 'Comprador':
+    if sheet['AB' + mel_row].value != 'Comprador':
         format_checked = False
-    if sheet['AA' + mel_row].value != 'Domicilio':
+    if sheet['AD' + mel_row].value != 'Domicilio':
         format_checked = False
-    if sheet['AB' + mel_row].value != 'Municipio/Alcaldía':
+    if sheet['AE' + mel_row].value != 'Municipio/Alcaldía':
         format_checked = False
-    if sheet['AC' + mel_row].value != 'Estado':
+    if sheet['AF' + mel_row].value != 'Estado':
         format_checked = False
-    if sheet['AD' + mel_row].value != 'Código postal':
+    if sheet['AG' + mel_row].value != 'Código postal':
         format_checked = False
-    if sheet['AE' + mel_row].value != 'País':
+    if sheet['AH' + mel_row].value != 'País':
         format_checked = False
     if not format_checked:
         # 修改上传通知
@@ -767,12 +767,12 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         receive_fund = cell_row[11].value if cell_row[11].value else 0
         is_ad = True if cell_row[12].value == 'Sí' else False
 
-        buyer_name = cell_row[24].value
-        buyer_address = cell_row[26].value
-        buyer_city = cell_row[27].value
-        buyer_state = cell_row[28].value
-        buyer_postcode = cell_row[29].value
-        buyer_country = cell_row[30].value
+        buyer_name = cell_row[27].value
+        buyer_address = cell_row[29].value
+        buyer_city = cell_row[30].value
+        buyer_state = cell_row[31].value
+        buyer_postcode = cell_row[32].value
+        buyer_country = cell_row[33].value
 
         profit = (float(
             receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty

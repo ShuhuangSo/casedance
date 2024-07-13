@@ -1035,9 +1035,9 @@ def upload_noon_order(shop_id, notify_id):
             format_checked = False
         if sheet['AF1'].value != 'fee_referral':
             format_checked = False
-        if sheet['AG1'].value != 'fee_outbound_fbn':
+        if sheet['AH1'].value != 'fee_outbound_fbn':
             format_checked = False
-        if sheet['AU1'].value != 'total_payment':
+        if sheet['AV1'].value != 'total_payment':
             format_checked = False
         if not format_checked:
             return 'ERROR'
@@ -1160,25 +1160,35 @@ def upload_ozon_order(shop_id, notify_id):
     ex_rate = er.value
 
     oz_row = 2  # 默认标题行
+    title_group_a = ['Номер заказа', '订单号']
+    title_group_b = ['Номер отправления', '发货号码']
+    title_group_c = ['Принят в обработку', '正在处理中']
+    title_group_e = ['Статус', '状态']
+    title_group_g = ['Фактическая дата передачи в доставку', '实际转移配送日期']
+    title_group_h = ['Сумма отправления', '发货的金额']
+    title_group_i = ['Код валюты отправления', '货件的货币代码']
+    title_group_k = ['OZON id', 'Ozon ID']
+    title_group_l = ['Артикул', '货号']
+    title_group_q = ['Количество', '数量']
     # 如果是订单表
-    if sheet['A' + str(oz_row)].value == 'Номер заказа' and sheet['B' + str(oz_row)].value == 'Номер отправления':
+    if sheet['A' + str(oz_row)].value in title_group_a and sheet['B' + str(oz_row)].value in title_group_b:
         # 模板格式检查
         format_checked = True
-        if sheet['C' + str(oz_row)].value != 'Принят в обработку':
+        if sheet['C' + str(oz_row)].value not in title_group_c:
             format_checked = False
-        if sheet['E' + str(oz_row)].value != 'Статус':
+        if sheet['E' + str(oz_row)].value not in title_group_e:
             format_checked = False
-        if sheet['G' + str(oz_row)].value != 'Фактическая дата передачи в доставку':
+        if sheet['G' + str(oz_row)].value not in title_group_g:
             format_checked = False
-        if sheet['H' + str(oz_row)].value != 'Сумма отправления':
+        if sheet['H' + str(oz_row)].value not in title_group_h:
             format_checked = False
-        if sheet['I' + str(oz_row)].value != 'Код валюты отправления':
+        if sheet['I' + str(oz_row)].value not in title_group_i:
             format_checked = False
-        if sheet['K' + str(oz_row)].value != 'OZON id':
+        if sheet['K' + str(oz_row)].value not in title_group_k:
             format_checked = False
-        if sheet['L' + str(oz_row)].value != 'Артикул':
+        if sheet['L' + str(oz_row)].value not in title_group_l:
             format_checked = False
-        if sheet['Q' + str(oz_row)].value != 'Количество':
+        if sheet['Q' + str(oz_row)].value not in title_group_q:
             format_checked = False
         if not format_checked:
             # 修改上传通知

@@ -1224,15 +1224,20 @@ def upload_ozon_order(shop_id, notify_id):
 
             oz_status = cell_row[4].value
             order_status = 'OTHERS'
-            if oz_status == 'Ожидает сборки':
+            status_group_ass = ['Ожидает сборки', '待备货']
+            status_group_ship = ['Ожидает отгрузки', '等待发运']
+            status_group_deliver = ['Доставляется', '运输中']
+            status_group_finish = ['Доставлен', '已签收']
+            status_group_cancel = ['Отменен', '已被取消']
+            if oz_status in status_group_ass:
                 order_status = 'WAIT_ASS'
-            if oz_status == 'Ожидает отгрузки':
+            if oz_status in status_group_ship:
                 order_status = 'WAIT_SHIP'
-            if oz_status == 'Доставляется':
+            if oz_status in status_group_deliver:
                 order_status = 'DELIVERED'
-            if oz_status == 'Доставлен':
+            if oz_status in status_group_finish:
                 order_status = 'FINISHED'
-            if oz_status == 'Отменен':
+            if oz_status in status_group_cancel:
                 order_status = 'CANCEL'
 
             # 检查同一店铺订单编号是否存在

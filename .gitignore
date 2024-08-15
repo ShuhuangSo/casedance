@@ -4,3 +4,4 @@ uwsgi.pid
 uwsgi.log
 casedance/settings.py
 .idea/
+.vscode/

@@ -3,7 +3,7 @@ from django.contrib import admin
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
     Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings, CarrierTrack, \
-    GeneralSettings
+    GeneralSettings, PlatformCategoryRate, ShippingPrice
 
 
 @admin.register(Listing)
@@ -15,7 +15,9 @@ class ListingAdmin(admin.ModelAdmin):
 
 @admin.register(ListingTrack)
 class ListingTrackAdmin(admin.ModelAdmin):
-    list_display = ['listing', 'today_sold', 'reviews', 'stock_num', 'create_time']
+    list_display = [
+        'listing', 'today_sold', 'reviews', 'stock_num', 'create_time'
+    ]
 
 
 @admin.register(ApiSetting)
@@ -35,7 +37,9 @@ class SellerAdmin(admin.ModelAdmin):
 
 @admin.register(SellerTrack)
 class SellerTrackAdmin(admin.ModelAdmin):
-    list_display = ['seller', 'today_sold', 'total_items', 'total', 'create_time']
+    list_display = [
+        'seller', 'today_sold', 'total_items', 'total', 'create_time'
+    ]
 
 
 @admin.register(Categories)
@@ -47,7 +51,9 @@ class CategoriesAdmin(admin.ModelAdmin):
 
 @admin.register(Keywords)
 class KeywordsAdmin(admin.ModelAdmin):
-    list_display = ['categ_id', 'keyword', 'rank', 'status', 'rank_changed', 'update_time']
+    list_display = [
+        'categ_id', 'keyword', 'rank', 'status', 'rank_changed', 'update_time'
+    ]
     list_filter = ['categ_id']
     search_fields = ['keyword', 't_keyword']
 
@@ -118,7 +124,9 @@ class ExRateAdmin(admin.ModelAdmin):
 
 @admin.register(Finance)
 class FinanceAdmin(admin.ModelAdmin):
-    list_display = ['shop', 'currency', 'income', 'is_received', 'wd_date', 'rec_date']
+    list_display = [
+        'shop', 'currency', 'income', 'is_received', 'wd_date', 'rec_date'
+    ]
     list_filter = ['f_type', 'shop']
 
 
@@ -162,7 +170,9 @@ class RefillRecommendAdmin(admin.ModelAdmin):
 
 @admin.register(RefillSettings)
 class RefillSettingsAdmin(admin.ModelAdmin):
-    list_display = ['fly_days', 'fly_batch_period', 'is_include_trans', 'platform']
+    list_display = [
+        'fly_days', 'fly_batch_period', 'is_include_trans', 'platform'
+    ]
     list_filter = ['is_include_trans']
 
 
@@ -177,3 +187,21 @@ class CarrierTrackAdmin(admin.ModelAdmin):
 class GeneralSettingsAdmin(admin.ModelAdmin):
     list_display = ['item_name', 'update_time']
     search_fields = ['item_name']
+
+
+@admin.register(PlatformCategoryRate)
+class PlatformCategoryRateAdmin(admin.ModelAdmin):
+    list_display = [
+        'site', 'category_id', 'en_name', 'cn_name', 'first_category'
+    ]
+    list_filter = ['site']
+    search_fields = ['en_name']
+
+
+@admin.register(ShippingPrice)
+class ShippingPriceAdmin(admin.ModelAdmin):
+    list_display = [
+        'carrier_name', 'basic_price', 'calc_price', 'area', 'is_elec'
+    ]
+    list_filter = ['country']
+    search_fields = ['carrier_name']

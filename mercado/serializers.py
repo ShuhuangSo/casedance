@@ -8,7 +8,7 @@ from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
     PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack, StockLog, \
-    FileUploadNotify
+    FileUploadNotify, PlatformCategoryRate
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -25,7 +25,8 @@ class ListingSerializer(serializers.ModelSerializer):
     # 获取7天销量
     def get_sold_7d(self, obj):
         start_date = datetime.now() - timedelta(days=7)
-        lt = ListingTrack.objects.filter(create_time__gte=start_date, listing=obj)
+        lt = ListingTrack.objects.filter(create_time__gte=start_date,
+                                         listing=obj)
         n = 0
         for i in lt:
             n += i.today_sold
@@ -33,17 +34,20 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_yesterday_sold(self, obj):
         date = datetime.now().date() - timedelta(days=1)
-        lt = ListingTrack.objects.filter(create_time__date=date, listing=obj).first()
+        lt = ListingTrack.objects.filter(create_time__date=date,
+                                         listing=obj).first()
         n = lt.today_sold if lt else 0
         return n
 
     def get_yesterday_sold_grow(self, obj):
         date = datetime.now() - timedelta(days=1)
         last_date = date - timedelta(days=1)
-        lt = ListingTrack.objects.filter(create_time__date=date, listing=obj).first()
+        lt = ListingTrack.objects.filter(create_time__date=date,
+                                         listing=obj).first()
         n = lt.today_sold if lt else 0
 
-        lt2 = ListingTrack.objects.filter(create_time__date=last_date, listing=obj).first()
+        lt2 = ListingTrack.objects.filter(create_time__date=last_date,
+                                          listing=obj).first()
         m = lt2.today_sold if lt2 else 0
 
         p = n * 100 if m == 0 else int((n - m) / m * 100)
@@ -53,13 +57,16 @@ class ListingSerializer(serializers.ModelSerializer):
     def get_sold_7d_grow(self, obj):
         start_date = datetime.now().date() - timedelta(days=7)
         last_start_date = start_date - timedelta(days=7)
-        lt = ListingTrack.objects.filter(create_time__date__gte=start_date, listing=obj)
+        lt = ListingTrack.objects.filter(create_time__date__gte=start_date,
+                                         listing=obj)
         n = 0
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
-                                          listing=obj)
+        lt2 = ListingTrack.objects.filter(
+            create_time__date__gte=last_start_date,
+            create_time__date__lt=start_date,
+            listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
@@ -70,7 +77,8 @@ class ListingSerializer(serializers.ModelSerializer):
     # 获取30天销量
     def get_sold_30d(self, obj):
         start_date = datetime.now().date() - timedelta(days=30)
-        lt = ListingTrack.objects.filter(create_time__date__gte=start_date, listing=obj)
+        lt = ListingTrack.objects.filter(create_time__date__gte=start_date,
+                                         listing=obj)
         n = 0
         for i in lt:
             n += i.today_sold
@@ -80,13 +88,16 @@ class ListingSerializer(serializers.ModelSerializer):
     def get_sold_30d_grow(self, obj):
         start_date = datetime.now().date() - timedelta(days=30)
         last_start_date = start_date - timedelta(days=30)
-        lt = ListingTrack.objects.filter(create_time__date__gte=start_date, listing=obj)
+        lt = ListingTrack.objects.filter(create_time__date__gte=start_date,
+                                         listing=obj)
         n = 0
         for i in lt:
             n += i.today_sold
 
-        lt2 = ListingTrack.objects.filter(create_time__date__gte=last_start_date, create_time__date__lt=start_date,
-                                          listing=obj)
+        lt2 = ListingTrack.objects.filter(
+            create_time__date__gte=last_start_date,
+            create_time__date__lt=start_date,
+            listing=obj)
         m = 0
         for i in lt2:
             m += i.today_sold
@@ -96,10 +107,13 @@ class ListingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Listing
-        fields = ('id', 'item_id', 'site_id', 'title', 'image', 'link', 'price', 'currency', 'total_sold', 'sold_7d',
-                  'sold_30d', 'reviews', 'rating_average', 'start_date', 'listing_status', 'health', 'stock_num',
-                  'ship_type', 'is_cbt', 'is_free_shipping', 'seller_id', 'seller_name', 'brand', 'collection',
-                  'cost', 'profit', 'note', 'create_time', 'update_time', 'sold_7d_grow', 'sold_30d_grow',
+        fields = ('id', 'item_id', 'site_id', 'title', 'image', 'link',
+                  'price', 'currency', 'total_sold', 'sold_7d', 'sold_30d',
+                  'reviews', 'rating_average', 'start_date', 'listing_status',
+                  'health', 'stock_num', 'ship_type', 'is_cbt',
+                  'is_free_shipping', 'seller_id', 'seller_name', 'brand',
+                  'collection', 'cost', 'profit', 'note', 'create_time',
+                  'update_time', 'sold_7d_grow', 'sold_30d_grow',
                   'yesterday_sold', 'yesterday_sold_grow')
 
 
@@ -132,15 +146,17 @@ class SellerSerializer(serializers.ModelSerializer):
 
     def get_yesterday_sold(self, obj):
         date = datetime.now().date() - timedelta(days=1)
-        st = SellerTrack.objects.filter(create_time__date=date, seller=obj).first()
+        st = SellerTrack.objects.filter(create_time__date=date,
+                                        seller=obj).first()
         n = st.today_sold if st else 0
         return n
 
     class Meta:
         model = Seller
-        fields = ('id', 'seller_id', 'site_id', 'nickname', 'level_id', 'total', 'canceled', 'negative', 'neutral',
-                  'positive', 'registration_date', 'link', 'sold_60d', 'total_items', 'collection', 'update_time',
-                  'note', 'yesterday_sold')
+        fields = ('id', 'seller_id', 'site_id', 'nickname', 'level_id',
+                  'total', 'canceled', 'negative', 'neutral', 'positive',
+                  'registration_date', 'link', 'sold_60d', 'total_items',
+                  'collection', 'update_time', 'note', 'yesterday_sold')
 
 
 class SellerTrackSerializer(serializers.ModelSerializer):
@@ -163,23 +179,29 @@ class MLProductSerializer(serializers.ModelSerializer):
     def get_is_incomplete(self, obj):
         status = False
 
-        if not (obj.site and obj.item_id and obj.unit_cost and obj.image and obj.shop):
+        if not (obj.site and obj.item_id and obj.unit_cost and obj.image
+                and obj.shop):
             status = True
-        if not (
-                obj.custom_code and obj.cn_name and obj.en_name and obj.brand and obj.declared_value and obj.cn_material and obj.en_material):
+        if not (obj.custom_code and obj.cn_name and obj.en_name and obj.brand
+                and obj.declared_value and obj.cn_material
+                and obj.en_material):
             status = True
-        if not (obj.use and obj.weight and obj.length and obj.width and obj.heigth and obj.first_ship_cost):
+        if not (obj.use and obj.weight and obj.length and obj.width
+                and obj.heigth and obj.first_ship_cost):
             status = True
         return status
 
     class Meta:
         model = MLProduct
-        fields = ('id', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'p_status', 'custom_code', 'cn_name',
-                  'en_name', 'brand', 'declared_value', 'cn_material', 'en_material', 'use', 'site', 'shop',
-                  'unit_cost', 'is_elec', 'is_magnet', 'is_water',
-                  'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
-                  'create_time', 'is_checked', 'label_title', 'label_option', 'packing_id', 'buy_url2', 'buy_url3',
-                  'buy_url4', 'buy_url5', 'user_id', 'is_incomplete', 'platform')
+        fields = ('id', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
+                  'image', 'p_status', 'custom_code', 'cn_name', 'en_name',
+                  'brand', 'declared_value', 'cn_material', 'en_material',
+                  'use', 'site', 'shop', 'unit_cost', 'is_elec', 'is_magnet',
+                  'is_water', 'first_ship_cost', 'length', 'width', 'heigth',
+                  'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
+                  'create_time', 'is_checked', 'label_title', 'label_option',
+                  'packing_id', 'buy_url2', 'buy_url3', 'buy_url4', 'buy_url5',
+                  'user_id', 'is_incomplete', 'platform')
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -212,14 +234,19 @@ class ShopStockSerializer(serializers.ModelSerializer):
 
     def get_trans_onway_qty(self, obj):
         qty = 0
-        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__target='TRANSIT').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+        queryset = ShipDetail.objects.filter(sku=obj.sku,
+                                             ship__target='TRANSIT').filter(
+                                                 Q(ship__s_status='SHIPPED')
+                                                 | Q(ship__s_status='BOOKED'))
         for i in queryset:
             qty += i.qty
         return qty
 
     def get_fbm_onway_qty(self, obj):
         qty = 0
-        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__target='FBM').filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+        queryset = ShipDetail.objects.filter(
+            sku=obj.sku, ship__target='FBM').filter(
+                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
         for i in queryset:
             qty += i.qty
         return qty
@@ -227,7 +254,9 @@ class ShopStockSerializer(serializers.ModelSerializer):
     # 备货中数量
     def get_preparing_qty(self, obj):
         qty = 0
-        queryset = ShipDetail.objects.filter(sku=obj.sku, item_id=obj.item_id, ship__s_status='PREPARING')
+        queryset = ShipDetail.objects.filter(sku=obj.sku,
+                                             item_id=obj.item_id,
+                                             ship__s_status='PREPARING')
         for i in queryset:
             qty += i.qty
         return qty
@@ -235,7 +264,8 @@ class ShopStockSerializer(serializers.ModelSerializer):
     # 采购中数量
     def get_p_onway_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        queryset = PurchaseManage.objects.filter(sku=obj.sku,
+                                                 p_status='PURCHASED')
         for i in queryset:
             qty += i.buy_qty
         return qty
@@ -243,7 +273,8 @@ class ShopStockSerializer(serializers.ModelSerializer):
     # 采购到货数量
     def get_p_rec_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        queryset = PurchaseManage.objects.filter(
+            sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
         for i in queryset:
             if i.p_status == 'RECEIVED':
                 qty += i.rec_qty
@@ -253,12 +284,15 @@ class ShopStockSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShopStock
-        fields = (
-            'id', 'shop', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
-            'image', 'p_status', 'qty', 'fbm_onway_qty', 'trans_onway_qty', 'trans_qty_new', 'trans_qty', 'day7_sold', 'day15_sold', 'day30_sold',
-            'total_sold', 'unit_cost', 'first_ship_cost', 'length', 'width', 'heigth', 'weight', 'total_profit',
-            'total_weight', 'total_cbm', 'stock_value', 'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
-            'note', 'create_time', 'is_active', 'is_collect', 'preparing_qty', 'p_onway_qty', 'p_rec_qty')
+        fields = ('id', 'shop', 'sku', 'p_name', 'label_code', 'upc',
+                  'item_id', 'image', 'p_status', 'qty', 'fbm_onway_qty',
+                  'trans_onway_qty', 'trans_qty_new', 'trans_qty', 'day7_sold',
+                  'day15_sold', 'day30_sold', 'total_sold', 'unit_cost',
+                  'first_ship_cost', 'length', 'width', 'heigth', 'weight',
+                  'total_profit', 'total_weight', 'total_cbm', 'stock_value',
+                  'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
+                  'note', 'create_time', 'is_active', 'is_collect',
+                  'preparing_qty', 'p_onway_qty', 'p_rec_qty')
 
 
 class StockLogSerializer(serializers.ModelSerializer):
@@ -274,7 +308,8 @@ class StockLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockLog
-        fields = ('id', 'shop_stock', 'current_stock', 'qty', 'in_out', 'action', 'desc', 'user_name', 'create_time')
+        fields = ('id', 'shop_stock', 'current_stock', 'qty', 'in_out',
+                  'action', 'desc', 'user_name', 'create_time')
 
 
 class ShipDetailSerializer(serializers.ModelSerializer):
@@ -287,14 +322,16 @@ class ShipDetailSerializer(serializers.ModelSerializer):
 
     def get_total_onway_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        queryset = PurchaseManage.objects.filter(sku=obj.sku,
+                                                 p_status='PURCHASED')
         for i in queryset:
             qty += i.buy_qty
         return qty
 
     def get_total_rec_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        queryset = PurchaseManage.objects.filter(
+            sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
         for i in queryset:
             if i.p_status == 'RECEIVED':
                 qty += i.rec_qty
@@ -312,11 +349,14 @@ class ShipDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShipDetail
-        fields = (
-            'id', 'target_FBM', 'box_number', 's_type', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
-            'image', 'custom_code', 'cn_name', 'en_name', 'brand', 'declared_value', 'cn_material', 'en_material',
-            'use', 'unit_cost', 'avg_ship_fee', 'qty', 'length', 'width', 'heigth', 'weight', 'note',
-            'create_time', 'packing_name', 'packing_size', 'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty', 'user_id')
+        fields = ('id', 'target_FBM', 'box_number', 's_type', 'sku', 'p_name',
+                  'label_code', 'upc', 'item_id', 'image', 'custom_code',
+                  'cn_name', 'en_name', 'brand', 'declared_value',
+                  'cn_material', 'en_material', 'use', 'unit_cost',
+                  'avg_ship_fee', 'qty', 'length', 'width', 'heigth', 'weight',
+                  'note', 'create_time', 'packing_name', 'packing_size',
+                  'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty',
+                  'user_id')
 
 
 class ShipSerializer(serializers.ModelSerializer):
@@ -324,7 +364,9 @@ class ShipSerializer(serializers.ModelSerializer):
     头程运单
     """
     # 运单详情
-    ship_shipDetail = ShipDetailSerializer(many=True, required=False, read_only=True)
+    ship_shipDetail = ShipDetailSerializer(many=True,
+                                           required=False,
+                                           read_only=True)
 
     fbm_name = serializers.SerializerMethodField()
     fbm_address = serializers.SerializerMethodField()
@@ -339,7 +381,8 @@ class ShipSerializer(serializers.ModelSerializer):
     def get_latest_track(self, obj):
         msg = ''
         if obj.s_number:
-            ct = CarrierTrack.objects.filter(carrier_number=obj.s_number).order_by('-time').first()
+            ct = CarrierTrack.objects.filter(
+                carrier_number=obj.s_number).order_by('-time').first()
             if ct:
                 msg = ct.context
 
@@ -394,13 +437,16 @@ class ShipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ship
-        fields = (
-            'id', 's_number', 'batch', 's_status', 'shop', 'shop_color', 'target', 'envio_number', 'ship_type',
-            'shipping_fee', 'sent_time', 'platform',
-            'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address', 'send_from', 'tag_name', 'tag_color',
-            'carrier', 'end_date', 'ship_date', 'book_date', 'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-            'note', 'create_time', 'products_cost', 'products_weight', 'user_id', 'manager', 'logi_fee_clear',
-            'is_attach', 'is_remove_items', 'ship_shipDetail', 'latest_track', 'carrier_order_status', 'carrier_rec_check')
+        fields = ('id', 's_number', 'batch', 's_status', 'shop', 'shop_color',
+                  'target', 'envio_number', 'ship_type', 'shipping_fee',
+                  'sent_time', 'platform', 'extra_fee', 'fbm_warehouse',
+                  'fbm_name', 'fbm_address', 'send_from', 'tag_name',
+                  'tag_color', 'carrier', 'end_date', 'ship_date', 'book_date',
+                  'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
+                  'note', 'create_time', 'products_cost', 'products_weight',
+                  'user_id', 'manager', 'logi_fee_clear', 'is_attach',
+                  'is_remove_items', 'ship_shipDetail', 'latest_track',
+                  'carrier_order_status', 'carrier_rec_check')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):
@@ -433,8 +479,10 @@ class ShipItemRemoveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShipItemRemove
-        fields = ('id', 'item_type', 'sku', 'p_name', 'item_id', 'image', 'plan_qty', 'send_qty', 'note', 'create_time',
-                  'handle', 'handle_time', 'ship', 'batch', 'shop', 'shop_color', 'belong_shop')
+        fields = ('id', 'item_type', 'sku', 'p_name', 'item_id', 'image',
+                  'plan_qty', 'send_qty', 'note', 'create_time', 'handle',
+                  'handle_time', 'ship', 'batch', 'shop', 'shop_color',
+                  'belong_shop')
 
 
 class ShipAttachmentSerializer(serializers.ModelSerializer):
@@ -444,7 +492,9 @@ class ShipAttachmentSerializer(serializers.ModelSerializer):
     link = serializers.SerializerMethodField()
 
     def get_link(self, obj):
-        path = '{batch}_{id}/{name}'.format(batch=obj.ship.batch, id=obj.ship.id, name=obj.name)
+        path = '{batch}_{id}/{name}'.format(batch=obj.ship.batch,
+                                            id=obj.ship.id,
+                                            name=obj.name)
         url = BASE_URL + MEDIA_URL + 'ml_ships/' + path
         return url
 
@@ -485,17 +535,19 @@ class TransStockSerializer(serializers.ModelSerializer):
         return shop.name_color if shop else ''
 
     def get_group(self, obj):
-        count = TransStock.objects.filter(box_number=obj.box_number, is_out=False).count()
+        count = TransStock.objects.filter(box_number=obj.box_number,
+                                          is_out=False).count()
         return count if count > 1 else 0
 
     class Meta:
         model = TransStock
-        fields = (
-            'id', 'listing_shop', 'shop_color', 'sku', 'p_name', 'label_code', 'upc', 'item_id', 'image', 'qty',
-            'unit_cost', 'first_ship_cost', 's_number', 'batch',
-            'box_number', 'carrier_box_number', 'box_length', 'box_width', 'box_heigth', 'box_weight', 'box_cbm',
-            'note',
-            'arrived_date', 'is_out', 'shop', 'stock_days', 'group', 'user_id', 'out_time')
+        fields = ('id', 'listing_shop', 'shop_color', 'sku', 'p_name',
+                  'label_code', 'upc', 'item_id', 'image', 'qty', 'unit_cost',
+                  'first_ship_cost', 's_number', 'batch', 'box_number',
+                  'carrier_box_number', 'box_length', 'box_width',
+                  'box_heigth', 'box_weight', 'box_cbm', 'note',
+                  'arrived_date', 'is_out', 'shop', 'stock_days', 'group',
+                  'user_id', 'out_time')
 
 
 class MLSiteSerializer(serializers.ModelSerializer):
@@ -529,20 +581,26 @@ class MLOrderSerializer(serializers.ModelSerializer):
         if obj.shop.platform == 'MERCADO':
             url = 'https://articulo.mercadolibre.com.mx/' + obj.shop.site + '-' + obj.item_id
         if obj.shop.platform == 'NOON':
-            url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=obj.item_id)
+            url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(
+                item_id=obj.item_id)
         if obj.shop.platform == 'OZON':
-            url = 'https://www.ozon.ru/product/{item_id}'.format(item_id=obj.item_id)
+            url = 'https://www.ozon.ru/product/{item_id}'.format(
+                item_id=obj.item_id)
         return url
 
     class Meta:
         model = MLOrder
-        fields = ('id', 'order_number', 'order_status', 'order_time', 'order_time_bj', 'qty', 'currency', 'ex_rate',
-                  'price', 'fees', 'postage', 'receive_fund', 'profit', 'profit_rate', 'is_ad', 'sku', 'p_name',
-                  'item_id', 'image', 'unit_cost', 'first_ship_cost', 'buyer_name', 'buyer_address', 'buyer_city',
-                  'buyer_state', 'buyer_postcode', 'buyer_country', 'create_time', 'shop', 'sale_url', 'platform',
-                  'buyer_id', 'shipped_date', 'delivered_date', 'VAT', 'invoice_price', 'promo_coupon', 'fee_rate',
-                  'fbo_fee', 'last_mile_fee', 'payment_fee', 'finance_check1', 'finance_check2', 'sp_fee', 'sp_fee_rate',
-                  'dispatch_number')
+        fields = ('id', 'order_number', 'order_status', 'order_time',
+                  'order_time_bj', 'qty', 'currency', 'ex_rate', 'price',
+                  'fees', 'postage', 'receive_fund', 'profit', 'profit_rate',
+                  'is_ad', 'sku', 'p_name', 'item_id', 'image', 'unit_cost',
+                  'first_ship_cost', 'buyer_name', 'buyer_address',
+                  'buyer_city', 'buyer_state', 'buyer_postcode',
+                  'buyer_country', 'create_time', 'shop', 'sale_url',
+                  'platform', 'buyer_id', 'shipped_date', 'delivered_date',
+                  'VAT', 'invoice_price', 'promo_coupon', 'fee_rate',
+                  'fbo_fee', 'last_mile_fee', 'payment_fee', 'finance_check1',
+                  'finance_check2', 'sp_fee', 'sp_fee_rate', 'dispatch_number')
 
 
 class FinanceSerializer(serializers.ModelSerializer):
@@ -557,8 +615,9 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Finance
-        fields = ('id', 'shop', 'currency', 'income', 'wd_date', 'rec_date', 'exchange', 'income_rmb', 'exc_date',
-                  'f_type', 'is_received', 'create_time', 'shop_name', 'note')
+        fields = ('id', 'shop', 'currency', 'income', 'wd_date', 'rec_date',
+                  'exchange', 'income_rmb', 'exc_date', 'f_type',
+                  'is_received', 'create_time', 'shop_name', 'note')
 
 
 class PackingSerializer(serializers.ModelSerializer):
@@ -607,8 +666,8 @@ class MLOperateLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MLOperateLog
-        fields = ('id', 'op_module', 'op_type', 'target_id', 'target_type', 'desc', 'user_name', 'create_time',
-                  'target_name')
+        fields = ('id', 'op_module', 'op_type', 'target_id', 'target_type',
+                  'desc', 'user_name', 'create_time', 'target_name')
 
 
 class ShopReportSerializer(serializers.ModelSerializer):
@@ -646,28 +705,32 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
 
     def get_item_remove_status(self, obj):
         remove_handle = 100
-        sir = ShipItemRemove.objects.filter(sku=obj.sku).filter(Q(handle=0) | Q(handle=3)).first()
+        sir = ShipItemRemove.objects.filter(
+            sku=obj.sku).filter(Q(handle=0) | Q(handle=3)).first()
         if sir:
             remove_handle = sir.handle
         return remove_handle
 
     def get_need_qty(self, obj):
         qty = 0
-        queryset = ShipDetail.objects.filter(sku=obj.sku, ship__s_status='PREPARING')
+        queryset = ShipDetail.objects.filter(sku=obj.sku,
+                                             ship__s_status='PREPARING')
         for i in queryset:
             qty += i.qty
         return qty
 
     def get_total_onway_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku, p_status='PURCHASED')
+        queryset = PurchaseManage.objects.filter(sku=obj.sku,
+                                                 p_status='PURCHASED')
         for i in queryset:
             qty += i.buy_qty
         return qty
 
     def get_total_rec_qty(self, obj):
         qty = 0
-        queryset = PurchaseManage.objects.filter(sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+        queryset = PurchaseManage.objects.filter(
+            sku=obj.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
         for i in queryset:
             if i.p_status == 'RECEIVED':
                 qty += i.rec_qty
@@ -685,12 +748,15 @@ class PurchaseManageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseManage
-        fields = (
-            'id', 'p_status', 's_type', 'create_type', 'sku', 'p_name', 'label_code', 'item_id', 'image',
-            'unit_cost', 'length', 'width', 'heigth', 'weight', 'buy_qty', 'rec_qty', 'pack_qty', 'used_qty',
-            'used_batch', 'from_batch', 'note', 'shop', 'shop_color', 'packing_name', 'packing_size', 'create_time',
-            'buy_time', 'rec_time', 'pack_time', 'used_time', 'location', 'is_urgent', 'need_qty', 'total_onway_qty',
-            'total_rec_qty', 'is_checked', 'packing_id', 'is_qc', 'item_remove_status', 'platform')
+        fields = ('id', 'p_status', 's_type', 'create_type', 'sku', 'p_name',
+                  'label_code', 'item_id', 'image', 'unit_cost', 'length',
+                  'width', 'heigth', 'weight', 'buy_qty', 'rec_qty',
+                  'pack_qty', 'used_qty', 'used_batch', 'from_batch', 'note',
+                  'shop', 'shop_color', 'packing_name', 'packing_size',
+                  'create_time', 'buy_time', 'rec_time', 'pack_time',
+                  'used_time', 'location', 'is_urgent', 'need_qty',
+                  'total_onway_qty', 'total_rec_qty', 'is_checked',
+                  'packing_id', 'is_qc', 'item_remove_status', 'platform')
 
 
 class UPCSerializer(serializers.ModelSerializer):
@@ -704,7 +770,8 @@ class UPCSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UPC
-        fields = ('id', 'number', 'is_used', 'user_name', 'create_time', 'use_time')
+        fields = ('id', 'number', 'is_used', 'user_name', 'create_time',
+                  'use_time')
 
 
 class RefillRecommendSerializer(serializers.ModelSerializer):
@@ -744,4 +811,14 @@ class FileUploadNotifySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FileUploadNotify
+        fields = "__all__"
+
+
+class PlatformCategoryRateSerializer(serializers.ModelSerializer):
+    """
+    平台类目佣金费率
+    """
+
+    class Meta:
+        model = PlatformCategoryRate
         fields = "__all__"

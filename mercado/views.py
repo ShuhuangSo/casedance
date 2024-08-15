@@ -20,14 +20,14 @@ from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify
+    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify, PlatformCategoryRate, ShippingPrice
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
     ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
     RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer, StockLogSerializer, \
-    FileUploadNotifySerializer
+    FileUploadNotifySerializer, PlatformCategoryRateSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -42,12 +42,9 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 1000
 
 
-class ListingViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class ListingViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         在线产品列表,分页,过滤,搜索,排序
@@ -64,11 +61,14 @@ class ListingViewSet(mixins.ListModelMixin,
     serializer_class = ListingSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('site_id', 'listing_status', 'is_cbt', 'seller_id', 'seller_name', 'brand',
-                     'collection')  # 配置过滤字段
-    search_fields = ('item_id', 'title', 'seller_id', 'seller_name', 'brand')  # 配置搜索字段
-    ordering_fields = ('create_time', 'total_sold', 'reviews', 'stock_num', 'profit', 'update_time')  # 配置排序字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('site_id', 'listing_status', 'is_cbt', 'seller_id',
+                     'seller_name', 'brand', 'collection')  # 配置过滤字段
+    search_fields = ('item_id', 'title', 'seller_id', 'seller_name', 'brand'
+                     )  # 配置搜索字段
+    ordering_fields = ('create_time', 'total_sold', 'reviews', 'stock_num',
+                       'profit', 'update_time')  # 配置排序字段
 
     # test
     @action(methods=['get'], detail=False, url_path='test')
@@ -82,7 +82,8 @@ class ListingViewSet(mixins.ListModelMixin,
             if i.w_code == 'MXRCO1 RC':
                 i.zip = '54803'
                 i.save()
-        fbm = FBMWarehouse.objects.filter(w_code='Traslada la etiqueta').first()
+        fbm = FBMWarehouse.objects.filter(
+            w_code='Traslada la etiqueta').first()
         if not fbm:
             wh = FBMWarehouse()
             wh.country = '墨西哥MX'
@@ -99,7 +100,8 @@ class ListingViewSet(mixins.ListModelMixin,
         item_id = request.data['item_id']
         is_exist = Listing.objects.filter(item_id=item_id).count()
         if is_exist:
-            return Response({'msg': '商品已存在'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+            return Response({'msg': '商品已存在'},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
         tasks.create_listing(item_id)
 
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
@@ -111,13 +113,15 @@ class ListingViewSet(mixins.ListModelMixin,
         cost = request.data['cost']
         listing = Listing.objects.filter(id=id).first()
         if not listing:
-            return Response({'msg': '商品不存在'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+            return Response({'msg': '商品不存在'},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
 
         mercado_fee = listing.price * 0.305 if listing.price >= 299 else listing.price * 0.305 + 25
         shipping_fee = 57 if listing.price >= 299 else 79.8
         if not listing.is_free_shipping:
             shipping_fee = 0
-        profit = ((listing.price - mercado_fee - shipping_fee) / 3.1 - cost) * 0.99
+        profit = (
+            (listing.price - mercado_fee - shipping_fee) / 3.1 - cost) * 0.99
 
         from xToolkit import xstring
         listing.profit = xstring.dispose(profit).humanized_amount(compel=True)
@@ -127,12 +131,9 @@ class ListingViewSet(mixins.ListModelMixin,
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
 
-class ListingTrackViewSet(mixins.ListModelMixin,
-                          mixins.CreateModelMixin,
-                          mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin,
-                          mixins.RetrieveModelMixin,
-                          viewsets.GenericViewSet):
+class ListingTrackViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         商品跟踪列表,分页,过滤,搜索,排序
@@ -148,21 +149,19 @@ class ListingTrackViewSet(mixins.ListModelMixin,
     queryset = ListingTrack.objects.all()
     serializer_class = ListingTrackSerializer  # 序列化
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('listing__id', 'health')  # 配置过滤字段
     filterset_fields = {
         'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'listing__id': ['exact']
     }
-    ordering_fields = ('create_time',)  # 配置排序字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
 
-class CategoriesViewSet(mixins.ListModelMixin,
-                        mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
+class CategoriesViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         站点类目列表,分页,过滤,搜索,排序
@@ -178,8 +177,10 @@ class CategoriesViewSet(mixins.ListModelMixin,
     queryset = Categories.objects.all()
     serializer_class = CategoriesSerializer  # 序列化
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('father_id', 'site_id', 'collection', 'has_children')  # 配置过滤字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('father_id', 'site_id', 'collection', 'has_children'
+                     )  # 配置过滤字段
     search_fields = ('categ_id', 'name', 't_name')  # 配置搜索字段
     ordering_fields = ('name', 'update_time')  # 配置排序字段
 
@@ -189,7 +190,8 @@ class CategoriesViewSet(mixins.ListModelMixin,
         father_id = self.request.query_params.get('father_id')
         site_id = self.request.query_params.get('site_id')
         if father_id != '0':
-            is_exist = Categories.objects.filter(father_id=father_id, site_id=site_id).count()
+            is_exist = Categories.objects.filter(father_id=father_id,
+                                                 site_id=site_id).count()
             if not is_exist:
                 # 如果类目不在数据库里，则发起请求查询并保存
                 at = ApiSetting.objects.all().first()
@@ -207,29 +209,33 @@ class CategoriesViewSet(mixins.ListModelMixin,
                         path_from_root += p['name'] + ' > '
 
                     if len(data['children_categories']) == 0:
-                        cate = Categories.objects.filter(categ_id=father_id, site_id=site_id).first()
+                        cate = Categories.objects.filter(
+                            categ_id=father_id, site_id=site_id).first()
                         cate.has_children = False
                         cate.save()
                     for item in data['children_categories']:
                         result = tasks.translate(item['name'])
-                        add_list.append(Categories(
-                            categ_id=item['id'],
-                            father_id=father_id,
-                            site_id=site_id,
-                            name=item['name'],
-                            t_name=result if result else None,
-                            path_from_root=path_from_root + item['name'],
-                            total_items=item['total_items_in_this_category'],
-                            update_time=datetime.now()
-                        ))
+                        add_list.append(
+                            Categories(categ_id=item['id'],
+                                       father_id=father_id,
+                                       site_id=site_id,
+                                       name=item['name'],
+                                       t_name=result if result else None,
+                                       path_from_root=path_from_root +
+                                       item['name'],
+                                       total_items=item[
+                                           'total_items_in_this_category'],
+                                       update_time=datetime.now()))
                     Categories.objects.bulk_create(add_list)
         else:
             # 如果一级目录不存在，则请求数据
-            is_exist = Categories.objects.filter(father_id=father_id, site_id=site_id).count()
+            is_exist = Categories.objects.filter(father_id=father_id,
+                                                 site_id=site_id).count()
             if not is_exist:
                 tasks.update_categories(site_id)
 
-        queryset = Categories.objects.filter(father_id=father_id, site_id=site_id)
+        queryset = Categories.objects.filter(father_id=father_id,
+                                             site_id=site_id)
         data_list = []
         for i in queryset:
             data_list.append({
@@ -254,7 +260,8 @@ class CategoriesViewSet(mixins.ListModelMixin,
         site_id = self.request.query_params.get('site_id')
         # 如果当天有数据
         today = datetime.now().date()
-        queryset = Keywords.objects.filter(update_time__date=today, categ_id=categ_id)
+        queryset = Keywords.objects.filter(update_time__date=today,
+                                           categ_id=categ_id)
         if queryset:
             query_list = []
             for i in queryset:
@@ -288,7 +295,8 @@ class CategoriesViewSet(mixins.ListModelMixin,
             if data:
                 add_list = []
                 for i in data:
-                    kw = Keywords.objects.filter(keyword=i['keyword'], categ_id=categ_id).first()
+                    kw = Keywords.objects.filter(keyword=i['keyword'],
+                                                 categ_id=categ_id).first()
                     rank_status = 'NEW'
                     rank_changed = 0
                     if kw:
@@ -305,15 +313,14 @@ class CategoriesViewSet(mixins.ListModelMixin,
                         t_keyword = kw.t_keyword
                     else:
                         t_keyword = tasks.translate(i['keyword'])
-                    add_list.append(Keywords(
-                        categ_id=categ_id,
-                        keyword=i['keyword'],
-                        t_keyword=t_keyword,
-                        url=i['url'],
-                        rank=n,
-                        status=rank_status,
-                        rank_changed=rank_changed
-                    ))
+                    add_list.append(
+                        Keywords(categ_id=categ_id,
+                                 keyword=i['keyword'],
+                                 t_keyword=t_keyword,
+                                 url=i['url'],
+                                 rank=n,
+                                 status=rank_status,
+                                 rank_changed=rank_changed))
                     n += 1
                 Keywords.objects.filter(categ_id=categ_id).delete()
                 Keywords.objects.bulk_create(add_list)
@@ -347,12 +354,9 @@ class CategoriesViewSet(mixins.ListModelMixin,
         return Response({'data': 'OK'}, status=status.HTTP_200_OK)
 
 
-class SellerViewSet(mixins.ListModelMixin,
-                    mixins.CreateModelMixin,
-                    mixins.UpdateModelMixin,
-                    mixins.DestroyModelMixin,
-                    mixins.RetrieveModelMixin,
-                    viewsets.GenericViewSet):
+class SellerViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                    mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                    mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         卖家列表,分页,过滤,搜索,排序
@@ -369,7 +373,8 @@ class SellerViewSet(mixins.ListModelMixin,
     serializer_class = SellerSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('site_id', 'level_id', 'collection')  # 配置过滤字段
     search_fields = ('nickname', 'seller_id')  # 配置搜索字段
     ordering_fields = ('registration_date', 'total')  # 配置排序字段
@@ -404,16 +409,15 @@ class SellerViewSet(mixins.ListModelMixin,
                 tasks.create_or_update_seller(site_id, seller_id)
                 return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
             else:
-                return Response({'msg': '卖家不存在，请检查卖家名称'}, status=status.HTTP_406_NOT_ACCEPTABLE)
-        return Response({'msg': 'api操作不成功'}, status=status.HTTP_406_NOT_ACCEPTABLE)
+                return Response({'msg': '卖家不存在，请检查卖家名称'},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response({'msg': 'api操作不成功'},
+                        status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
-class SellerTrackViewSet(mixins.ListModelMixin,
-                         mixins.CreateModelMixin,
-                         mixins.UpdateModelMixin,
-                         mixins.DestroyModelMixin,
-                         mixins.RetrieveModelMixin,
-                         viewsets.GenericViewSet):
+class SellerTrackViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                         mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                         mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         卖家跟踪列表,分页,过滤,搜索,排序
@@ -429,21 +433,19 @@ class SellerTrackViewSet(mixins.ListModelMixin,
     queryset = SellerTrack.objects.all()
     serializer_class = SellerTrackSerializer  # 序列化
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('listing__id', 'health')  # 配置过滤字段
     filterset_fields = {
         'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'seller__id': ['exact']
     }
-    ordering_fields = ('create_time',)  # 配置排序字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
 
-class MLProductViewSet(mixins.ListModelMixin,
-                       mixins.CreateModelMixin,
-                       mixins.UpdateModelMixin,
-                       mixins.DestroyModelMixin,
-                       mixins.RetrieveModelMixin,
-                       viewsets.GenericViewSet):
+class MLProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         ML产品列表,分页,过滤,搜索,排序
@@ -460,8 +462,10 @@ class MLProductViewSet(mixins.ListModelMixin,
     serializer_class = MLProductSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('p_status', 'site', 'shop', 'is_checked', 'user_id')  # 配置过滤字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('p_status', 'site', 'shop', 'is_checked', 'user_id'
+                     )  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'sku', 'item_id')  # 配置排序字段
 
@@ -477,9 +481,17 @@ class MLProductViewSet(mixins.ListModelMixin,
 
         add_list = []
         if sheet.max_row <= 1:
-            return Response({'msg': '表格不能为空', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '表格不能为空',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
         if sheet['V1'].value != '是否带电 1/0':
-            return Response({'msg': '表格有误，请下载最新模板', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '表格有误，请下载最新模板',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
 
         for cell_row in list(sheet)[1:]:
             # 检查1，2列是否为空，空则跳过
@@ -488,7 +500,8 @@ class MLProductViewSet(mixins.ListModelMixin,
                 continue
 
             # 检查型号是否已存在
-            is_exist = MLProduct.objects.filter(sku=cell_row[0].value.strip()).count()
+            is_exist = MLProduct.objects.filter(
+                sku=cell_row[0].value.strip()).count()
             if is_exist:
                 continue
             # 检查店铺是否存在
@@ -559,36 +572,37 @@ class MLProductViewSet(mixins.ListModelMixin,
             sale_url = cell_row[24].value
             refer_url = cell_row[25].value
 
-            add_list.append(MLProduct(
-                sku=sku,
-                p_name=p_name,
-                platform=platform,
-                upc=upc,
-                item_id=item_id,
-                label_code=label_code,
-                site=site,
-                shop=shop,
-                unit_cost=unit_cost,
-                weight=weight,
-                length=length,
-                width=width,
-                heigth=heigth,
-                first_ship_cost=first_ship_cost,
-                custom_code=custom_code,
-                cn_name=cn_name,
-                en_name=en_name,
-                brand=brand,
-                declared_value=declared_value,
-                cn_material=cn_material,
-                en_material=en_material,
-                use=use,
-                is_elec=is_elec,
-                is_water=is_water,
-                buy_url=buy_url,
-                sale_url=sale_url,
-                refer_url=refer_url,
-                user_id=request.user.id,
-            ))
+            add_list.append(
+                MLProduct(
+                    sku=sku,
+                    p_name=p_name,
+                    platform=platform,
+                    upc=upc,
+                    item_id=item_id,
+                    label_code=label_code,
+                    site=site,
+                    shop=shop,
+                    unit_cost=unit_cost,
+                    weight=weight,
+                    length=length,
+                    width=width,
+                    heigth=heigth,
+                    first_ship_cost=first_ship_cost,
+                    custom_code=custom_code,
+                    cn_name=cn_name,
+                    en_name=en_name,
+                    brand=brand,
+                    declared_value=declared_value,
+                    cn_material=cn_material,
+                    en_material=en_material,
+                    use=use,
+                    is_elec=is_elec,
+                    is_water=is_water,
+                    buy_url=buy_url,
+                    sale_url=sale_url,
+                    refer_url=refer_url,
+                    user_id=request.user.id,
+                ))
         MLProduct.objects.bulk_create(add_list)
 
         # 创建操作日志
@@ -656,9 +670,13 @@ class MLProductViewSet(mixins.ListModelMixin,
 
         is_ship_exist = ShipDetail.objects.filter(sku=product.sku).count()
         is_stock_exist = ShopStock.objects.filter(sku=product.sku).count()
-        is_purchase_exist = PurchaseManage.objects.filter(sku=product.sku).count()
+        is_purchase_exist = PurchaseManage.objects.filter(
+            sku=product.sku).count()
         if is_ship_exist or is_stock_exist or is_purchase_exist:
-            return Response({'msg': '产品已被引用，无法删除', 'status': 'error'},
+            return Response({
+                'msg': '产品已被引用，无法删除',
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
 
         # 创建操作日志
@@ -667,21 +685,23 @@ class MLProductViewSet(mixins.ListModelMixin,
         log.op_type = 'DEL'
         log.target_type = 'PRODUCT'
         log.target_id = product.id
-        log.desc = '删除产品 {sku} {p_name}'.format(sku=product.sku, p_name=product.p_name)
+        log.desc = '删除产品 {sku} {p_name}'.format(sku=product.sku,
+                                                p_name=product.p_name)
         log.user = request.user
         log.save()
 
         product.delete()
 
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
 
-class PackingViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class PackingViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         包材管理列表,分页,过滤,搜索,排序
@@ -698,10 +718,11 @@ class PackingViewSet(mixins.ListModelMixin,
     serializer_class = PackingSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('name', 'size')  # 配置过滤字段
-    search_fields = ('name',)  # 配置搜索字段
-    ordering_fields = ('create_time',)  # 配置排序字段
+    search_fields = ('name', )  # 配置搜索字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
     # 重写
     def create(self, request, *args, **kwargs):
@@ -718,13 +739,17 @@ class PackingViewSet(mixins.ListModelMixin,
         log.desc = '新增包材 {name}'.format(name=request.data['name'])
         log.user = request.user
         log.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(serializer.data,
+                        status=status.HTTP_201_CREATED,
+                        headers=headers)
 
     # 重写
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(instance,
+                                         data=request.data,
+                                         partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
@@ -762,12 +787,9 @@ class PackingViewSet(mixins.ListModelMixin,
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ShopViewSet(mixins.ListModelMixin,
-                  mixins.CreateModelMixin,
-                  mixins.UpdateModelMixin,
-                  mixins.DestroyModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+class ShopViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                  mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                  mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         FBM店铺列表,分页,过滤,搜索,排序
@@ -784,8 +806,10 @@ class ShopViewSet(mixins.ListModelMixin,
     serializer_class = ShopSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('warehouse_type', 'platform', 'shop_type', 'site', 'is_active', 'user')  # 配置过滤字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('warehouse_type', 'platform', 'shop_type', 'site',
+                     'is_active', 'user')  # 配置过滤字段
     search_fields = ('name', 'seller_id', 'nickname')  # 配置搜索字段
     ordering_fields = ('create_time', 'total_profit', 'total_weight')  # 配置排序字段
 
@@ -807,9 +831,11 @@ class ShopViewSet(mixins.ListModelMixin,
             booked_qty = Ship.objects.filter(s_status='BOOKED').count()
 
             ships = Ship.objects.filter(s_status='BOOKED')
-            need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM').count()
+            need_book = Ship.objects.filter(s_status='SHIPPED',
+                                            target='FBM').count()
 
-            income_confirm = Finance.objects.filter(f_type='WD', is_received=False).count()
+            income_confirm = Finance.objects.filter(f_type='WD',
+                                                    is_received=False).count()
         else:
             pre_qty = Ship.objects.filter(s_status='PREPARING').filter(
                 Q(user_id=request.user.id) | Q(user_id=0)).count()
@@ -818,11 +844,15 @@ class ShopViewSet(mixins.ListModelMixin,
             booked_qty = Ship.objects.filter(s_status='BOOKED').filter(
                 Q(user_id=request.user.id) | Q(user_id=0)).count()
 
-            ships = Ship.objects.filter(s_status='BOOKED', user_id=request.user.id)
-            need_book = Ship.objects.filter(s_status='SHIPPED', target='FBM', user_id=request.user.id).count()
+            ships = Ship.objects.filter(s_status='BOOKED',
+                                        user_id=request.user.id)
+            need_book = Ship.objects.filter(s_status='SHIPPED',
+                                            target='FBM',
+                                            user_id=request.user.id).count()
 
-            income_confirm = Finance.objects.filter(f_type='WD', is_received=False,
-                                                    shop__user_id=request.user.id).count()
+            income_confirm = Finance.objects.filter(
+                f_type='WD', is_received=False,
+                shop__user_id=request.user.id).count()
         for i in ships:
             if i.book_date:
                 ad = str(i.book_date)
@@ -832,24 +862,29 @@ class ShopViewSet(mixins.ListModelMixin,
                     overtime_ship += 1
 
         # 采购管理
-        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY', buy_qty__gt=0).count()
-        purchased_num = PurchaseManage.objects.filter(p_status='PURCHASED').count()
+        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY',
+                                                     buy_qty__gt=0).count()
+        purchased_num = PurchaseManage.objects.filter(
+            p_status='PURCHASED').count()
         rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
 
         # 检查产品完整状态
         all_product_incomplete = False
-        products = MLProduct.objects.filter(user_id=request.user.id).exclude(p_status='OFFLINE')
+        products = MLProduct.objects.filter(user_id=request.user.id).exclude(
+            p_status='OFFLINE')
         for i in products:
 
-            if not (i.site and i.unit_cost and i.image and i.shop and i.item_id):
+            if not (i.site and i.unit_cost and i.image and i.shop
+                    and i.item_id):
                 all_product_incomplete = True
                 break
-            if not (
-                    i.custom_code and i.cn_name and i.en_name and i.brand and i.declared_value and i.cn_material and i.en_material):
+            if not (i.custom_code and i.cn_name and i.en_name and i.brand
+                    and i.declared_value and i.cn_material and i.en_material):
                 all_product_incomplete = True
                 break
-            if not (i.use and i.weight and i.length and i.width and i.heigth and i.first_ship_cost):
+            if not (i.use and i.weight and i.length and i.width and i.heigth
+                    and i.first_ship_cost):
                 all_product_incomplete = True
                 break
 
@@ -857,17 +892,29 @@ class ShopViewSet(mixins.ListModelMixin,
         shops_set = Shop.objects.filter(user__id=request.user.id)
         remove_items_count = 0
         if request.user.is_superuser:
-            remove_items_count = ShipItemRemove.objects.filter(handle=0).count()
+            remove_items_count = ShipItemRemove.objects.filter(
+                handle=0).count()
         else:
             for i in shops_set:
-                remove_items_count += ShipItemRemove.objects.filter(handle=0).filter(belong_shop=i.name).count()
+                remove_items_count += ShipItemRemove.objects.filter(
+                    handle=0).filter(belong_shop=i.name).count()
 
-        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty,
-                         'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num,
-                         'pack_num': pack_num, 'overtime_ship': overtime_ship, 'need_book': need_book,
-                         'income_confirm': income_confirm, 'all_product_incomplete': all_product_incomplete,
-                         'remove_items_count': remove_items_count},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {
+                'pre_qty': pre_qty,
+                'shipped_qty': shipped_qty,
+                'booked_qty': booked_qty,
+                'wait_buy_num': wait_buy_num,
+                'purchased_num': purchased_num,
+                'rec_num': rec_num,
+                'pack_num': pack_num,
+                'overtime_ship': overtime_ship,
+                'need_book': need_book,
+                'income_confirm': income_confirm,
+                'all_product_incomplete': all_product_incomplete,
+                'remove_items_count': remove_items_count
+            },
+            status=status.HTTP_200_OK)
 
     # 店铺信息
     @action(methods=['post'], detail=False, url_path='shop_info')
@@ -892,8 +939,15 @@ class ShopViewSet(mixins.ListModelMixin,
 
         used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
         return Response(
-            {'manager': manager, 'total_sku': total_sku, 'total_qty': total_qty, 'total_amount': total_amount,
-             'quota': shop.quota, 'out_stock': out_stock, 'used_quota': used_quota},
+            {
+                'manager': manager,
+                'total_sku': total_sku,
+                'total_qty': total_qty,
+                'total_amount': total_amount,
+                'quota': shop.quota,
+                'out_stock': out_stock,
+                'used_quota': used_quota
+            },
             status=status.HTTP_200_OK)
 
     # 店铺收支管理
@@ -908,8 +962,10 @@ class ShopViewSet(mixins.ListModelMixin,
             # 直发目标店铺的支出统计(不统计中转入仓运单)
             total_pay = 0  # 总支出
             ships = Ship.objects.filter(shop=s.name, send_from='CN').filter(
-                Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
-                sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+                Q(s_status='SHIPPED') | Q(s_status='BOOKED')
+                | Q(s_status='FINISHED')).filter(
+                    sent_time__date__gte=start_date,
+                    sent_time__date__lte=end_date)
 
             for i in ships:
                 total_pay += i.shipping_fee
@@ -917,32 +973,37 @@ class ShopViewSet(mixins.ListModelMixin,
                 total_pay += i.products_cost
             # 中转运单的支出统计
             ships = Ship.objects.filter(target='TRANSIT').filter(
-                Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
-                sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+                Q(s_status='SHIPPED') | Q(s_status='BOOKED')
+                | Q(s_status='FINISHED')).filter(
+                    sent_time__date__gte=start_date,
+                    sent_time__date__lte=end_date)
             for i in ships:
                 sd = ShipDetail.objects.filter(ship=i)
                 for item in sd:
                     # 统计中转运单中该店铺产品部分
                     if item.target_FBM == s.name:
-                        total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
+                        total_pay += (item.unit_cost +
+                                      item.avg_ship_fee) * item.qty
             # 店铺费用支出统计
-            shop_fees = Finance.objects.filter(shop=s, f_type='FEE').filter(wd_date__gte=start_date,
-                                                                            wd_date__lte=end_date)
+            shop_fees = Finance.objects.filter(shop=s, f_type='FEE').filter(
+                wd_date__gte=start_date, wd_date__lte=end_date)
             for i in shop_fees:
                 total_pay += i.income
 
-            finance = Finance.objects.filter(shop=s, f_type='EXC').filter(exc_date__gte=start_date,
-                                                                          exc_date__lte=end_date)
+            finance = Finance.objects.filter(shop=s, f_type='EXC').filter(
+                exc_date__gte=start_date, exc_date__lte=end_date)
             total_rec = 0  # 总收入
             for i in finance:
                 total_rec += i.income_rmb
-            data.append(
-                {'shop_id': s.id, 'shop_name': s.name, 'total_pay': total_pay, 'total_rec': total_rec,
-                 'profit': total_rec - total_pay})
+            data.append({
+                'shop_id': s.id,
+                'shop_name': s.name,
+                'total_pay': total_pay,
+                'total_rec': total_rec,
+                'profit': total_rec - total_pay
+            })
 
-        return Response(
-            {'data': data},
-            status=status.HTTP_200_OK)
+        return Response({'data': data}, status=status.HTTP_200_OK)
 
     # 导出店铺收支明细
     @action(methods=['post'], detail=False, url_path='export_shop_finance')
@@ -969,8 +1030,9 @@ class ShopViewSet(mixins.ListModelMixin,
         f_sheet['H1'] = '小计'
 
         ships = Ship.objects.filter(send_from='CN').filter(
-            Q(s_status='SHIPPED') | Q(s_status='BOOKED') | Q(s_status='FINISHED')).filter(
-            sent_time__date__gte=start_date, sent_time__date__lte=end_date)
+            Q(s_status='SHIPPED') | Q(s_status='BOOKED')
+            | Q(s_status='FINISHED')).filter(sent_time__date__gte=start_date,
+                                             sent_time__date__lte=end_date)
         num = 2
         for i in ships:
             # 直发目标店铺的支出统计(不含中转入仓运单)
@@ -984,11 +1046,14 @@ class ShopViewSet(mixins.ListModelMixin,
                 f_sheet['B' + str(num)] = i.batch
                 f_sheet['C' + str(num)] = shop.name
                 f_sheet['D' + str(num)] = 'FBM直发'
-                f_sheet['E' + str(num)] = Decimal(i.products_cost).quantize(Decimal("0.00"))
+                f_sheet['E' + str(num)] = Decimal(i.products_cost).quantize(
+                    Decimal("0.00"))
                 if i.shipping_fee:
-                    f_sheet['F' + str(num)] = Decimal(i.shipping_fee).quantize(Decimal("0.00"))
+                    f_sheet['F' + str(num)] = Decimal(i.shipping_fee).quantize(
+                        Decimal("0.00"))
                 if i.extra_fee:
-                    f_sheet['G' + str(num)] = Decimal(i.extra_fee).quantize(Decimal("0.00"))
+                    f_sheet['G' + str(num)] = Decimal(i.extra_fee).quantize(
+                        Decimal("0.00"))
                 f_sheet['H' + str(num)] = subtotal
                 num += 1
 
@@ -1003,16 +1068,23 @@ class ShopViewSet(mixins.ListModelMixin,
                         if item.target_FBM == shop.name:
                             product_cost += item.unit_cost * item.qty
                             shipping_fee += item.avg_ship_fee * item.qty
-                            total_pay += (item.unit_cost + item.avg_ship_fee) * item.qty
+                            total_pay += (item.unit_cost +
+                                          item.avg_ship_fee) * item.qty
                     f_sheet['A' + str(num)] = i.sent_time.strftime('%Y-%m-%d')
                     f_sheet['B' + str(num)] = i.batch
                     f_sheet['C' + str(num)] = shop.name
                     f_sheet['D' + str(num)] = '中转'
-                    f_sheet['E' + str(num)] = Decimal(product_cost).quantize(Decimal("0.00"))
+                    f_sheet['E' + str(num)] = Decimal(product_cost).quantize(
+                        Decimal("0.00"))
                     if shipping_fee:
-                        f_sheet['F' + str(num)] = Decimal(shipping_fee).quantize(Decimal("0.00"))
+                        f_sheet['F' +
+                                str(num)] = Decimal(shipping_fee).quantize(
+                                    Decimal("0.00"))
                     if product_cost + shipping_fee:
-                        f_sheet['H' + str(num)] = Decimal(product_cost + shipping_fee).quantize(Decimal("0.00"))
+                        f_sheet['H' +
+                                str(num)] = Decimal(product_cost +
+                                                    shipping_fee).quantize(
+                                                        Decimal("0.00"))
                     num += 1
 
         f_sheet = wb.create_sheet('其它费用')
@@ -1020,8 +1092,8 @@ class ShopViewSet(mixins.ListModelMixin,
         f_sheet['B1'] = '店铺名称'
         f_sheet['C1'] = '费用金额(RMB)'
         f_sheet['D1'] = '说明'
-        shop_fees = Finance.objects.filter(shop=shop, f_type='FEE').filter(wd_date__gte=start_date,
-                                                                           wd_date__lte=end_date)
+        shop_fees = Finance.objects.filter(shop=shop, f_type='FEE').filter(
+            wd_date__gte=start_date, wd_date__lte=end_date)
         num = 2
         fee_note = ''
         for i in shop_fees:
@@ -1029,7 +1101,8 @@ class ShopViewSet(mixins.ListModelMixin,
 
             f_sheet['A' + str(num)] = i.wd_date
             f_sheet['B' + str(num)] = shop.name
-            f_sheet['C' + str(num)] = Decimal(i.income).quantize(Decimal("0.00"))
+            f_sheet['C' + str(num)] = Decimal(i.income).quantize(
+                Decimal("0.00"))
             f_sheet['D' + str(num)] = i.note
             num += 1
 
@@ -1038,8 +1111,8 @@ class ShopViewSet(mixins.ListModelMixin,
         f_sheet['B1'] = '店铺名称'
         f_sheet['C1'] = '外汇金额({currency})'.format(currency=shop.currency)
         f_sheet['D1'] = '到账金额(RMB)'
-        finance = Finance.objects.filter(shop=shop, f_type='EXC').filter(exc_date__gte=start_date,
-                                                                         exc_date__lte=end_date)
+        finance = Finance.objects.filter(shop=shop, f_type='EXC').filter(
+            exc_date__gte=start_date, exc_date__lte=end_date)
         total_rec = 0  # 总收入
         num = 2
         for i in finance:
@@ -1047,8 +1120,10 @@ class ShopViewSet(mixins.ListModelMixin,
 
             f_sheet['A' + str(num)] = i.exc_date
             f_sheet['B' + str(num)] = shop.name
-            f_sheet['C' + str(num)] = Decimal(i.exchange).quantize(Decimal("0.00"))
-            f_sheet['D' + str(num)] = Decimal(i.income_rmb).quantize(Decimal("0.00"))
+            f_sheet['C' + str(num)] = Decimal(i.exchange).quantize(
+                Decimal("0.00"))
+            f_sheet['D' + str(num)] = Decimal(i.income_rmb).quantize(
+                Decimal("0.00"))
             num += 1
 
         f_sheet = wb.create_sheet('汇总')
@@ -1063,22 +1138,18 @@ class ShopViewSet(mixins.ListModelMixin,
         f_sheet['C2'] = start_date + '至' + end_date
         f_sheet['D2'] = Decimal(total_pay).quantize(Decimal("0.00"))
         f_sheet['E2'] = Decimal(total_rec).quantize(Decimal("0.00"))
-        f_sheet['F2'] = Decimal(total_rec - total_pay).quantize(Decimal("0.00"))
+        f_sheet['F2'] = Decimal(total_rec - total_pay).quantize(
+            Decimal("0.00"))
 
         del wb['Sheet']
         wb.save('media/export/shop_finance/收支明细报表-' + shop.name + '.xlsx')
         url = BASE_URL + '/media/export/shop_finance/收支明细报表-' + shop.name + '.xlsx'
-        return Response(
-            {'url': url},
-            status=status.HTTP_200_OK)
+        return Response({'url': url}, status=status.HTTP_200_OK)
 
 
-class ShopStockViewSet(mixins.ListModelMixin,
-                       mixins.CreateModelMixin,
-                       mixins.UpdateModelMixin,
-                       mixins.DestroyModelMixin,
-                       mixins.RetrieveModelMixin,
-                       viewsets.GenericViewSet):
+class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         店铺库存列表,分页,过滤,搜索,排序
@@ -1095,7 +1166,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
     serializer_class = ShopStockSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('shop', 'p_status', 'is_active', 'is_collect')  # 配置过滤字段
     filterset_fields = {
         'qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
@@ -1117,9 +1189,11 @@ class ShopStockViewSet(mixins.ListModelMixin,
         'is_collect': ['exact'],
     }
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
-                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty', 'refund_rate', 'avg_profit',
-                       'avg_profit_rate')  # 配置排序字段
+    ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold',
+                       'day30_sold', 'total_sold', 'total_profit',
+                       'total_weight', 'total_cbm', 'stock_value', 'onway_qty',
+                       'refund_rate', 'avg_profit', 'avg_profit_rate'
+                       )  # 配置排序字段
 
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')
@@ -1138,17 +1212,20 @@ class ShopStockViewSet(mixins.ListModelMixin,
             item_id = cell_row[3].value
             qty = cell_row[16].value
 
-            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id).first()
+            shop_stock = ShopStock.objects.filter(sku=sku,
+                                                  item_id=item_id).first()
             if shop_stock:
                 shop_stock.qty = qty
                 shop_stock.save()
             else:
-                ml_product = MLProduct.objects.filter(sku=sku, item_id=item_id).first()
+                ml_product = MLProduct.objects.filter(sku=sku,
+                                                      item_id=item_id).first()
                 url = ''
                 if shop.platform == 'MERCADO':
                     url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + ml_product.item_id
                 if shop.platform == 'NOON':
-                    url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=ml_product.item_id)
+                    url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(
+                        item_id=ml_product.item_id)
                 if ml_product:
                     shop_stock = ShopStock()
                     shop_stock.shop = shop
@@ -1189,7 +1266,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
         ex_rate = ex.value if ex else 0
 
         # FBM库存统计
-        queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id)
+        queryset = ShopStock.objects.filter(is_active=True,
+                                            qty__gt=0,
+                                            shop__id=shop_id)
         total_amount = 0
         total_qty = 0
         for i in queryset:
@@ -1203,7 +1282,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
             trans_amount += (i.unit_cost + i.first_ship_cost) * i.qty
 
         # 在途运单统计
-        ships = Ship.objects.filter(shop=shop.name).filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
+        ships = Ship.objects.filter(shop=shop.name).filter(
+            Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
         onway_amount = 0
         for i in ships:
             onway_amount += i.shipping_fee
@@ -1211,34 +1291,47 @@ class ShopStockViewSet(mixins.ListModelMixin,
             onway_amount += i.products_cost
 
         date = datetime.now().date() - timedelta(days=30)
-        sum_qty = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('qty'))
+        sum_qty = MLOrder.objects.filter(shop__id=shop_id,
+                                         order_time__gte=date).aggregate(
+                                             Sum('qty'))
         sold_qty = sum_qty['qty__sum']
-        sum_amount = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('price'))
+        sum_amount = MLOrder.objects.filter(shop__id=shop_id,
+                                            order_time__gte=date).aggregate(
+                                                Sum('price'))
         sold_amount = sum_amount['price__sum']
-        sum_profit = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('profit'))
+        sum_profit = MLOrder.objects.filter(shop__id=shop_id,
+                                            order_time__gte=date).aggregate(
+                                                Sum('profit'))
         sold_profit = sum_profit['profit__sum']
 
-        sum_unit_cost = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(Sum('unit_cost'))
+        sum_unit_cost = MLOrder.objects.filter(shop__id=shop_id,
+                                               order_time__gte=date).aggregate(
+                                                   Sum('unit_cost'))
         total_unit_cost = sum_unit_cost['unit_cost__sum']
         if not total_unit_cost:
             total_unit_cost = 0
 
-        sum_first_ship_cost = MLOrder.objects.filter(shop__id=shop_id, order_time__gte=date).aggregate(
-            Sum('first_ship_cost'))
+        sum_first_ship_cost = MLOrder.objects.filter(
+            shop__id=shop_id,
+            order_time__gte=date).aggregate(Sum('first_ship_cost'))
         total_first_ship_cost = sum_first_ship_cost['first_ship_cost__sum']
         if not total_first_ship_cost:
             total_first_ship_cost = 0
         total_cost = total_unit_cost + total_first_ship_cost
 
         # 结汇外汇
-        sum_exchange = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('exchange'))
+        sum_exchange = Finance.objects.filter(shop__id=shop_id,
+                                              f_type='EXC').aggregate(
+                                                  Sum('exchange'))
         exchange_fund = sum_exchange['exchange__sum']
         if not exchange_fund:
             exchange_fund = 0
 
         # 店铺提现外汇
-        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
-            Sum('income'))
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id,
+                                                 is_received=True,
+                                                 f_type='WD').aggregate(
+                                                     Sum('income'))
         income_fund = sum_income_fund['income__sum']
         if not income_fund:
             income_fund = 0
@@ -1247,8 +1340,10 @@ class ShopStockViewSet(mixins.ListModelMixin,
         rest_income = income_fund - exchange_fund
 
         # 店铺结汇资金
-        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC', exc_date__gte=date).aggregate(
-            Sum('income_rmb'))
+        sum_income_rmb = Finance.objects.filter(shop__id=shop_id,
+                                                f_type='EXC',
+                                                exc_date__gte=date).aggregate(
+                                                    Sum('income_rmb'))
         income_rmb = sum_income_rmb['income_rmb__sum']
         if not income_rmb:
             income_rmb = 0
@@ -1256,10 +1351,18 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         real_profit = total_fund - total_cost
 
-        return Response({'todayStockQty': total_qty, 'todayStockAmount': total_amount, 'sold_qty': sold_qty,
-                         'sold_amount': sold_amount, 'sold_profit': sold_profit, 'real_profit': real_profit,
-                         'onway_amount': onway_amount, 'trans_amount': trans_amount},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {
+                'todayStockQty': total_qty,
+                'todayStockAmount': total_amount,
+                'sold_qty': sold_qty,
+                'sold_amount': sold_amount,
+                'sold_profit': sold_profit,
+                'real_profit': real_profit,
+                'onway_amount': onway_amount,
+                'trans_amount': trans_amount
+            },
+            status=status.HTTP_200_OK)
 
     # 查询库存在途情况
     @action(methods=['post'], detail=False, url_path='get_stock_detail')
@@ -1269,8 +1372,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
 
         data = []
         if op_type == 'FBM_ONWAY':
-            querySet = ShipDetail.objects.filter(sku=sku, ship__target='FBM').filter(
-                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            querySet = ShipDetail.objects.filter(
+                sku=sku, ship__target='FBM').filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             if querySet:
                 for i in querySet:
                     data.append({
@@ -1282,8 +1386,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
                         "batch": i.ship.batch,
                     })
         if op_type == 'TRANS_ONWAY':
-            querySet = ShipDetail.objects.filter(sku=sku, ship__target='TRANSIT').filter(
-                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            querySet = ShipDetail.objects.filter(
+                sku=sku, ship__target='TRANSIT').filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             if querySet:
                 for i in querySet:
                     data.append({
@@ -1296,8 +1401,9 @@ class ShopStockViewSet(mixins.ListModelMixin,
                     })
         if op_type == 'FINISH':
             date = datetime.now().date() - timedelta(days=30)
-            querySet = ShipDetail.objects.filter(sku=sku, ship__s_status='FINISHED', ship__target='FBM').filter(
-                ship__book_date__gte=date)
+            querySet = ShipDetail.objects.filter(
+                sku=sku, ship__s_status='FINISHED',
+                ship__target='FBM').filter(ship__book_date__gte=date)
             if querySet:
                 for i in querySet:
                     data.append({
@@ -1351,9 +1457,11 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.op_type = 'EDIT'
         log.target_id = sid
         log.target_type = 'FBM'
-        log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(sku=shop_stock.sku,
-                                                                                         old_qty=old_qty,
-                                                                                         new_qty=new_qty, reason=reason)
+        log.desc = '库存盘点: {sku}数量 {old_qty} ===>> {new_qty}, 理由：{reason}'.format(
+            sku=shop_stock.sku,
+            old_qty=old_qty,
+            new_qty=new_qty,
+            reason=reason)
         log.user = request.user
         log.save()
 
@@ -1378,9 +1486,8 @@ class ShopStockViewSet(mixins.ListModelMixin,
         log.op_type = 'EDIT'
         log.target_id = sid
         log.target_type = 'FBM'
-        log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(sku=shop_stock.sku,
-                                                                                old_status=old_status,
-                                                                                new_status=new_status)
+        log.desc = '修改状态: {sku}状态 {old_status} ===>> {new_status}'.format(
+            sku=shop_stock.sku, old_status=old_status, new_status=new_status)
         log.user = request.user
         log.save()
 
@@ -1400,25 +1507,19 @@ class ShopStockViewSet(mixins.ListModelMixin,
             i.save()
 
         result = True
-        return Response({'result': result},
-                        status=status.HTTP_200_OK)
+        return Response({'result': result}, status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         message = 'runing'
         tasks.bulk_ship_tracking.delay()
 
-        return Response(
-            {'message': message},
-            status=status.HTTP_200_OK)
+        return Response({'message': message}, status=status.HTTP_200_OK)
 
 
-class ShipViewSet(mixins.ListModelMixin,
-                  mixins.CreateModelMixin,
-                  mixins.UpdateModelMixin,
-                  mixins.DestroyModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                  mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                  mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         头程运单列表,分页,过滤,搜索,排序
@@ -1435,7 +1536,8 @@ class ShipViewSet(mixins.ListModelMixin,
     serializer_class = ShipSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
     filterset_fields = {
         'book_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
@@ -1448,7 +1550,8 @@ class ShipViewSet(mixins.ListModelMixin,
         'carrier': ['exact'],
         'user_id': ['exact', 'in'],
     }
-    search_fields = ('s_number', 'batch', 'envio_number', 'note', 'ship_shipDetail__sku', 'ship_shipDetail__item_id',
+    search_fields = ('s_number', 'batch', 'envio_number', 'note',
+                     'ship_shipDetail__sku', 'ship_shipDetail__item_id',
                      'ship_shipDetail__p_name', 'shop')  # 配置搜索字段
     ordering_fields = ('create_time', 'book_date', 'shop')  # 配置排序字段
 
@@ -1476,7 +1579,10 @@ class ShipViewSet(mixins.ListModelMixin,
                 products_cost += product.unit_cost * i['qty']
             used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
             if (products_cost + used_quota) > shop_obj.quota:
-                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'},
+                return Response({
+                    'msg': '店铺额度不足,请减少发货数量!',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         batch = 'P{time_str}'.format(time_str=time.strftime('%m%d'))
@@ -1491,20 +1597,18 @@ class ShipViewSet(mixins.ListModelMixin,
         # 如果全员可见，id=0
         if all_see:
             user_id = 0
-        ship = Ship(
-            s_status='PREPARING',
-            send_from='CN',
-            platform=platform,
-            batch=batch,
-            shop=shop,
-            target=target,
-            carrier=carrier,
-            ship_type=ship_type,
-            end_date=end_date,
-            ship_date=ship_date,
-            note=note,
-            user_id=user_id
-        )
+        ship = Ship(s_status='PREPARING',
+                    send_from='CN',
+                    platform=platform,
+                    batch=batch,
+                    shop=shop,
+                    target=target,
+                    carrier=carrier,
+                    ship_type=ship_type,
+                    end_date=end_date,
+                    ship_date=ship_date,
+                    note=note,
+                    user_id=user_id)
         ship.save()
 
         total_qty = 0  # 总数量
@@ -1552,7 +1656,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 # 如果店铺库存中没有，发货在途没有，自动标为新品
                 is_exist = ShopStock.objects.filter(sku=sd.sku).count()
                 is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
-                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                    Q(ship__s_status='SHIPPED')
+                    | Q(ship__s_status='BOOKED')).count()
                 if not is_exist and not is_ship:
                     sd.s_type = 'NEW'
 
@@ -1575,7 +1680,11 @@ class ShipViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
 
-        return Response({'msg': '成功创建运单', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '成功创建运单',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 编辑运单
     @action(methods=['post'], detail=False, url_path='edit_ship')
@@ -1610,8 +1719,12 @@ class ShipViewSet(mixins.ListModelMixin,
                 ori_products_cost += i.unit_cost * i.qty
 
             used_quota = tasks.get_shop_quota(shop_id)  # 获取店铺已用额度
-            if (products_cost - ori_products_cost + used_quota) > shop_obj.quota:
-                return Response({'msg': '店铺额度不足,请减少发货数量!', 'status': 'error'},
+            if (products_cost - ori_products_cost +
+                    used_quota) > shop_obj.quota:
+                return Response({
+                    'msg': '店铺额度不足,请减少发货数量!',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         ship = Ship.objects.filter(id=id).first()
@@ -1627,10 +1740,14 @@ class ShipViewSet(mixins.ListModelMixin,
         if ship.batch != batch:
             # 判断是否有文件夹需要修改
             path = 'media/ml_ships/'
-            head_path = '{path}{batch}_{id}'.format(path=path, batch=ship.batch, id=ship.id)
+            head_path = '{path}{batch}_{id}'.format(path=path,
+                                                    batch=ship.batch,
+                                                    id=ship.id)
             # 如果存在文件夹，则修改文件夹名称
             if os.path.exists(head_path):
-                new_head_path = '{path}{batch}_{id}'.format(path=path, batch=batch, id=ship.id)
+                new_head_path = '{path}{batch}_{id}'.format(path=path,
+                                                            batch=batch,
+                                                            id=ship.id)
                 os.rename(head_path, new_head_path)
             ship.batch = batch
 
@@ -1664,7 +1781,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 log.op_type = 'DEL'
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
-                log.desc = '移除产品 {sku} {p_name}'.format(sku=i.sku, p_name=i.p_name)
+                log.desc = '移除产品 {sku} {p_name}'.format(sku=i.sku,
+                                                        p_name=i.p_name)
                 log.user = request.user
                 log.save()
 
@@ -1688,8 +1806,8 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.op_type = 'CREATE'
                     log.target_type = 'SHIP'
                     log.target_id = ship.id
-                    log.desc = '新增产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                        qty=i['qty'])
+                    log.desc = '新增产品 {sku} {p_name} {qty}个'.format(
+                        sku=product.sku, p_name=product.p_name, qty=i['qty'])
                     log.user = request.user
                     log.save()
 
@@ -1732,7 +1850,8 @@ class ShipViewSet(mixins.ListModelMixin,
                     # 如果店铺库存中没有，发货在途没有，自动标为新品
                     is_exist = ShopStock.objects.filter(sku=sd.sku).count()
                     is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
-                        Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                        Q(ship__s_status='SHIPPED')
+                        | Q(ship__s_status='BOOKED')).count()
                     if not is_exist and not is_ship:
                         sd.s_type = 'NEW'
 
@@ -1744,7 +1863,11 @@ class ShipViewSet(mixins.ListModelMixin,
         ship.total_qty = total_qty
         ship.products_cost = products_cost
         ship.save()
-        return Response({'msg': '成功更新运单', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '成功更新运单',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 运单发货/保存
     @action(methods=['post'], detail=False, url_path='send_ship')
@@ -1757,16 +1880,26 @@ class ShipViewSet(mixins.ListModelMixin,
         # 运单发货前检查
         if ship_action == 'SHIPPED':
             # 检查是否重复发货
-            is_exist = Ship.objects.filter(id=ship_id, s_status='PREPARING').count()
+            is_exist = Ship.objects.filter(id=ship_id,
+                                           s_status='PREPARING').count()
             if not is_exist:
-                return Response({'msg': '重复发货!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({
+                    'msg': '重复发货!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
             # 检查库存是否足够
             for i in ship_detail:
-                pm = PurchaseManage.objects.filter(p_status='PACKED', sku=i['sku']).first()
+                pm = PurchaseManage.objects.filter(p_status='PACKED',
+                                                   sku=i['sku']).first()
                 if pm:
                     if pm.pack_qty >= i['qty']:
                         continue
-                return Response({'msg': '已打包货品库存不足!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({
+                    'msg': '已打包货品库存不足!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
 
         products_cost = 0  # 总货品成本
         for i in ship_detail:
@@ -1774,7 +1907,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 # 发货为0的加入遗弃清单
                 sd = ShipDetail.objects.filter(id=i['id']).first()
 
-                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship, sku=sd.sku).first()
+                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship,
+                                                        sku=sd.sku).first()
                 if not ship_ir:
                     ship_ir = ShipItemRemove()
                     ship_ir.ship = sd.ship
@@ -1801,7 +1935,8 @@ class ShipViewSet(mixins.ListModelMixin,
 
             # 发货数量少于计划数量的加入遗弃清单
             if i['qty'] < sd.qty:
-                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship, sku=sd.sku).first()
+                ship_ir = ShipItemRemove.objects.filter(ship=sd.ship,
+                                                        sku=sd.sku).first()
                 if not ship_ir:
                     ship_ir = ShipItemRemove()
                     ship_ir.ship = sd.ship
@@ -1897,7 +2032,8 @@ class ShipViewSet(mixins.ListModelMixin,
         if ship_action == 'SHIPPED':
             sd_set = ShipDetail.objects.filter(ship=ship)
             for sd in sd_set:
-                pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
+                pm = PurchaseManage.objects.filter(sku=sd.sku,
+                                                   p_status='PACKED').first()
 
                 if pm:
                     # 创建操作日志
@@ -1905,7 +2041,8 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.op_module = 'PURCHASE'
                     log.op_type = 'CREATE'
                     log.target_type = 'PURCHASE'
-                    log.desc = '库存扣除 {qty}个 {sku} {p_name}'.format(sku=pm.sku, p_name=pm.p_name, qty=sd.qty)
+                    log.desc = '库存扣除 {qty}个 {sku} {p_name}'.format(
+                        sku=pm.sku, p_name=pm.p_name, qty=sd.qty)
                     log.save()
                     purchase_manage = PurchaseManage(
                         p_status='USED',
@@ -1928,8 +2065,7 @@ class ShipViewSet(mixins.ListModelMixin,
                         shop_color=pm.shop_color,
                         packing_size=pm.packing_size,
                         packing_name=pm.packing_name,
-                        used_time=datetime.now()
-                    )
+                        used_time=datetime.now())
                     purchase_manage.save()
                     if pm.pack_qty > sd.qty:
                         pm.pack_qty = pm.pack_qty - sd.qty
@@ -1941,7 +2077,8 @@ class ShipViewSet(mixins.ListModelMixin,
         if ship.target == 'FBM' and ship_action == 'SHIPPED':
             queryset = ShipDetail.objects.filter(ship=ship)
             for i in queryset:
-                shop_stock = ShopStock.objects.filter(sku=i.sku, shop__name=ship.shop).first()
+                shop_stock = ShopStock.objects.filter(
+                    sku=i.sku, shop__name=ship.shop).first()
                 if shop_stock:
                     shop_stock.onway_qty += i.qty
                     shop_stock.save()
@@ -1960,7 +2097,11 @@ class ShipViewSet(mixins.ListModelMixin,
             log.save()
         else:
             msg = '保存成功!'
-        return Response({'msg': msg, 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': msg,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 添加运费
     @action(methods=['post'], detail=False, url_path='postage')
@@ -2070,14 +2211,19 @@ class ShipViewSet(mixins.ListModelMixin,
         # 检查是否重复操作
         is_exist = Ship.objects.filter(id=ship_id, s_status='BOOKED').count()
         if not is_exist:
-            return Response({'msg': '运单状态已变动，请检查!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '运单状态已变动，请检查!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
 
         ship = Ship.objects.filter(id=ship_id).first()
 
         if ship.target == 'FBM':
             ship_detail = ShipDetail.objects.filter(ship=ship)
             for i in ship_detail:
-                shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
+                shop_stock = ShopStock.objects.filter(
+                    sku=i.sku, item_id=i.item_id).first()
                 # 如果是补货产品
                 if shop_stock:
                     shop_stock.qty += i.qty
@@ -2116,9 +2262,11 @@ class ShipViewSet(mixins.ListModelMixin,
                     if shop.platform == 'MERCADO':
                         url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
                     if shop.platform == 'NOON':
-                        url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(item_id=i.item_id)
+                        url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(
+                            item_id=i.item_id)
                     if shop.platform == 'OZON':
-                        url = 'https://www.ozon.ru/product/{item_id}'.format(item_id=i.item_id)
+                        url = 'https://www.ozon.ru/product/{item_id}'.format(
+                            item_id=i.item_id)
                     shop_stock.shop = shop
                     shop_stock.sku = i.sku
                     shop_stock.p_name = i.p_name
@@ -2172,7 +2320,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock.s_number = ship.s_number
                 trans_stock.batch = ship.batch
                 trans_stock.box_number = i.ship.batch + '-' + i.box_number
-                box = ShipBox.objects.filter(ship=ship, box_number=i.box_number).first()
+                box = ShipBox.objects.filter(ship=ship,
+                                             box_number=i.box_number).first()
                 trans_stock.carrier_box_number = box.carrier_box_number
                 trans_stock.box_weight = box.weight
                 trans_stock.box_length = box.length
@@ -2184,7 +2333,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 trans_stock.save()
 
                 # 增加fbm库存中转仓数量
-                shop_stock = ShopStock.objects.filter(sku=i.sku, item_id=i.item_id).first()
+                shop_stock = ShopStock.objects.filter(
+                    sku=i.sku, item_id=i.item_id).first()
                 if shop_stock:
                     shop_stock.trans_qty += i.qty
                     shop_stock.save()
@@ -2275,8 +2425,13 @@ class ShipViewSet(mixins.ListModelMixin,
                 Q(user_id=request.user.id) | Q(user_id=0)).count()
             booked_qty = Ship.objects.filter(s_status='BOOKED').filter(
                 Q(user_id=request.user.id) | Q(user_id=0)).count()
-        return Response({'pre_qty': pre_qty, 'shipped_qty': shipped_qty, 'booked_qty': booked_qty},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {
+                'pre_qty': pre_qty,
+                'shipped_qty': shipped_qty,
+                'booked_qty': booked_qty
+            },
+            status=status.HTTP_200_OK)
 
     # 导出物流申报单
     @action(methods=['post'], detail=False, url_path='export_logistic_decl')
@@ -2290,7 +2445,10 @@ class ShipViewSet(mixins.ListModelMixin,
         # 检查货品装箱情况
         for i in sd_set:
             if not i.box_number:
-                return Response({'msg': '有货品未装箱，请装箱后再导出!', 'status': 'error'},
+                return Response({
+                    'msg': '有货品未装箱，请装箱后再导出!',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         if logistic_name == 'SHENGDE':
@@ -2330,12 +2488,14 @@ class ShipViewSet(mixins.ListModelMixin,
             box_num = 0
             num = 0
             for b in boxes:
-                ship_detail = ShipDetail.objects.filter(ship__id=ship_id, box_number=b.box_number)
+                ship_detail = ShipDetail.objects.filter(
+                    ship__id=ship_id, box_number=b.box_number)
 
                 box_tag = 1
                 for i in ship_detail:
                     sh.row_dimensions[num + 2].height = 100
-                    sh['A' + str(num + 2)] = i.ship.batch + '/' + str(box_num + 1)
+                    sh['A' +
+                       str(num + 2)] = i.ship.batch + '/' + str(box_num + 1)
                     sh['B' + str(num + 2)] = box_tag
                     sh['C' + str(num + 2)] = i.sku
                     sh['D' + str(num + 2)] = i.brand
@@ -2349,7 +2509,9 @@ class ShipViewSet(mixins.ListModelMixin,
                     sh['L' + str(num + 2)] = i.use
                     sh['M' + str(num + 2)] = i.custom_code
                     sh['N' + str(num + 2)] = ''
-                    sh['O' + str(num + 2)] = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
+                    sh['O' + str(
+                        num + 2
+                    )] = 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id
                     sh['P' + str(num + 2)] = ''
                     sh['Q' + str(num + 2)] = ''
                     sh['R' + str(num + 2)] = ''
@@ -2387,11 +2549,10 @@ class ShipViewSet(mixins.ListModelMixin,
             alignment = Alignment(horizontal='center', vertical='center')
             v_alignment = Alignment(vertical='center')
             title_font = Font(name='微软雅黑', sz=10, b=True)
-            border = Border(
-                left=Side(border_style='thin', color='000000'),
-                right=Side(border_style='thin', color='000000'),
-                top=Side(style='thin', color='000000'),
-                bottom=Side(style='thin', color='000000'))
+            border = Border(left=Side(border_style='thin', color='000000'),
+                            right=Side(border_style='thin', color='000000'),
+                            top=Side(style='thin', color='000000'),
+                            bottom=Side(style='thin', color='000000'))
             wb = openpyxl.Workbook()
             boxes = ShipBox.objects.filter(ship__id=ship_id)
             n = 0
@@ -2416,8 +2577,7 @@ class ShipViewSet(mixins.ListModelMixin,
                 sh['B1'] = 'Shenzhen Suke Technology Co., Ltd'
                 sh['F1'] = '收货人名/送仓地址（英文）：'
                 sh['A2'] = '地址（英文）：'
-                sh[
-                    'B2'] = 'Room 820, 8th Floor, Aihua Building, No. 2038, Shennan Middle Road, Fuqiang Community, Huaqiangbei Street, Futian District, Shenzhen'
+                sh['B2'] = 'Room 820, 8th Floor, Aihua Building, No. 2038, Shennan Middle Road, Fuqiang Community, Huaqiangbei Street, Futian District, Shenzhen'
                 sh['F2'] = '地址（英文）'
                 sh['A3'] = '联系电话：'
                 sh['B3'] = '13823289200'
@@ -2450,7 +2610,8 @@ class ShipViewSet(mixins.ListModelMixin,
 
                 num = 0
                 all_qty = 0
-                ship_detail = ShipDetail.objects.filter(ship__id=ship_id, box_number=b.box_number)
+                ship_detail = ShipDetail.objects.filter(
+                    ship__id=ship_id, box_number=b.box_number)
                 for i in ship_detail:
                     sh.row_dimensions[num + 6].height = 100
 
@@ -2493,7 +2654,8 @@ class ShipViewSet(mixins.ListModelMixin,
                 sh['A' + str(num + 7)].font = title_font
                 sh['A' + str(num + 7)].border = border
                 sh['A' + str(num + 7)].alignment = alignment
-                sh['B' + str(num + 7)] = '{w}kg / {l}x{h}x{k}cm'.format(w=b.weight, l=b.length, h=b.heigth, k=b.width)
+                sh['B' + str(num + 7)] = '{w}kg / {l}x{h}x{k}cm'.format(
+                    w=b.weight, l=b.length, h=b.heigth, k=b.width)
                 sh['B' + str(num + 7)].border = border
                 sh['B' + str(num + 7)].alignment = alignment
 
@@ -2510,7 +2672,11 @@ class ShipViewSet(mixins.ListModelMixin,
             log.user = request.user
             log.save()
 
-        return Response({'url': url, 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 导出采购单
     @action(methods=['post'], detail=False, url_path='export_purchase')
@@ -2591,11 +2757,10 @@ class ShipViewSet(mixins.ListModelMixin,
         v_alignment = Alignment(vertical='center')
         title_font = Font(name='微软雅黑', sz=10, b=True)
         big_title_font = Font(name='微软雅黑', sz=15, b=True)
-        border = Border(
-            left=Side(border_style='thin', color='000000'),
-            right=Side(border_style='thin', color='000000'),
-            top=Side(style='thin', color='000000'),
-            bottom=Side(style='thin', color='000000'))
+        border = Border(left=Side(border_style='thin', color='000000'),
+                        right=Side(border_style='thin', color='000000'),
+                        top=Side(style='thin', color='000000'),
+                        bottom=Side(style='thin', color='000000'))
 
         ship_id = request.data['id']
         ship = Ship.objects.filter(id=ship_id).first()
@@ -2711,10 +2876,12 @@ class ShipViewSet(mixins.ListModelMixin,
         shops_set = Shop.objects.filter(user__id=request.user.id)
         remove_items_count = 0
         if request.user.is_superuser:
-            remove_items_count = ShipItemRemove.objects.filter(handle=0).count()
+            remove_items_count = ShipItemRemove.objects.filter(
+                handle=0).count()
         else:
             for i in shops_set:
-                remove_items_count += ShipItemRemove.objects.filter(handle=0).filter(belong_shop=i.name).count()
+                remove_items_count += ShipItemRemove.objects.filter(
+                    handle=0).filter(belong_shop=i.name).count()
 
         return Response({'remove_items_count': remove_items_count},
                         status=status.HTTP_200_OK)
@@ -2727,11 +2894,17 @@ class ShipViewSet(mixins.ListModelMixin,
         ship_changed = False
 
         # 查出最新修改的日志
-        log = MLOperateLog.objects.filter(op_module='SHIP', target_id=ship_id).filter(
-            Q(op_type='EDIT') | Q(op_type='DEL')).first()
+        log = MLOperateLog.objects.filter(
+            op_module='SHIP',
+            target_id=ship_id).filter(Q(op_type='EDIT')
+                                      | Q(op_type='DEL')).first()
 
         if not log:
-            return Response({'time_flag': '', 'ship_changed': ship_changed}, status=status.HTTP_200_OK)
+            return Response({
+                'time_flag': '',
+                'ship_changed': ship_changed
+            },
+                            status=status.HTTP_200_OK)
 
         if log:
             latest_time = log.create_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -2741,7 +2914,11 @@ class ShipViewSet(mixins.ListModelMixin,
                 if time_flag != latest_time:
                     ship_changed = True
 
-        return Response({'time_flag': time_flag, 'ship_changed': ship_changed}, status=status.HTTP_200_OK)
+        return Response({
+            'time_flag': time_flag,
+            'ship_changed': ship_changed
+        },
+                        status=status.HTTP_200_OK)
 
     # 跟踪物流单号
     @action(methods=['post'], detail=False, url_path='ship_tracking')
@@ -2754,12 +2931,16 @@ class ShipViewSet(mixins.ListModelMixin,
         log.op_module = 'SHIP'
         log.op_type = 'EDIT'
         log.target_type = 'SHIP'
-        log.desc = '刷新物流跟踪-{message} 单号{track_num}'.format(track_num=track_num, message=message)
+        log.desc = '刷新物流跟踪-{message} 单号{track_num}'.format(track_num=track_num,
+                                                           message=message)
         log.user = request.user
         log.save()
 
         if message != 'SUCCESS':
-            return Response({'msg': message, 'status': 'error'},
+            return Response({
+                'msg': message,
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
@@ -2799,7 +2980,10 @@ class ShipViewSet(mixins.ListModelMixin,
 
         if 'success' in resp.json():
             # 查询运单异常情况
-            return Response({'msg': resp.json()['msg'], 'status': 'error'},
+            return Response({
+                'msg': resp.json()['msg'],
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
 
         # 查到运单（已受理）
@@ -2813,13 +2997,19 @@ class ShipViewSet(mixins.ListModelMixin,
             if label_type == 'BOX':
                 url_2 = 'http://client.sanstar.net.cn/console/Report/shippingmark'
                 data_2 = {
-                    'param': '[{"operNo":' + oper_no + ',"dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'}
+                    'param':
+                    '[{"operNo":' + oper_no +
+                    ',"dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'
+                }
 
             # 交运单
             if label_type == 'RECEIPT':
                 url_2 = 'http://client.sanstar.net.cn/console/Report/getwarehousereceipt'
                 data_2 = {
-                    'param': '[{"type":1,"operNo":"' + oper_no + '","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","proc":"cliect_交仓单","warehouseid":"0200","regionid":30,"repottype":"pdf"}]'}
+                    'param':
+                    '[{"type":1,"operNo":"' + oper_no +
+                    '","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","proc":"cliect_交仓单","warehouseid":"0200","regionid":30,"repottype":"pdf"}]'
+                }
 
             # 获取标签链接
             resp2 = requests.post(url_2, data=data_2, headers=header)
@@ -2830,16 +3020,30 @@ class ShipViewSet(mixins.ListModelMixin,
                     log.op_module = 'SHIP'
                     log.op_type = 'EDIT'
                     log.target_type = 'SHIP'
-                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(track_num=s_number,
-                                                                               message='箱唛' if label_type == 'BOX' else '交运单')
+                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(
+                        track_num=s_number,
+                        message='箱唛' if label_type == 'BOX' else '交运单')
                     log.user = request.user
                     log.save()
-                    return Response({'link': resp2.json()['msg'], 'status': 'success'}, status=status.HTTP_200_OK)
+                    return Response(
+                        {
+                            'link': resp2.json()['msg'],
+                            'status': 'success'
+                        },
+                        status=status.HTTP_200_OK)
 
         else:
-            return Response({'msg': '运单待受理，无法生成标签', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '运单待受理，无法生成标签',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
 
-        return Response({'msg': '生成标签异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        return Response({
+            'msg': '生成标签异常',
+            'status': 'error'
+        },
+                        status=status.HTTP_202_ACCEPTED)
 
     # 盛德交运运单
     @action(methods=['post'], detail=False, url_path='carrier_place_order')
@@ -2848,7 +3052,10 @@ class ShipViewSet(mixins.ListModelMixin,
         d_code = request.data['d_code']
         fbm = FBMWarehouse.objects.filter(w_code=d_code).first()
         if not fbm:
-            return Response({'msg': 'fbm仓库不存在!', 'status': 'error'},
+            return Response({
+                'msg': 'fbm仓库不存在!',
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
         ship_data = {
             'd_code': d_code,
@@ -2867,12 +3074,21 @@ class ShipViewSet(mixins.ListModelMixin,
 
         info = tasks.sd_place_order(ship_id, ship_data)
         if info['status'] == 'error':
-            return Response({'msg': info['msg'], 'status': 'error'},
+            return Response({
+                'msg': info['msg'],
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
-        return Response({'msg': info['msg'], 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': info['msg'],
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 盛德交运前检查
-    @action(methods=['post'], detail=False, url_path='check_before_place_order')
+    @action(methods=['post'],
+            detail=False,
+            url_path='check_before_place_order')
     def check_before_place_order(self, request):
         ship_id = request.data['ship_id']
         ship = Ship.objects.filter(id=ship_id).first()
@@ -2896,14 +3112,23 @@ class ShipViewSet(mixins.ListModelMixin,
         if is_packed and is_declare and is_file:
             all_status = True
         return Response(
-            {'is_packed': is_packed, 'is_declare': is_declare, 'is_file': is_file, 'all_status': all_status},
+            {
+                'is_packed': is_packed,
+                'is_declare': is_declare,
+                'is_file': is_file,
+                'all_status': all_status
+            },
             status=status.HTTP_200_OK)
 
     # 查询盛德运单受理状态
     @action(methods=['get'], detail=False, url_path='check_sd_order_status')
     def check_sd_order_status(self, request):
         tasks.query_sd_order_status()
-        return Response({'msg': '刷新成功！', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '刷新成功！',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 盛德对账查询
     @action(methods=['post'], detail=False, url_path='bill_check')
@@ -2911,7 +3136,9 @@ class ShipViewSet(mixins.ListModelMixin,
         ships = request.data['ships']
         checked_ships = []
         for i in ships:
-            sp = Ship.objects.filter(s_number=i['in_s_number'], envio_number=i['in_envio_number']).first()
+            sp = Ship.objects.filter(
+                s_number=i['in_s_number'],
+                envio_number=i['in_envio_number']).first()
             in_weight = round(float(i['in_weight']), 2)
             in_price = round(float(i['in_price']), 2)
             if sp:
@@ -2971,10 +3198,16 @@ class ShipViewSet(mixins.ListModelMixin,
                 log.op_type = 'EDIT'
                 log.target_type = 'SHIP'
                 log.target_id = sp.id
-                log.desc = '物流费用已结算(对账),结算运费 {shipping_fee}'.format(shipping_fee=sp.shipping_fee)
+                log.desc = '物流费用已结算(对账),结算运费 {shipping_fee}'.format(
+                    shipping_fee=sp.shipping_fee)
                 log.user = request.user
                 log.save()
-        return Response({'ships': ships, 'msg': '操作成功！', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'ships': ships,
+            'msg': '操作成功！',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):
@@ -2986,7 +3219,8 @@ class ShipViewSet(mixins.ListModelMixin,
         log.op_type = 'DEL'
         log.target_type = 'SHIP'
         log.target_id = instance.id
-        log.desc = '删除运单 {batch}-{shop}'.format(batch=instance.batch, shop=instance.shop)
+        log.desc = '删除运单 {batch}-{shop}'.format(batch=instance.batch,
+                                                shop=instance.shop)
         log.user = request.user
         log.save()
 
@@ -2994,12 +3228,9 @@ class ShipViewSet(mixins.ListModelMixin,
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ShipDetailViewSet(mixins.ListModelMixin,
-                        mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
+class ShipDetailViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         运单详情列表,分页,过滤,搜索,排序
@@ -3016,16 +3247,15 @@ class ShipDetailViewSet(mixins.ListModelMixin,
     serializer_class = ShipDetailSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('ship', 'box_number', 's_type')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'qty')  # 配置排序字段
 
 
-class ShipItemRemoveViewSet(mixins.ListModelMixin,
-                            mixins.CreateModelMixin,
-                            mixins.UpdateModelMixin,
-                            mixins.DestroyModelMixin,
+class ShipItemRemoveViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin, mixins.DestroyModelMixin,
                             mixins.RetrieveModelMixin,
                             viewsets.GenericViewSet):
     """
@@ -3044,7 +3274,8 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
     serializer_class = ShipItemRemoveSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('ship', 'item_type', 'handle', 'belong_shop')  # 配置过滤字段
     filterset_fields = {
         'ship': ['exact'],
@@ -3115,7 +3346,10 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
         if ship.target == 'FBM':
             for i in product_list:
                 if i['belong_shop'] != ship.shop:
-                    return Response({'msg': '产品与目标店铺不符，请核查', 'status': 'error'},
+                    return Response({
+                        'msg': '产品与目标店铺不符，请核查',
+                        'status': 'error'
+                    },
                                     status=status.HTTP_202_ACCEPTED)
 
         sd_set = ShipDetail.objects.filter(ship=ship)
@@ -3157,7 +3391,8 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 # 如果店铺库存中没有，发货在途没有，自动标为新品
                 is_exist = ShopStock.objects.filter(sku=sd.sku).count()
                 is_ship = ShipDetail.objects.filter(sku=sd.sku).filter(
-                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')).count()
+                    Q(ship__s_status='SHIPPED')
+                    | Q(ship__s_status='BOOKED')).count()
                 if not is_exist and not is_ship:
                     sd.s_type = 'NEW'
 
@@ -3173,8 +3408,8 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.op_type = 'CREATE'
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
-                log.desc = '迁入产品 {sku} {p_name} {qty}个'.format(sku=product.sku, p_name=product.p_name,
-                                                                    qty=i['move_qty'])
+                log.desc = '迁入产品 {sku} {p_name} {qty}个'.format(
+                    sku=product.sku, p_name=product.p_name, qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -3187,8 +3422,8 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log = MLOperateLog()
                 log.op_module = 'SHIP'
                 log.op_type = 'DEL'
-                log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                            qty=i['move_qty'])
+                log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(
+                    sku=p.sku, p_name=p.p_name, qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
@@ -3207,13 +3442,17 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
                 log.op_type = 'CREATE'
                 log.target_type = 'SHIP'
                 log.target_id = ship.id
-                log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(sku=p.sku, p_name=p.p_name,
-                                                                        qty=i['move_qty'])
+                log.desc = '叠加迁入产品 {sku} {p_name} {qty}个'.format(
+                    sku=p.sku, p_name=p.p_name, qty=i['move_qty'])
                 log.user = request.user
                 log.save()
                 continue
 
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 批量移除变动产品
     @action(methods=['post'], detail=False, url_path='del_items')
@@ -3228,11 +3467,17 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log = MLOperateLog()
             log.op_module = 'SHIP'
             log.op_type = 'DEL'
-            log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+            log.desc = '移除变动清单产品 {sku} {p_name} {qty}个'.format(
+                sku=item_remove.sku,
+                p_name=item_remove.p_name,
+                qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 批量保留变动产品
     @action(methods=['post'], detail=False, url_path='keep_items')
@@ -3247,17 +3492,21 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin,
             log = MLOperateLog()
             log.op_module = 'SHIP'
             log.op_type = 'EDIT'
-            log.desc = '保留变动清单产品 {sku} {p_name} {qty}个'.format(sku=item_remove.sku, p_name=item_remove.p_name,
-                                                                        qty=item_remove.plan_qty - item_remove.send_qty)
+            log.desc = '保留变动清单产品 {sku} {p_name} {qty}个'.format(
+                sku=item_remove.sku,
+                p_name=item_remove.p_name,
+                qty=item_remove.plan_qty - item_remove.send_qty)
             log.user = request.user
             log.save()
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
 
-class ShipAttachmentViewSet(mixins.ListModelMixin,
-                            mixins.CreateModelMixin,
-                            mixins.UpdateModelMixin,
-                            mixins.DestroyModelMixin,
+class ShipAttachmentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin, mixins.DestroyModelMixin,
                             mixins.RetrieveModelMixin,
                             viewsets.GenericViewSet):
     """
@@ -3276,9 +3525,10 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
     serializer_class = ShipAttachmentSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('ship', 'a_type')  # 配置过滤字段
-    search_fields = ('name',)  # 配置搜索字段
+    search_fields = ('name', )  # 配置搜索字段
     ordering_fields = ('create_time', 'a_type')  # 配置排序字段
 
     # 运单附件上传
@@ -3291,7 +3541,9 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         a_type = data['a_type']
         ship = Ship.objects.filter(id=ship_id).first()
 
-        head_path = '{path}{batch}_{id}'.format(path=path, batch=ship.batch, id=ship.id)
+        head_path = '{path}{batch}_{id}'.format(path=path,
+                                                batch=ship.batch,
+                                                id=ship.id)
         # 判断是否存在文件夹,如果没有就创建文件路径
         if not os.path.exists(head_path):
             os.makedirs(head_path)
@@ -3300,11 +3552,14 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         file_name = file.name
 
         # 判断是否存在文件
-        is_exist = ShipAttachment.objects.filter(ship=ship, name=file_name).count()
+        is_exist = ShipAttachment.objects.filter(ship=ship,
+                                                 name=file_name).count()
         if is_exist:
             after_name = os.path.splitext(file_name)[-1]  # 获取扩展名
             first_name = os.path.splitext(file_name)[0]  # 获取文件名
-            file_name = '{fn}({time_str})'.format(fn=first_name, time_str=time.strftime('%m%d%H%M%S')) + after_name
+            file_name = '{fn}({time_str})'.format(
+                fn=first_name,
+                time_str=time.strftime('%m%d%H%M%S')) + after_name
 
         head_path = head_path + '/' + file_name
         with open(head_path, 'wb') as f:
@@ -3344,7 +3599,9 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         log.user = request.user
         log.save()
 
-        path = 'media/ml_ships/{batch}_{id}/{name}'.format(batch=sa.ship.batch, id=sa.ship.id, name=sa.name)
+        path = 'media/ml_ships/{batch}_{id}/{name}'.format(batch=sa.ship.batch,
+                                                           id=sa.ship.id,
+                                                           name=sa.name)
         # path = 'media/ml_ships/' + sa.ship.envio_number + '/' + sa.name
         os.remove(path)
         sa.delete()
@@ -3352,12 +3609,9 @@ class ShipAttachmentViewSet(mixins.ListModelMixin,
         return Response({'msg': '成功删除'}, status=status.HTTP_200_OK)
 
 
-class ShipBoxViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class ShipBoxViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         包装箱列表,分页,过滤,搜索,排序
@@ -3374,8 +3628,9 @@ class ShipBoxViewSet(mixins.ListModelMixin,
     serializer_class = ShipBoxSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('ship',)  # 配置过滤字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('ship', )  # 配置过滤字段
     search_fields = ('box_number', 'carrier_box_number')  # 配置搜索字段
     ordering_fields = ('item_qty', 'box_number', 'id')  # 配置排序字段# 创建运单
 
@@ -3460,7 +3715,8 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         box.save()
 
         # 统计包装箱总重量
-        sum_weight = ShipBox.objects.filter(ship=box.ship).aggregate(Sum('weight'))
+        sum_weight = ShipBox.objects.filter(ship=box.ship).aggregate(
+            Sum('weight'))
         total_weight = sum_weight['weight__sum']
         box.ship.weight = total_weight
 
@@ -3515,12 +3771,9 @@ class ShipBoxViewSet(mixins.ListModelMixin,
         return Response({'msg': '包装箱已删除!'}, status=status.HTTP_200_OK)
 
 
-class CarrierViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class CarrierViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         物流商列表,分页,过滤,搜索,排序
@@ -3537,9 +3790,10 @@ class CarrierViewSet(mixins.ListModelMixin,
     serializer_class = CarrierSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('name',)  # 配置过滤字段
-    search_fields = ('name',)  # 配置搜索字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('name', )  # 配置过滤字段
+    search_fields = ('name', )  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
 
     # 获取盛德预约入仓时间
@@ -3563,9 +3817,18 @@ class CarrierViewSet(mixins.ListModelMixin,
         resp = requests.post(url, data=payload, headers=header)
         if 'success' in resp.json():
             if resp.json()['success']:
-                return Response({'status': 'success', 'data': resp.json()['data']}, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        'status': 'success',
+                        'data': resp.json()['data']
+                    },
+                    status=status.HTTP_200_OK)
 
-        return Response({'msg': '查询异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        return Response({
+            'msg': '查询异常',
+            'status': 'error'
+        },
+                        status=status.HTTP_202_ACCEPTED)
 
     # 获取盛德fbm仓库信息
     @action(methods=['get'], detail=False, url_path='get_fbm_warehouse')
@@ -3583,17 +3846,23 @@ class CarrierViewSet(mixins.ListModelMixin,
         resp = requests.post(url, data=payload, headers=header)
         if 'success' in resp.json():
             if resp.json()['success']:
-                return Response({'status': 'success', 'data': resp.json()['data']}, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        'status': 'success',
+                        'data': resp.json()['data']
+                    },
+                    status=status.HTTP_200_OK)
 
-        return Response({'msg': '查询异常', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+        return Response({
+            'msg': '查询异常',
+            'status': 'error'
+        },
+                        status=status.HTTP_202_ACCEPTED)
 
 
-class TransStockViewSet(mixins.ListModelMixin,
-                        mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
+class TransStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         中转仓库存列表,分页,过滤,搜索,排序
@@ -3610,12 +3879,14 @@ class TransStockViewSet(mixins.ListModelMixin,
     serializer_class = TransStockSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('listing_shop', 'shop', 'is_out', 'user_id')  # 配置过滤字段
-    search_fields = (
-        'sku', 'p_name', 'label_code', 'upc', 'item_id', 's_number', 'batch', 'box_number',
-        'carrier_box_number', 'listing_shop')  # 配置搜索字段
-    ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch', 'arrived_date', 'stock_days', 'out_time')  # 配置排序字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id',
+                     's_number', 'batch', 'box_number', 'carrier_box_number',
+                     'listing_shop')  # 配置搜索字段
+    ordering_fields = ('sku', 'item_id', 'qty', 's_number', 'batch',
+                       'arrived_date', 'stock_days', 'out_time')  # 配置排序字段
 
     # fbm发仓
     @action(methods=['post'], detail=False, url_path='send_fbm')
@@ -3632,33 +3903,41 @@ class TransStockViewSet(mixins.ListModelMixin,
 
         for i in data:
             # 检查是否拼箱
-            box_count = TransStock.objects.filter(box_number=i['box_number'], is_out=False).count()
+            box_count = TransStock.objects.filter(box_number=i['box_number'],
+                                                  is_out=False).count()
             if box_count > 1:
                 current_box_count = box_number_set.count(i['box_number'])
                 if box_count != current_box_count:
-                    return Response({'msg': '拼箱货品需同时出库！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                    return Response({
+                        'msg': '拼箱货品需同时出库！',
+                        'status': 'error'
+                    },
+                                    status=status.HTTP_202_ACCEPTED)
 
         # 检查产品是否已出库
         for i in data:
-            ts_check = TransStock.objects.filter(id=i['id'], is_out=False).first()
+            ts_check = TransStock.objects.filter(id=i['id'],
+                                                 is_out=False).first()
             if not ts_check:
-                return Response({'msg': '产品状态已变动，请检查！', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+                return Response({
+                    'msg': '产品状态已变动，请检查！',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
 
         shop_obj = Shop.objects.filter(name=shop).first()
         platform = ''
         if shop_obj:
             platform = shop_obj.platform
-        ship = Ship(
-            s_status='SHIPPED',
-            send_from='LOCAL',
-            shop=shop,
-            platform=platform,
-            target='FBM',
-            batch=batch,
-            logi_fee_clear=True,
-            user_id=request.user.id,
-            sent_time=datetime.now()
-        )
+        ship = Ship(s_status='SHIPPED',
+                    send_from='LOCAL',
+                    shop=shop,
+                    platform=platform,
+                    target='FBM',
+                    batch=batch,
+                    logi_fee_clear=True,
+                    user_id=request.user.id,
+                    sent_time=datetime.now())
         ship.save()
 
         # 创建操作日志
@@ -3708,7 +3987,8 @@ class TransStockViewSet(mixins.ListModelMixin,
             sd.save()
 
             # 检查是否同箱号的拼箱
-            is_exist = ShipBox.objects.filter(ship=ship, box_number=i['box_number']).count()
+            is_exist = ShipBox.objects.filter(
+                ship=ship, box_number=i['box_number']).count()
             if not is_exist:
                 # 创建包装箱
                 box = ShipBox()
@@ -3730,7 +4010,8 @@ class TransStockViewSet(mixins.ListModelMixin,
             total_qty += i['qty']
 
             # 减去fbm库存 中转仓数量
-            shop_stock = ShopStock.objects.filter(sku=sd.sku, item_id=sd.item_id).first()
+            shop_stock = ShopStock.objects.filter(sku=sd.sku,
+                                                  item_id=sd.item_id).first()
             if shop_stock:
                 shop_stock.onway_qty += sd.qty  # 增加在途数量
                 shop_stock.trans_qty -= sd.qty  # 减去中转仓数量
@@ -3760,12 +4041,9 @@ class TransStockViewSet(mixins.ListModelMixin,
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
 
-class MLSiteViewSet(mixins.ListModelMixin,
-                    mixins.CreateModelMixin,
-                    mixins.UpdateModelMixin,
-                    mixins.DestroyModelMixin,
-                    mixins.RetrieveModelMixin,
-                    viewsets.GenericViewSet):
+class MLSiteViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                    mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                    mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         站点列表,分页,过滤,搜索,排序
@@ -3782,18 +4060,16 @@ class MLSiteViewSet(mixins.ListModelMixin,
     serializer_class = MLSiteSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('name',)  # 配置过滤字段
-    search_fields = ('name',)  # 配置搜索字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('name', )  # 配置过滤字段
+    search_fields = ('name', )  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
 
 
-class FBMWarehouseViewSet(mixins.ListModelMixin,
-                          mixins.CreateModelMixin,
-                          mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin,
-                          mixins.RetrieveModelMixin,
-                          viewsets.GenericViewSet):
+class FBMWarehouseViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         FBM仓库列表,分页,过滤,搜索,排序
@@ -3810,18 +4086,16 @@ class FBMWarehouseViewSet(mixins.ListModelMixin,
     serializer_class = FBMWarehouseSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('country', 'is_active', 'platform')  # 配置过滤字段
     search_fields = ('w_code', 'name', 'address')  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段
 
 
-class FinanceViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class FinanceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         财务管理列表,分页,过滤,搜索,排序
@@ -3838,7 +4112,8 @@ class FinanceViewSet(mixins.ListModelMixin,
     serializer_class = FinanceSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('country', 'is_active')  # 配置过滤字段
     filterset_fields = {
         'income': ['gte', 'lte', 'exact', 'gt', 'lt'],
@@ -3851,8 +4126,9 @@ class FinanceViewSet(mixins.ListModelMixin,
         'is_received': ['exact'],
         'f_type': ['exact'],
     }
-    search_fields = ('income',)  # 配置搜索字段
-    ordering_fields = ('wd_date', 'rec_date', 'exc_date', 'income_rmb', 'income', 'create_time')  # 配置排序字段
+    search_fields = ('income', )  # 配置搜索字段
+    ordering_fields = ('wd_date', 'rec_date', 'exc_date', 'income_rmb',
+                       'income', 'create_time')  # 配置排序字段
 
     # ML创建店铺提现
     @action(methods=['post'], detail=False, url_path='create_wd')
@@ -3874,7 +4150,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺提现 店铺: {name}，提现资金: ${income}'.format(name=shop.name, income=finance.income)
+        log.desc = '新增店铺提现 店铺: {name}，提现资金: ${income}'.format(
+            name=shop.name, income=finance.income)
         log.user = request.user
         log.save()
 
@@ -3900,9 +4177,8 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺费用 店铺: {name}，费用说明: ${currency}，费用金额: ${income}'.format(name=shop.name,
-                                                                                                currency=finance.note,
-                                                                                                income=finance.income)
+        log.desc = '新增店铺费用 店铺: {name}，费用说明: ${currency}，费用金额: ${income}'.format(
+            name=shop.name, currency=finance.note, income=finance.income)
         log.user = request.user
         log.save()
 
@@ -3915,13 +4191,16 @@ class FinanceViewSet(mixins.ListModelMixin,
         shop_id = data['shop']
 
         # 店铺提现外汇
-        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
-            Sum('income'))
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id,
+                                                 is_received=True,
+                                                 f_type='WD').aggregate(
+                                                     Sum('income'))
         income_fund = sum_income_fund['income__sum']
         if not income_fund:
             income_fund = 0
         if float(data['exchange']) > income_fund:
-            return Response({'msg': '结汇金额超过账号资金'}, status=status.HTTP_202_ACCEPTED)
+            return Response({'msg': '结汇金额超过账号资金'},
+                            status=status.HTTP_202_ACCEPTED)
 
         shop = Shop.objects.filter(id=shop_id).first()
         finance = Finance()
@@ -3938,9 +4217,10 @@ class FinanceViewSet(mixins.ListModelMixin,
         log.op_module = 'FINANCE'
         log.op_type = 'CREATE'
         log.target_type = 'FINANCE'
-        log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(name=shop.name,
-                                                                                           exchange=finance.exchange,
-                                                                                           income=finance.income_rmb)
+        log.desc = '新增店铺结汇 店铺: {name}，结汇资金: ${exchange}, 收入￥{income}'.format(
+            name=shop.name,
+            exchange=finance.exchange,
+            income=finance.income_rmb)
         log.user = request.user
         log.save()
 
@@ -3956,45 +4236,56 @@ class FinanceViewSet(mixins.ListModelMixin,
         shop = Shop.objects.filter(id=shop_id).first()
 
         # 在途外汇
-        sum_onway_fund = Finance.objects.filter(shop__id=shop_id, is_received=False, f_type='WD').aggregate(
-            Sum('income'))
+        sum_onway_fund = Finance.objects.filter(shop__id=shop_id,
+                                                is_received=False,
+                                                f_type='WD').aggregate(
+                                                    Sum('income'))
         onway_fund = sum_onway_fund['income__sum']
         if not onway_fund:
             onway_fund = 0
 
         # 结汇资金
-        sum_income_rmb = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('income_rmb'))
+        sum_income_rmb = Finance.objects.filter(shop__id=shop_id,
+                                                f_type='EXC').aggregate(
+                                                    Sum('income_rmb'))
         income_rmb = sum_income_rmb['income_rmb__sum']
         if not income_rmb:
             income_rmb = 0
 
         # 结汇外汇
-        sum_exchange = Finance.objects.filter(shop__id=shop_id, f_type='EXC').aggregate(Sum('exchange'))
+        sum_exchange = Finance.objects.filter(shop__id=shop_id,
+                                              f_type='EXC').aggregate(
+                                                  Sum('exchange'))
         exchange_fund = sum_exchange['exchange__sum']
         if not exchange_fund:
             exchange_fund = 0
 
         # 店铺提现外汇
-        sum_income_fund = Finance.objects.filter(shop__id=shop_id, is_received=True, f_type='WD').aggregate(
-            Sum('income'))
+        sum_income_fund = Finance.objects.filter(shop__id=shop_id,
+                                                 is_received=True,
+                                                 f_type='WD').aggregate(
+                                                     Sum('income'))
         income_fund = sum_income_fund['income__sum']
         if not income_fund:
             income_fund = 0
 
         # rest_income = income_fund - exchange_fund
-        rest_income = Decimal(income_fund).quantize(Decimal("0.00")) - Decimal(exchange_fund).quantize(Decimal("0.00"))
+        rest_income = Decimal(income_fund).quantize(
+            Decimal("0.00")) - Decimal(exchange_fund).quantize(Decimal("0.00"))
 
-        return Response({'onway_fund': onway_fund, 'income_rmb': income_rmb, 'rest_income': rest_income,
-                         'default_currency': shop.exc_currency},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {
+                'onway_fund': onway_fund,
+                'income_rmb': income_rmb,
+                'rest_income': rest_income,
+                'default_currency': shop.exc_currency
+            },
+            status=status.HTTP_200_OK)
 
 
-class MLOrderViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         销售订单列表,分页,过滤,搜索,排序
@@ -4011,7 +4302,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
     serializer_class = MLOrderSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('shop', 'is_ad', 'order_status')  # 配置过滤字段
     filterset_fields = {
         'order_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
@@ -4022,7 +4314,8 @@ class MLOrderViewSet(mixins.ListModelMixin,
         'finance_check1': ['exact'],
     }
     search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price', 'profit')  # 配置排序字段
+    ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price',
+                       'profit')  # 配置排序字段
 
     # ML订单批量上传(旧)
     @action(methods=['post'], detail=False, url_path='bulk_upload')
@@ -4036,9 +4329,20 @@ class MLOrderViewSet(mixins.ListModelMixin,
         wb = openpyxl.load_workbook(data['excel'])
         sheet = wb.active
 
-        month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
-                      'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
-                      'diciembre': '12'}
+        month_dict = {
+            'enero': '01',
+            'febrero': '02',
+            'marzo': '03',
+            'abril': '04',
+            'mayo': '05',
+            'junio': '06',
+            'julio': '07',
+            'agosto': '08',
+            'septiembre': '09',
+            'octubre': '10',
+            'noviembre': '11',
+            'diciembre': '12'
+        }
 
         shop = Shop.objects.filter(id=shop_id).first()
         er = ExRate.objects.filter(currency=shop.currency).first()
@@ -4053,7 +4357,9 @@ class MLOrderViewSet(mixins.ListModelMixin,
             item_id = cell_row[14].value[3:]
 
             # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+            shop_stock = ShopStock.objects.filter(sku=sku,
+                                                  item_id=item_id,
+                                                  shop=shop).first()
             if not shop_stock:
                 continue
             first_ship_cost = shop_stock.first_ship_cost
@@ -4071,9 +4377,11 @@ class MLOrderViewSet(mixins.ListModelMixin,
             year = t[de_locate[1] + 3:de_locate[1] + 7]
             hour = t[de_locate[1] + 8:de_locate[1] + 10]
             min = t[de_locate[1] + 11:de_locate[1] + 13]
-            order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
+            order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day,
+                                                hour, min)
 
-            bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+            bj = datetime.strptime(order_time,
+                                   '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
             order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
             price = cell_row[17].value if cell_row[17].value else 0
@@ -4089,8 +4397,9 @@ class MLOrderViewSet(mixins.ListModelMixin,
             buyer_postcode = cell_row[29].value
             buyer_country = cell_row[30].value
 
-            profit = (float(
-                receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
+            profit = (
+                float(receive_fund) * 0.99
+            ) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
             profit_rate = profit / (price * ex_rate)
             if profit_rate < 0:
                 profit_rate = 0
@@ -4102,44 +4411,47 @@ class MLOrderViewSet(mixins.ListModelMixin,
                 order_status = 'CANCEL'
             if cell_row[2].value == 'Devolución en camino':
                 order_status = 'RETURN'
-            if cell_row[2].value == 'Reclamo cerrado con reembolso al comprador':
+            if cell_row[
+                    2].value == 'Reclamo cerrado con reembolso al comprador':
                 order_status = 'CASE'
             if cell_row[2].value[:8] == 'Devuelto':
                 order_status = 'RETURN'
 
             # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+            ml_order = MLOrder.objects.filter(order_number=order_number,
+                                              shop=shop).first()
             if not ml_order:
-                add_list.append(MLOrder(
-                    shop=shop,
-                    platform='MERCADO',
-                    order_number=order_number,
-                    order_status=order_status,
-                    order_time=order_time,
-                    order_time_bj=order_time_bj,
-                    qty=qty,
-                    currency=shop.currency,
-                    ex_rate=ex_rate,
-                    price=price,
-                    fees=fees,
-                    postage=postage,
-                    receive_fund=receive_fund,
-                    is_ad=is_ad,
-                    sku=sku,
-                    p_name=shop_stock.p_name,
-                    item_id=item_id,
-                    image=shop_stock.image,
-                    unit_cost=shop_stock.unit_cost * qty,
-                    first_ship_cost=first_ship_cost * qty,
-                    profit=profit,
-                    profit_rate=profit_rate,
-                    buyer_name=buyer_name,
-                    buyer_address=buyer_address,
-                    buyer_city=buyer_city,
-                    buyer_state=buyer_state,
-                    buyer_postcode=buyer_postcode,
-                    buyer_country=buyer_country,
-                ))
+                add_list.append(
+                    MLOrder(
+                        shop=shop,
+                        platform='MERCADO',
+                        order_number=order_number,
+                        order_status=order_status,
+                        order_time=order_time,
+                        order_time_bj=order_time_bj,
+                        qty=qty,
+                        currency=shop.currency,
+                        ex_rate=ex_rate,
+                        price=price,
+                        fees=fees,
+                        postage=postage,
+                        receive_fund=receive_fund,
+                        is_ad=is_ad,
+                        sku=sku,
+                        p_name=shop_stock.p_name,
+                        item_id=item_id,
+                        image=shop_stock.image,
+                        unit_cost=shop_stock.unit_cost * qty,
+                        first_ship_cost=first_ship_cost * qty,
+                        profit=profit,
+                        profit_rate=profit_rate,
+                        buyer_name=buyer_name,
+                        buyer_address=buyer_address,
+                        buyer_city=buyer_city,
+                        buyer_state=buyer_state,
+                        buyer_postcode=buyer_postcode,
+                        buyer_country=buyer_country,
+                    ))
                 shop_stock.qty -= qty
                 shop_stock.save()
 
@@ -4206,7 +4518,10 @@ class MLOrderViewSet(mixins.ListModelMixin,
         shop = Shop.objects.filter(id=shop_id).first()
 
         if not shop:
-            return Response({'msg': '店铺状态异常', 'status': 'error'},
+            return Response({
+                'msg': '店铺状态异常',
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
 
         # 保存上传excel文件
@@ -4247,16 +4562,16 @@ class MLOrderViewSet(mixins.ListModelMixin,
         log.desc = '销售订单导入 店铺: {name}'.format(name=shop.name)
         log.user = request.user
         log.save()
-        return Response({'msg': '文件已上传，后台处理中，稍微刷新查看结果', 'status': 'success'},
+        return Response({
+            'msg': '文件已上传，后台处理中，稍微刷新查看结果',
+            'status': 'success'
+        },
                         status=status.HTTP_200_OK)
 
 
-class MLOperateLogViewSet(mixins.ListModelMixin,
-                          mixins.CreateModelMixin,
-                          mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin,
-                          mixins.RetrieveModelMixin,
-                          viewsets.GenericViewSet):
+class MLOperateLogViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         操作日志列表,分页,过滤,搜索,排序
@@ -4273,8 +4588,10 @@ class MLOperateLogViewSet(mixins.ListModelMixin,
     serializer_class = MLOperateLogSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('op_module', 'op_type', 'target_id', 'target_type', 'user')  # 配置过滤字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('op_module', 'op_type', 'target_id', 'target_type', 'user'
+                     )  # 配置过滤字段
     filterset_fields = {
         'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'op_module': ['exact'],
@@ -4283,12 +4600,11 @@ class MLOperateLogViewSet(mixins.ListModelMixin,
         'target_type': ['exact'],
         'user': ['exact'],
     }
-    search_fields = ('desc',)  # 配置搜索字段
+    search_fields = ('desc', )  # 配置搜索字段
     ordering_fields = ('create_time', 'id')  # 配置排序字段
 
 
-class ShopReportViewSet(mixins.ListModelMixin,
-                        viewsets.GenericViewSet):
+class ShopReportViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     list:
         统计店铺每天销量
@@ -4296,7 +4612,7 @@ class ShopReportViewSet(mixins.ListModelMixin,
     queryset = ShopReport.objects.all()
     serializer_class = ShopReportSerializer  # 序列化
 
-    filter_backends = (DjangoFilterBackend,)  # 过滤
+    filter_backends = (DjangoFilterBackend, )  # 过滤
     filterset_fields = {
         'calc_date': ['gte', 'lte', 'exact'],
         'shop': ['exact'],
@@ -4318,10 +4634,8 @@ class ShopReportViewSet(mixins.ListModelMixin,
         return Response({'msg': '更新成功'}, status=status.HTTP_200_OK)
 
 
-class PurchaseManageViewSet(mixins.ListModelMixin,
-                            mixins.CreateModelMixin,
-                            mixins.UpdateModelMixin,
-                            mixins.DestroyModelMixin,
+class PurchaseManageViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin, mixins.DestroyModelMixin,
                             mixins.RetrieveModelMixin,
                             viewsets.GenericViewSet):
     """
@@ -4340,7 +4654,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     serializer_class = PurchaseManageSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     # filter_fields = ('p_status', 'shop', 's_type', 'create_type', 'is_urgent')  # 配置过滤字段
     filterset_fields = {
         'buy_qty': ['gte', 'lte', 'exact', 'gt', 'lt'],
@@ -4352,21 +4667,24 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         'is_urgent': ['exact'],
     }
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = (
-        'create_time', 'shop', 'item_id', 'buy_time', 'rec_time', 'pack_time', 'used_time', 'p_name')  # 配置排序字段
+    ordering_fields = ('create_time', 'shop', 'item_id', 'buy_time',
+                       'rec_time', 'pack_time', 'used_time', 'p_name'
+                       )  # 配置排序字段
 
     # 拉取运单备货产品
     @action(methods=['get'], detail=False, url_path='pull_purchase')
     def pull_purchase(self, request):
         pm_queryset = PurchaseManage.objects.filter(p_status='WAITBUY')
         for i in pm_queryset:
-            sku_count = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku).count()
+            sku_count = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                                  sku=i.sku).count()
             if sku_count == 0:
                 if i.create_type == 'SYS':
                     i.delete()
             # 计算该sku已采购数量
             aready_buy_set = PurchaseManage.objects.filter(sku=i.sku).filter(
-                Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+                Q(p_status='PURCHASED') | Q(p_status='RECEIVED')
+                | Q(p_status='PACKED'))
             total_buy = 0
             for item in aready_buy_set:
                 if item.p_status == 'PURCHASED':
@@ -4376,12 +4694,14 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 if item.p_status == 'PACKED':
                     total_buy += item.pack_qty
             if sku_count == 1:
-                sd = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku).first()
+                sd = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                               sku=i.sku).first()
                 i.buy_qty = sd.qty - total_buy if sd.qty - total_buy > 0 else 0
                 i.create_time = datetime.now()
                 i.save()
             if sku_count > 1:
-                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                                   sku=i.sku)
                 total_ship_qty = 0
                 for item in sd_set:
                     total_ship_qty += item.qty
@@ -4391,10 +4711,13 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
 
         ship_queryset = ShipDetail.objects.filter(ship__s_status='PREPARING')
         for i in ship_queryset:
-            wait_buy_sku_count = PurchaseManage.objects.filter(sku=i.sku, p_status='WAITBUY').count()
+            wait_buy_sku_count = PurchaseManage.objects.filter(
+                sku=i.sku, p_status='WAITBUY').count()
             if not wait_buy_sku_count:
-                aready_buy_set = PurchaseManage.objects.filter(sku=i.sku).filter(
-                    Q(p_status='PURCHASED') | Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+                aready_buy_set = PurchaseManage.objects.filter(
+                    sku=i.sku).filter(
+                        Q(p_status='PURCHASED') | Q(p_status='RECEIVED')
+                        | Q(p_status='PACKED'))
                 total_buy = 0
                 for item in aready_buy_set:
                     if item.p_status == 'PURCHASED':
@@ -4403,36 +4726,37 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                         total_buy += item.rec_qty
                     if item.p_status == 'PACKED':
                         total_buy += item.pack_qty
-                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+                sd_set = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                                   sku=i.sku)
                 total_ship_qty = 0
                 for item in sd_set:
                     total_ship_qty += item.qty
 
                 shop = Shop.objects.filter(name=i.target_FBM).first()
-                purchase_manage = PurchaseManage(
-                    p_status='WAITBUY',
-                    s_type=i.s_type,
-                    create_type='SYS',
-                    from_batch=i.ship.batch,
-                    platform=i.ship.platform,
-                    sku=i.sku,
-                    p_name=i.p_name,
-                    item_id=i.item_id,
-                    label_code=i.label_code,
-                    image=i.image,
-                    unit_cost=i.unit_cost,
-                    weight=i.weight,
-                    length=i.length,
-                    width=i.width,
-                    heigth=i.heigth,
-                    buy_qty=total_ship_qty - total_buy if total_ship_qty - total_buy > 0 else 0,
-                    note=i.note,
-                    shop=shop.name,
-                    shop_color=shop.name_color,
-                    packing_size=i.packing_size,
-                    packing_name=i.packing_name,
-                    create_time=datetime.now()
-                )
+                purchase_manage = PurchaseManage(p_status='WAITBUY',
+                                                 s_type=i.s_type,
+                                                 create_type='SYS',
+                                                 from_batch=i.ship.batch,
+                                                 platform=i.ship.platform,
+                                                 sku=i.sku,
+                                                 p_name=i.p_name,
+                                                 item_id=i.item_id,
+                                                 label_code=i.label_code,
+                                                 image=i.image,
+                                                 unit_cost=i.unit_cost,
+                                                 weight=i.weight,
+                                                 length=i.length,
+                                                 width=i.width,
+                                                 heigth=i.heigth,
+                                                 buy_qty=total_ship_qty -
+                                                 total_buy if total_ship_qty -
+                                                 total_buy > 0 else 0,
+                                                 note=i.note,
+                                                 shop=shop.name,
+                                                 shop_color=shop.name_color,
+                                                 packing_size=i.packing_size,
+                                                 packing_name=i.packing_name,
+                                                 create_time=datetime.now())
                 purchase_manage.save()
 
         # 创建操作日志
@@ -4453,9 +4777,13 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         is_change = data['is_change']
         # 检查是否有产品重复下单采购
         for i in products:
-            is_exist = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').count()
+            is_exist = PurchaseManage.objects.filter(
+                id=i['id'], p_status='PURCHASED').count()
             if is_exist:
-                return Response({'msg': '产品重复下单采购，请刷新页面检查！', 'status': 'error'},
+                return Response({
+                    'msg': '产品重复下单采购，请刷新页面检查！',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         for i in products:
@@ -4481,10 +4809,16 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.op_module = 'PURCHASE'
             log.op_type = 'CREATE'
             log.target_type = 'PURCHASE'
-            log.desc = '下单采购 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['buy_qty'])
+            log.desc = '下单采购 {sku} {p_name} {qty}个'.format(sku=i['sku'],
+                                                           p_name=i['p_name'],
+                                                           qty=i['buy_qty'])
             log.user = request.user
             log.save()
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 确认收货
     @action(methods=['post'], detail=False, url_path='rec_buy')
@@ -4493,40 +4827,45 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
 
         # 检查是否重复操作
         for i in data:
-            pm = PurchaseManage.objects.filter(id=i['id'], p_status='PURCHASED').first()
+            pm = PurchaseManage.objects.filter(id=i['id'],
+                                               p_status='PURCHASED').first()
             if not pm:
-                return Response({'msg': '产品重复收货，请刷新页面检查！', 'status': 'error'},
+                return Response({
+                    'msg': '产品重复收货，请刷新页面检查！',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
             if i['rec_qty'] > pm.buy_qty:
-                return Response({'msg': '产品收货数量错误，请刷新页面检查！', 'status': 'error'},
+                return Response({
+                    'msg': '产品收货数量错误，请刷新页面检查！',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         for i in data:
             buy_pm = PurchaseManage.objects.filter(id=i['id']).first()
-            purchase_manage = PurchaseManage(
-                p_status='RECEIVED',
-                platform=buy_pm.platform,
-                s_type=buy_pm.s_type,
-                create_type=buy_pm.create_type,
-                sku=buy_pm.sku,
-                p_name=buy_pm.p_name,
-                item_id=buy_pm.item_id,
-                label_code=buy_pm.label_code,
-                image=buy_pm.image,
-                unit_cost=buy_pm.unit_cost,
-                weight=buy_pm.weight,
-                length=buy_pm.length,
-                width=buy_pm.width,
-                heigth=buy_pm.heigth,
-                rec_qty=i['rec_qty'],
-                pack_qty=i['rec_qty'],
-                note=buy_pm.note,
-                shop=buy_pm.shop,
-                shop_color=buy_pm.shop_color,
-                packing_size=buy_pm.packing_size,
-                packing_name=buy_pm.packing_name,
-                rec_time=datetime.now()
-            )
+            purchase_manage = PurchaseManage(p_status='RECEIVED',
+                                             platform=buy_pm.platform,
+                                             s_type=buy_pm.s_type,
+                                             create_type=buy_pm.create_type,
+                                             sku=buy_pm.sku,
+                                             p_name=buy_pm.p_name,
+                                             item_id=buy_pm.item_id,
+                                             label_code=buy_pm.label_code,
+                                             image=buy_pm.image,
+                                             unit_cost=buy_pm.unit_cost,
+                                             weight=buy_pm.weight,
+                                             length=buy_pm.length,
+                                             width=buy_pm.width,
+                                             heigth=buy_pm.heigth,
+                                             rec_qty=i['rec_qty'],
+                                             pack_qty=i['rec_qty'],
+                                             note=buy_pm.note,
+                                             shop=buy_pm.shop,
+                                             shop_color=buy_pm.shop_color,
+                                             packing_size=buy_pm.packing_size,
+                                             packing_name=buy_pm.packing_name,
+                                             rec_time=datetime.now())
             purchase_manage.save()
 
             # 创建操作日志
@@ -4534,7 +4873,9 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.op_module = 'PURCHASE'
             log.op_type = 'CREATE'
             log.target_type = 'PURCHASE'
-            log.desc = '确认收货 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['rec_qty'])
+            log.desc = '确认收货 {sku} {p_name} {qty}个'.format(sku=i['sku'],
+                                                           p_name=i['p_name'],
+                                                           qty=i['rec_qty'])
             log.user = request.user
             log.save()
 
@@ -4545,7 +4886,11 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 buy_pm.rec_qty = i['buy_qty'] - i['rec_qty']
                 buy_pm.save()
 
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 确认打包
     @action(methods=['post'], detail=False, url_path='pack_buy')
@@ -4554,17 +4899,25 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
 
         # 检查是否重复操作
         for i in data:
-            pm = PurchaseManage.objects.filter(id=i['id'], p_status='RECEIVED').first()
+            pm = PurchaseManage.objects.filter(id=i['id'],
+                                               p_status='RECEIVED').first()
             if not pm:
-                return Response({'msg': '产品重复打包，请刷新页面检查！', 'status': 'error'},
+                return Response({
+                    'msg': '产品重复打包，请刷新页面检查！',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
             if i['pack_qty'] > pm.rec_qty:
-                return Response({'msg': '产品打包数量错误，请刷新页面检查！', 'status': 'error'},
+                return Response({
+                    'msg': '产品打包数量错误，请刷新页面检查！',
+                    'status': 'error'
+                },
                                 status=status.HTTP_202_ACCEPTED)
 
         for i in data:
             rec_pm = PurchaseManage.objects.filter(id=i['id']).first()
-            pack_sku = PurchaseManage.objects.filter(sku=i['sku'], p_status='PACKED').first()
+            pack_sku = PurchaseManage.objects.filter(
+                sku=i['sku'], p_status='PACKED').first()
             if not pack_sku:
                 purchase_manage = PurchaseManage(
                     p_status='PACKED',
@@ -4587,8 +4940,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                     shop_color=rec_pm.shop_color,
                     packing_size=rec_pm.packing_size,
                     packing_name=rec_pm.packing_name,
-                    pack_time=datetime.now()
-                )
+                    pack_time=datetime.now())
                 purchase_manage.save()
             else:
                 pack_sku.pack_qty += i['pack_qty']
@@ -4606,11 +4958,17 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.op_module = 'PURCHASE'
             log.op_type = 'CREATE'
             log.target_type = 'PURCHASE'
-            log.desc = '确认打包 {sku} {p_name} {qty}个'.format(sku=i['sku'], p_name=i['p_name'], qty=i['pack_qty'])
+            log.desc = '确认打包 {sku} {p_name} {qty}个'.format(sku=i['sku'],
+                                                           p_name=i['p_name'],
+                                                           qty=i['pack_qty'])
             log.user = request.user
             log.save()
 
-        return Response({'msg': '操作成功!', 'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 确认质检
     @action(methods=['post'], detail=False, url_path='product_qc')
@@ -4627,7 +4985,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             log.op_module = 'PURCHASE'
             log.op_type = 'EDIT'
             log.target_type = 'PURCHASE'
-            log.desc = '完成质检 {sku} {p_name}'.format(sku=i['sku'], p_name=i['p_name'])
+            log.desc = '完成质检 {sku} {p_name}'.format(sku=i['sku'],
+                                                    p_name=i['p_name'])
             log.user = request.user
             log.save()
         return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
@@ -4635,13 +4994,20 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
     # 计算采购单数量
     @action(methods=['get'], detail=False, url_path='calc_purchase')
     def calc_purchase(self, request):
-        wait_buy_num = PurchaseManage.objects.filter(p_status='WAITBUY').count()
-        purchased_num = PurchaseManage.objects.filter(p_status='PURCHASED').count()
+        wait_buy_num = PurchaseManage.objects.filter(
+            p_status='WAITBUY').count()
+        purchased_num = PurchaseManage.objects.filter(
+            p_status='PURCHASED').count()
         rec_num = PurchaseManage.objects.filter(p_status='RECEIVED').count()
         pack_num = PurchaseManage.objects.filter(p_status='PACKED').count()
 
         return Response(
-            {'wait_buy_num': wait_buy_num, 'purchased_num': purchased_num, 'rec_num': rec_num, 'pack_num': pack_num},
+            {
+                'wait_buy_num': wait_buy_num,
+                'purchased_num': purchased_num,
+                'rec_num': rec_num,
+                'pack_num': pack_num
+            },
             status=status.HTTP_200_OK)
 
     # 手动新建采购
@@ -4672,8 +5038,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
                 shop_color=shop.name_color,
                 packing_size=packing.size if packing else '',
                 packing_name=packing.name if packing else '',
-                create_time=datetime.now()
-            )
+                create_time=datetime.now())
             purchase_manage.save()
         # 创建操作日志
         log = MLOperateLog()
@@ -4716,9 +5081,13 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         sku = request.data['sku']
         product = MLProduct.objects.filter(sku=sku).first()
         if not product:
-            return Response({'msg': '产品不存在，请检查sku是否正确！', 'status': 'error'},
+            return Response({
+                'msg': '产品不存在，请检查sku是否正确！',
+                'status': 'error'
+            },
                             status=status.HTTP_202_ACCEPTED)
-        url = '{base_url}/media/ml_product/{sku}.jpg'.format(base_url=BASE_URL, sku=product.sku)
+        url = '{base_url}/media/ml_product/{sku}.jpg'.format(base_url=BASE_URL,
+                                                             sku=product.sku)
         p = {
             'sku': product.sku,
             'p_name': product.p_name,
@@ -4757,8 +5126,7 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
             packing_size=packing.size if packing else '',
             packing_name=packing.name if packing else '',
             rec_time=datetime.now(),
-            create_time=datetime.now()
-        )
+            create_time=datetime.now())
         purchase_manage.save()
 
         pm = PurchaseManage.objects.filter(id=data['from_id']).first()
@@ -4774,12 +5142,17 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         log.op_module = 'PURCHASE'
         log.op_type = 'CREATE'
         log.target_type = 'PURCHASE'
-        log.desc = '迁移 {from_sku} 数量{move_qty}个至 {target_sku}'.format(from_sku=data['from_sku'],
-                                                                            move_qty=data['move_qty'],
-                                                                            target_sku=data['target_sku'])
+        log.desc = '迁移 {from_sku} 数量{move_qty}个至 {target_sku}'.format(
+            from_sku=data['from_sku'],
+            move_qty=data['move_qty'],
+            target_sku=data['target_sku'])
         log.user = request.user
         log.save()
-        return Response({'msg': '操作成功', 'code': 'success'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功',
+            'code': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 重写
     def destroy(self, request, *args, **kwargs):
@@ -4791,7 +5164,8 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         log.op_type = 'DEL'
         log.target_type = 'PURCHASE'
         log.target_id = instance.id
-        log.desc = '删除产品 {sku} {name}'.format(sku=instance.sku, name=instance.p_name)
+        log.desc = '删除产品 {sku} {name}'.format(sku=instance.sku,
+                                              name=instance.p_name)
         log.user = request.user
         log.save()
 
@@ -4799,12 +5173,9 @@ class PurchaseManageViewSet(mixins.ListModelMixin,
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class UPCViewSet(mixins.ListModelMixin,
-                 mixins.CreateModelMixin,
-                 mixins.UpdateModelMixin,
-                 mixins.DestroyModelMixin,
-                 mixins.RetrieveModelMixin,
-                 viewsets.GenericViewSet):
+class UPCViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                 mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                 mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         UPC号码池列表,分页,过滤,搜索,排序
@@ -4821,14 +5192,15 @@ class UPCViewSet(mixins.ListModelMixin,
     serializer_class = UPCSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('is_used', 'user', 'use_time')  # 配置过滤字段
     filterset_fields = {
         'use_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'is_used': ['exact'],
         'user': ['exact'],
     }
-    search_fields = ('number',)  # 配置搜索字段
+    search_fields = ('number', )  # 配置搜索字段
     ordering_fields = ('create_time', 'use_time')  # 配置排序字段
 
     # upc号码上传
@@ -4845,9 +5217,7 @@ class UPCViewSet(mixins.ListModelMixin,
                 continue
             is_exist = UPC.objects.filter(number=number).count()
             if not is_exist:
-                add_list.append(UPC(
-                    number=number
-                ))
+                add_list.append(UPC(number=number))
         UPC.objects.bulk_create(add_list)
         msg = '成功上传 {s} 条'.format(s=len(add_list))
 
@@ -4859,7 +5229,8 @@ class UPCViewSet(mixins.ListModelMixin,
         qty = request.data['qty']
         available = UPC.objects.filter(is_used=False).count()
         if qty > available:
-            return Response({'msg': 'UPC号码数量不足，请联系管理员'}, status=status.HTTP_202_ACCEPTED)
+            return Response({'msg': 'UPC号码数量不足，请联系管理员'},
+                            status=status.HTTP_202_ACCEPTED)
         upcs = UPC.objects.filter(is_used=False)[:qty]
         for i in upcs:
             i.is_used = True
@@ -4869,10 +5240,8 @@ class UPCViewSet(mixins.ListModelMixin,
         return Response({'msg': '申请成功'}, status=status.HTTP_200_OK)
 
 
-class RefillRecommendViewSet(mixins.ListModelMixin,
-                             mixins.CreateModelMixin,
-                             mixins.UpdateModelMixin,
-                             mixins.DestroyModelMixin,
+class RefillRecommendViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                             mixins.UpdateModelMixin, mixins.DestroyModelMixin,
                              mixins.RetrieveModelMixin,
                              viewsets.GenericViewSet):
     """
@@ -4891,11 +5260,13 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
     serializer_class = RefillRecommendSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('is_new', 'shop', 'trend')  # 配置过滤字段
     search_fields = ('sku', 'p_name', 'item_id')  # 配置搜索字段
-    ordering_fields = ('create_time', 'item_id', 'all_sold', 'days30_sold', 'days15_sold', 'days7_sold', 'min_send',
-                       'full_send')  # 配置排序字段
+    ordering_fields = ('create_time', 'item_id', 'all_sold', 'days30_sold',
+                       'days15_sold', 'days7_sold', 'min_send', 'full_send'
+                       )  # 配置排序字段
 
     # 创建补货推荐列表
     @action(methods=['post'], detail=False, url_path='create_refill')
@@ -4912,9 +5283,14 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
         b_num = end_date.replace('-', '')[2:]
         batch = 'P{time_str}'.format(time_str=b_num)
 
-        refill_setting = RefillSettings.objects.filter(platform=shop.platform).first()
+        refill_setting = RefillSettings.objects.filter(
+            platform=shop.platform).first()
         if not refill_setting:
-            return Response({'msg': '补货参数未初始化!', 'status': 'error'}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '补货参数未初始化!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
         # 获取设置参数
         ship_days = refill_setting.fly_days  # 截单日期到上架所需天数
         batch_period = refill_setting.fly_batch_period  # 批次周期（发货批次间隔天数）
@@ -4931,12 +5307,16 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             if i.p_status == 'OFFLINE' or i.p_status == 'CLEAN':
                 continue
             # 该批次已备货的产品不计算
-            is_exist = ShipDetail.objects.filter(ship__s_status='PREPARING', ship__batch=batch, sku=i.sku).count()
+            is_exist = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                                 ship__batch=batch,
+                                                 sku=i.sku).count()
             if is_exist:
                 continue
 
             # 获取首次入仓的天数
-            sd = ShipDetail.objects.filter(ship__s_status='FINISHED', sku=i.sku).order_by('-create_time').first()
+            sd = ShipDetail.objects.filter(
+                ship__s_status='FINISHED',
+                sku=i.sku).order_by('-create_time').first()
             is_new = False  # 是否新品
             first_list_days = 0  # 首次上架天数
             avg_sale = 0  # 日均销量
@@ -4968,8 +5348,9 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             for t in ts:
                 trans_qty += t.qty
             # 中转在途数量
-            ssd = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
-                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            ssd = ShipDetail.objects.filter(
+                sku=i.sku, ship__target='TRANSIT').filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             for s in ssd:
                 trans_onway_qty += s.qty
             # 如果计算包含中转仓数量
@@ -4995,7 +5376,8 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
             if keep_days < current_days + ship_days:
                 # 补货天数：周期 + 货运时间
                 min_send = int(avg_sale * (batch_period + ship_days))
-                full_send = int(avg_sale * (current_days + batch_period + ship_days))
+                full_send = int(avg_sale *
+                                (current_days + batch_period + ship_days))
                 advice = '即将缺货'
             # 维持天数大于货运时间 + 当前时间,不断货
             elif keep_days < current_days + ship_days + batch_period:
@@ -5010,12 +5392,14 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
 
             # 备货中数量
             prepare_qty = 0
-            sd = ShipDetail.objects.filter(ship__s_status='PREPARING', sku=i.sku)
+            sd = ShipDetail.objects.filter(ship__s_status='PREPARING',
+                                           sku=i.sku)
             for s in sd:
                 prepare_qty += s.qty
             own_qty = 0
             # 已采购现货数量
-            pm = PurchaseManage.objects.filter(sku=i.sku).filter(Q(p_status='RECEIVED') | Q(p_status='PACKED'))
+            pm = PurchaseManage.objects.filter(sku=i.sku).filter(
+                Q(p_status='RECEIVED') | Q(p_status='PACKED'))
             for p in pm:
                 if p.p_status == 'RECEIVED':
                     own_qty += p.rec_qty
@@ -5024,36 +5408,38 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
 
             # fbm在途库存数量
             fbm_onway_qty = 0
-            sd_set = ShipDetail.objects.filter(sku=i.sku, ship__target='TRANSIT').filter(
-                Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
+            sd_set = ShipDetail.objects.filter(
+                sku=i.sku, ship__target='TRANSIT').filter(
+                    Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED'))
             for sst in sd_set:
                 fbm_onway_qty += sst.qty
 
-            add_list.append(RefillRecommend(
-                shop=shop,
-                sku=i.sku,
-                p_name=i.p_name,
-                image=i.image,
-                item_id=i.item_id,
-                is_new=is_new,
-                first_list_days=first_list_days,
-                trend=trend,
-                all_sold=i.total_sold,
-                days30_sold=i.day30_sold,
-                days15_sold=i.day15_sold,
-                days7_sold=i.day7_sold,
-                fbm_qty=i.qty,
-                onway_qty=fbm_onway_qty,
-                trans_qty=trans_qty,
-                trans_onway_qty=trans_onway_qty,
-                prepare_qty=prepare_qty,
-                own_qty=own_qty,
-                avg_sale=avg_sale,
-                keep_days=keep_days,
-                min_send=min_send,
-                full_send=full_send,
-                advice=advice,
-            ))
+            add_list.append(
+                RefillRecommend(
+                    shop=shop,
+                    sku=i.sku,
+                    p_name=i.p_name,
+                    image=i.image,
+                    item_id=i.item_id,
+                    is_new=is_new,
+                    first_list_days=first_list_days,
+                    trend=trend,
+                    all_sold=i.total_sold,
+                    days30_sold=i.day30_sold,
+                    days15_sold=i.day15_sold,
+                    days7_sold=i.day7_sold,
+                    fbm_qty=i.qty,
+                    onway_qty=fbm_onway_qty,
+                    trans_qty=trans_qty,
+                    trans_onway_qty=trans_onway_qty,
+                    prepare_qty=prepare_qty,
+                    own_qty=own_qty,
+                    avg_sale=avg_sale,
+                    keep_days=keep_days,
+                    min_send=min_send,
+                    full_send=full_send,
+                    advice=advice,
+                ))
         if len(add_list) > 0:
             RefillRecommend.objects.bulk_create(add_list)
         msg = '成功推荐{n}个产品'.format(n=len(add_list))
@@ -5061,10 +5447,8 @@ class RefillRecommendViewSet(mixins.ListModelMixin,
         return Response({'msg': msg}, status=status.HTTP_200_OK)
 
 
-class RefillSettingsViewSet(mixins.ListModelMixin,
-                            mixins.CreateModelMixin,
-                            mixins.UpdateModelMixin,
-                            mixins.DestroyModelMixin,
+class RefillSettingsViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                            mixins.UpdateModelMixin, mixins.DestroyModelMixin,
                             mixins.RetrieveModelMixin,
                             viewsets.GenericViewSet):
     """
@@ -5083,18 +5467,16 @@ class RefillSettingsViewSet(mixins.ListModelMixin,
     serializer_class = RefillSettingsSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('is_include_trans',)  # 配置过滤字段
-    search_fields = ('fly_days',)  # 配置搜索字段
-    ordering_fields = ('fly_days',)  # 配置排序字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('is_include_trans', )  # 配置过滤字段
+    search_fields = ('fly_days', )  # 配置搜索字段
+    ordering_fields = ('fly_days', )  # 配置排序字段
 
 
-class CarrierTrackViewSet(mixins.ListModelMixin,
-                          mixins.CreateModelMixin,
-                          mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin,
-                          mixins.RetrieveModelMixin,
-                          viewsets.GenericViewSet):
+class CarrierTrackViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         运单物流跟踪列表,分页,过滤,搜索,排序
@@ -5111,18 +5493,16 @@ class CarrierTrackViewSet(mixins.ListModelMixin,
     serializer_class = CarrierTrackSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('carrier_name', 'carrier_number')  # 配置过滤字段
-    search_fields = ('context',)  # 配置搜索字段
+    search_fields = ('context', )  # 配置搜索字段
     ordering_fields = ('create_time', 'time', 'optime')  # 配置排序字段
 
 
-class MLStockLogViewSet(mixins.ListModelMixin,
-                        mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
+class MLStockLogViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         库存日志列表,分页,过滤,搜索,排序
@@ -5139,14 +5519,14 @@ class MLStockLogViewSet(mixins.ListModelMixin,
     serializer_class = StockLogSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('shop_stock', 'in_out', 'action', 'user_id')  # 配置过滤字段
-    search_fields = ('desc',)  # 配置搜索字段
-    ordering_fields = ('create_time',)  # 配置排序字段
+    search_fields = ('desc', )  # 配置搜索字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
 
-class FileUploadNotifyViewSet(mixins.ListModelMixin,
-                              mixins.CreateModelMixin,
+class FileUploadNotifyViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                               mixins.UpdateModelMixin,
                               mixins.DestroyModelMixin,
                               mixins.RetrieveModelMixin,
@@ -5167,10 +5547,12 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin,
     serializer_class = FileUploadNotifySerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('shop', 'upload_status', 'upload_type', 'user_id')  # 配置过滤字段
-    search_fields = ('desc',)  # 配置搜索字段
-    ordering_fields = ('create_time',)  # 配置排序字段
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('shop', 'upload_status', 'upload_type', 'user_id'
+                     )  # 配置过滤字段
+    search_fields = ('desc', )  # 配置搜索字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
     # 获取订单上传记录
     @action(methods=['post'], detail=False, url_path='get_upload_result')
@@ -5183,8 +5565,180 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin,
         if not res:
             return Response({'status': '无记录！'}, status=status.HTTP_200_OK)
 
+        return Response(
+            {
+                'upload_status': res.upload_status,
+                'create_time': res.create_time,
+                'desc': res.desc,
+                'status': 'success'
+            },
+            status=status.HTTP_200_OK)
+
+
+class PlatformCategoryRateViewSet(mixins.ListModelMixin,
+                                  mixins.CreateModelMixin,
+                                  mixins.UpdateModelMixin,
+                                  mixins.DestroyModelMixin,
+                                  mixins.RetrieveModelMixin,
+                                  viewsets.GenericViewSet):
+    """
+    list:
+        平台类目佣金费率列表,分页,过滤,搜索,排序
+    create:
+        平台类目佣金费率新增
+    retrieve:
+        平台类目佣金费率详情页
+    update:
+        平台类目佣金费率修改
+    destroy:
+        平台类目佣金费率删除
+    """
+    queryset = PlatformCategoryRate.objects.all()
+    serializer_class = PlatformCategoryRateSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_fields = ('platform', 'site', 'first_category')  # 配置过滤字段
+    search_fields = ('en_name', 'cn_name', 'first_category')  # 配置搜索字段
+
+    # 上传平台类目费率表
+    @action(methods=['get'], detail=False, url_path='upload_category')
+    def upload_category(self, request):
+        import warnings
+        import openpyxl
+        warnings.filterwarnings('ignore')
+
+        data = MEDIA_ROOT + '/upload_file/ebay澳洲类目.xlsx'
+        wb = openpyxl.load_workbook(data)
+        sheet = wb.active
+
+        for cell_row in list(sheet)[2:]:
+            pc = PlatformCategoryRate()
+            pc.platform = 'ebay'
+            pc.site = cell_row[0].value
+            pc.category_id = cell_row[1].value
+            pc.en_name = cell_row[2].value
+            pc.cn_name = cell_row[3].value
+            pc.first_category = cell_row[4].value
+            pc.fixed_fee0 = cell_row[5].value
+            pc.fixed_fee1 = cell_row[6].value
+            pc.fee0 = cell_row[7].value
+            pc.fee1 = cell_row[8].value
+            pc.fee2 = cell_row[9].value
+            pc.fee3 = cell_row[10].value
+            pc.save()
+
+        return Response({'message': 'ok'}, status=status.HTTP_200_OK)
+
+    # 上传虚拟仓物流价格表
+    @action(methods=['get'], detail=False, url_path='upload_shipping')
+    def upload_shipping(self, request):
+        import warnings
+        import openpyxl
+        warnings.filterwarnings('ignore')
+
+        data = MEDIA_ROOT + '/upload_file/物流价格表.xlsx'
+        wb = openpyxl.load_workbook(data)
+        sheet = wb.active
+
+        for cell_row in list(sheet)[2:]:
+            pc = ShippingPrice()
+            pc.country = cell_row[0].value
+            pc.carrier_name = cell_row[1].value
+            pc.carrier_code = cell_row[2].value
+            pc.area = cell_row[3].value
+            pc.min_weight = cell_row[4].value
+            pc.max_weight = cell_row[5].value
+            pc.basic_price = cell_row[6].value
+            pc.calc_price = cell_row[7].value
+            pc.volume_ratio = cell_row[8].value
+            pc.is_elec = True if cell_row[9].value else False
+            pc.save()
+
+        return Response({'message': 'ok'}, status=status.HTTP_200_OK)
+
+    # 获取计算物流运费和利润
+    @action(methods=['post'], detail=False, url_path='get_shipping_price')
+    def get_shipping_price(self, request):
+        data = request.data
+        site = data['site']  # 站点、国家
+        p_width = data['p_width']  # 宽
+        p_height = data['p_height']  # 高
+        p_length = data['p_length']  # 长
+        p_weight = data['p_weight']  # 重量g
+        p_cost = data['p_cost']  # 产品成本价
+        carrier_code = data['carrier_code']  # 物流渠道
+        rec_rmb = data['rec_rmb']  # rmb收款
+        price = data['price']  # 售价
+        ex_rate = data['ex_rate']  # 汇率
+
+        if carrier_code == 'ALL':
+            sp = ShippingPrice.objects.filter(country=site,
+                                              min_weight__lte=p_weight,
+                                              max_weight__gte=p_weight)
+        else:
+            sp = ShippingPrice.objects.filter(country=site,
+                                              carrier_code=carrier_code,
+                                              min_weight__lte=p_weight,
+                                              max_weight__gte=p_weight)
+
+        p_list = []
+        for i in sp:
+            # 计算计费重量
+            calc_weight = 0
+            # 体积重
+            v_weight = p_width * p_height * p_length / i.volume_ratio
+            # ubi计费方式
+            if i.carrier_code in [
+                    'UBI_AUS_POST', 'UBI_AUS_POST_E', 'UBI_ARAMEX',
+                    'UBI_ARAMEX_E'
+            ]:
+                # 体积重量与实际重量比低于2:1的，按照实际重量收费。超过2:1的，按照体积重量收取
+                if p_weight * 2 < v_weight:
+                    calc_weight = v_weight
+                else:
+                    calc_weight = p_weight
+            # 其它物流计费方式
+            else:
+                if v_weight > p_weight:
+                    calc_weight = v_weight
+                else:
+                    calc_weight = p_weight
+
+            # 运费计算
+            cost = calc_weight * i.calc_price / 1000 + i.basic_price
+
+            # 利润
+            profit = rec_rmb - cost - p_cost
+
+            # 毛利率
+            gross_margin = profit / (price * ex_rate)
+
+            p_list.append({
+                'name': i.carrier_name,
+                'area': i.area,
+                'calc_weight': calc_weight,
+                'cost': cost,
+                'profit': profit,
+                'gross_margin': gross_margin,
+            })
+
+        return Response(p_list, status=status.HTTP_200_OK)
+
+    # 获取汇率
+    @action(methods=['post'], detail=False, url_path='get_ex_rate')
+    def get_ex_rate(self, request):
+        currency = request.data['currency']
+        rate = ExRate.objects.filter(currency=currency).first()
+
+        value = 0
+        update = ''
+        if rate:
+            value = rate.value
+            update = rate.update_time.strftime('%Y%m%d')
         return Response({
-            'upload_status': res.upload_status,
-            'create_time': res.create_time,
-            'desc': res.desc,
-            'status': 'success'}, status=status.HTTP_200_OK)
+            'value': value,
+            'update': update
+        },
+                        status=status.HTTP_200_OK)

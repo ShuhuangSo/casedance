@@ -4,6 +4,7 @@ from django.http import HttpResponse
 
 
 class VisitLimitMiddleWare(MiddlewareMixin):
+
     def process_request(self, request):
 
         # 系统关闭维护
@@ -11,7 +12,7 @@ class VisitLimitMiddleWare(MiddlewareMixin):
             return HttpResponse(content="系统关闭", status=503)
 
         # 客户端要求最低版本
-        required_app_ver = 141
+        required_app_ver = 143
         app_ver = request.META.get("HTTP_APP_VER")
 
         if app_ver:

@@ -41,6 +41,7 @@ from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSe
 from rest_framework.routers import DefaultRouter
 
 from store.views import StoreViewSet, StockInOutViewSet, StockLogViewSet, StockViewSet
+from devproduct.views import DevProductViewSet, DevPriceViewSet, DevChannelDataViewSet, DevListingChannelViewSet, DevListingAccountViewSet
 
 router = DefaultRouter()
 
@@ -256,6 +257,25 @@ router.register('ml_file_upload_notify',
 router.register('platform_category',
                 PlatformCategoryRateViewSet,
                 basename='platform_category')
+# ---------------------------产品开发app-------------------------------------------------
+# 产品开发列表
+router.register('dev_products', DevProductViewSet, basename='dev_products')
+# 产品开发定价列表
+router.register('dev_product_price',
+                DevPriceViewSet,
+                basename='dev_product_price')
+# 开发平台渠道数据列表
+router.register('dev_channel_data',
+                DevChannelDataViewSet,
+                basename='dev_channel_data')
+# 开发产品发布渠道列表
+router.register('dev_channel',
+                DevListingChannelViewSet,
+                basename='dev_channel')
+# 开发产品上架账号列表
+router.register('dev_listing_account',
+                DevListingAccountViewSet,
+                basename='dev_listing_account')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

@@ -2723,3 +2723,50 @@ class ShippingPrice(models.Model):
 
     def __str__(self):
         return self.carrier_name
+
+
+class ShippingAreaCode(models.Model):
+    """
+    物流服务分区
+    """
+
+    country = models.CharField(max_length=10,
+                               verbose_name='国家',
+                               help_text='国家')
+    carrier_name = models.CharField(max_length=50,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='物流名称',
+                                    help_text='物流名称')
+    carrier_code = models.CharField(max_length=30,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='物流代码',
+                                    help_text='物流代码')
+    postcode = models.CharField(max_length=10,
+                                verbose_name='邮编',
+                                help_text='邮编')
+    area = models.CharField(max_length=30,
+                            null=True,
+                            blank=True,
+                            verbose_name='分区',
+                            help_text='分区')
+    is_avaiable = models.BooleanField(default=True,
+                                      verbose_name='配送服务',
+                                      help_text='配送服务')
+    note = models.CharField(max_length=100,
+                            null=True,
+                            blank=True,
+                            verbose_name='简要备注',
+                            help_text='简要备注')
+    update_time = models.DateTimeField(null=True,
+                                       blank=True,
+                                       verbose_name='更新时间',
+                                       help_text='更新时间')
+
+    class Meta:
+        verbose_name = '物流服务分区'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.postcode

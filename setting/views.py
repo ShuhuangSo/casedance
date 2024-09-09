@@ -27,12 +27,9 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 100
 
 
-class TagViewSet(mixins.ListModelMixin,
-                 mixins.CreateModelMixin,
-                 mixins.UpdateModelMixin,
-                 mixins.DestroyModelMixin,
-                 mixins.RetrieveModelMixin,
-                 viewsets.GenericViewSet):
+class TagViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                 mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                 mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         标签库,分页,过滤,搜索,排序
@@ -51,7 +48,7 @@ class TagViewSet(mixins.ListModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)  # 过滤,搜索,排序
     filter_fields = ('type', 'color', 'user')  # 配置过滤字段
-    search_fields = ('tag_name',)  # 配置搜索字段
+    search_fields = ('tag_name', )  # 配置搜索字段
 
     @action(methods=['post'], detail=False, url_path='create_tag')
     def create_tag(self, request):
@@ -60,9 +57,12 @@ class TagViewSet(mixins.ListModelMixin,
         tag_type = request.data['type']
         color = request.data['color']
 
-        is_exist = Tag.objects.filter(user=user, type=tag_type, tag_name=tag_name).count()
+        is_exist = Tag.objects.filter(user=user,
+                                      type=tag_type,
+                                      tag_name=tag_name).count()
         if is_exist:
-            return Response({'msg': '标签名称已存在！'}, status=status.HTTP_202_ACCEPTED)
+            return Response({'msg': '标签名称已存在！'},
+                            status=status.HTTP_202_ACCEPTED)
         tag = Tag()
         tag.tag_name = tag_name
         tag.type = tag_type
@@ -72,12 +72,9 @@ class TagViewSet(mixins.ListModelMixin,
         return Response({'msg': '创建成功'}, status=status.HTTP_200_OK)
 
 
-class OperateLogViewSet(mixins.ListModelMixin,
-                        mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
+class OperateLogViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                        mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         操作日志,分页,过滤,搜索,排序
@@ -94,14 +91,14 @@ class OperateLogViewSet(mixins.ListModelMixin,
     serializer_class = OperateLogSerializer  # 序列化
     pagination_class = DefaultPagination  # 分页
 
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)  # 过滤,搜索,排序
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('op_type', 'target_id', 'user')  # 配置过滤字段
-    search_fields = ('op_log',)  # 配置搜索字段
-    ordering_fields = ('create_time',)  # 配置排序字段
+    search_fields = ('op_log', )  # 配置搜索字段
+    ordering_fields = ('create_time', )  # 配置排序字段
 
 
-class MenuViewSet(mixins.ListModelMixin,
-                  viewsets.GenericViewSet):
+class MenuViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     list:
         前端导航菜单列表
@@ -111,15 +108,14 @@ class MenuViewSet(mixins.ListModelMixin,
 
     def get_queryset(self):
         # 返回当前用户数据
-        return Menu.objects.filter(user=self.request.user, is_active=True, parent=None)
+        return Menu.objects.filter(user=self.request.user,
+                                   is_active=True,
+                                   parent=None)
 
 
-class AllMenuViewSet(mixins.ListModelMixin,
-                     mixins.CreateModelMixin,
-                     mixins.UpdateModelMixin,
-                     mixins.DestroyModelMixin,
-                     mixins.RetrieveModelMixin,
-                     viewsets.GenericViewSet):
+class AllMenuViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                     mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         全部前端导航菜单列表
@@ -133,12 +129,9 @@ class AllMenuViewSet(mixins.ListModelMixin,
         return Menu.objects.filter(user=user, parent=None)
 
 
-class UserMenuViewSet(mixins.ListModelMixin,
-                      mixins.CreateModelMixin,
-                      mixins.UpdateModelMixin,
-                      mixins.DestroyModelMixin,
-                      mixins.RetrieveModelMixin,
-                      viewsets.GenericViewSet):
+class UserMenuViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                      mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                      mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         指定用户前端导航菜单列表
@@ -196,17 +189,14 @@ class UserMenuViewSet(mixins.ListModelMixin,
         for i in queryset:
             if not i.parent:
                 parent_add_list.append(
-                    Menu(
-                        parent=i.parent,
-                        path=i.path,
-                        component=i.component,
-                        name=i.name,
-                        icon=i.icon,
-                        order_num=i.order_num,
-                        user=user,
-                        is_active=False
-                    )
-                )
+                    Menu(parent=i.parent,
+                         path=i.path,
+                         component=i.component,
+                         name=i.name,
+                         icon=i.icon,
+                         order_num=i.order_num,
+                         user=user,
+                         is_active=False))
         Menu.objects.bulk_create(parent_add_list)
 
         # 创建子菜单
@@ -218,17 +208,15 @@ class UserMenuViewSet(mixins.ListModelMixin,
                 if item.parent:
                     if item.parent.name == i.name:
                         children_add_list.append(
-                            Menu(
-                                parent=i,
-                                path=item.path,
-                                component=item.component,
-                                name=item.name,
-                                icon=item.icon,
-                                order_num=item.order_num,
-                                user=user,
-                                is_active=True if item.id in request.data else False
-                            )
-                        )
+                            Menu(parent=i,
+                                 path=item.path,
+                                 component=item.component,
+                                 name=item.name,
+                                 icon=item.icon,
+                                 order_num=item.order_num,
+                                 user=user,
+                                 is_active=True
+                                 if item.id in request.data else False))
                         i.is_active = True
                         i.save()
         Menu.objects.bulk_create(children_add_list)
@@ -301,14 +289,14 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
             log.desc = '转移中转仓产品归属权'
             log.user = request.user
             log.save()
-        return Response({'msg': '操作成功!'},
-                        status=status.HTTP_200_OK)
+        return Response({'msg': '操作成功!'}, status=status.HTTP_200_OK)
 
     # 创建默认数据
     @action(methods=['get'], detail=False, url_path='create_default_data')
     def create_default_data(self, request):
         admin = User.objects.get(username='admin')
-        MLUserPermission.objects.filter(user=admin, parent__isnull=False).delete()
+        MLUserPermission.objects.filter(user=admin,
+                                        parent__isnull=False).delete()
         MLUserPermission.objects.filter(user=admin).delete()
         mp = MLUserPermission()
         mp.module_name = '产品库'
@@ -849,11 +837,144 @@ class AllMLUserPermissionViewSet(mixins.ListModelMixin,
         mp_c.user = User.objects.get(username='admin')
         mp_c.save()
 
+        mp = MLUserPermission()
+        mp.module_name = '产品开发'
+        mp.component = 'devproduct'
+        mp.order_num = 10
+        mp.is_active = True
+        mp.user = User.objects.get(username='admin')
+        mp.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '基本信息-产品导入'
+        mp_c.component = 'devproduct_import'
+        mp_c.order_num = 1
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '基本信息-产品修改'
+        mp_c.component = 'devproduct_edit'
+        mp_c.order_num = 2
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '基本信息-产品关联/解除'
+        mp_c.component = 'devproduct_cp'
+        mp_c.order_num = 3
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '基本信息-产品删除'
+        mp_c.component = 'devproduct_delete'
+        mp_c.order_num = 4
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '定价-新增定价'
+        mp_c.component = 'devproduct_price_add'
+        mp_c.order_num = 5
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '定价-操作'
+        mp_c.component = 'devproduct_price_op'
+        mp_c.order_num = 6
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看产品发布渠道'
+        mp_c.component = 'devproduct_online_check'
+        mp_c.order_num = 7
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品发布/取消发布'
+        mp_c.component = 'devproduct_online_list'
+        mp_c.order_num = 8
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品下线'
+        mp_c.component = 'devproduct_offline'
+        mp_c.order_num = 9
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '产品重新上线'
+        mp_c.component = 'devproduct_relist'
+        mp_c.order_num = 10
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '备货申请'
+        mp_c.component = 'devproduct_buy_req'
+        mp_c.order_num = 11
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '备货审批'
+        mp_c.component = 'devproduct_buy_check'
+        mp_c.order_num = 12
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '备货采购'
+        mp_c.component = 'devproduct_buy_make'
+        mp_c.order_num = 13
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
+        mp_c = MLUserPermission()
+        mp_c.parent = mp
+        mp_c.module_name = '查看数据统计'
+        mp_c.component = 'devproduct_check_statistic'
+        mp_c.order_num = 14
+        mp_c.is_active = True
+        mp_c.user = User.objects.get(username='admin')
+        mp_c.save()
+
         return Response({'msg': '创建成功!'}, status=status.HTTP_200_OK)
 
 
-class MLUserPermissionViewSet(mixins.ListModelMixin,
-                              mixins.CreateModelMixin,
+class MLUserPermissionViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                               mixins.UpdateModelMixin,
                               mixins.DestroyModelMixin,
                               mixins.RetrieveModelMixin,
@@ -921,9 +1042,7 @@ class MLUserPermissionViewSet(mixins.ListModelMixin,
                         module_name=i.module_name,
                         order_num=i.order_num,
                         user=user,
-                        is_active=True if i.id in request.data else False
-                    )
-                )
+                        is_active=True if i.id in request.data else False))
         MLUserPermission.objects.bulk_create(parent_add_list)
 
         # 创建子菜单
@@ -935,15 +1054,13 @@ class MLUserPermissionViewSet(mixins.ListModelMixin,
                 if item.parent:
                     if item.parent.component == i.component:
                         children_add_list.append(
-                            MLUserPermission(
-                                parent=i,
-                                component=item.component,
-                                module_name=item.module_name,
-                                order_num=item.order_num,
-                                user=user,
-                                is_active=True if item.id in request.data else False
-                            )
-                        )
+                            MLUserPermission(parent=i,
+                                             component=item.component,
+                                             module_name=item.module_name,
+                                             order_num=item.order_num,
+                                             user=user,
+                                             is_active=True if item.id
+                                             in request.data else False))
                         i.is_active = True
                         i.save()
         MLUserPermission.objects.bulk_create(children_add_list)
@@ -951,12 +1068,9 @@ class MLUserPermissionViewSet(mixins.ListModelMixin,
         return Response({'msg': '创建成功'}, status=status.HTTP_200_OK)
 
 
-class MLPermissionViewSet(mixins.ListModelMixin,
-                          mixins.CreateModelMixin,
-                          mixins.UpdateModelMixin,
-                          mixins.DestroyModelMixin,
-                          mixins.RetrieveModelMixin,
-                          viewsets.GenericViewSet):
+class MLPermissionViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                          mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                          mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         前端指定用户美客多操作权限列表
@@ -969,12 +1083,9 @@ class MLPermissionViewSet(mixins.ListModelMixin,
         return MLUserPermission.objects.filter(user=self.request.user)
 
 
-class UserViewSet(mixins.ListModelMixin,
-                  mixins.CreateModelMixin,
-                  mixins.UpdateModelMixin,
-                  mixins.DestroyModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+class UserViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                  mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                  mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         user信息
@@ -983,7 +1094,8 @@ class UserViewSet(mixins.ListModelMixin,
     serializer_class = UserSerializer  # 序列化
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)  # 过滤,搜索
-    filter_fields = ('is_staff', 'is_active', 'is_superuser', 'last_name')  # 配置过滤字段
+    filter_fields = ('is_staff', 'is_active', 'is_superuser', 'last_name'
+                     )  # 配置过滤字段
     search_fields = ('username', 'first_name')  # 配置搜索字段
 
     # 获取当前用户信息
@@ -1013,7 +1125,11 @@ class UserViewSet(mixins.ListModelMixin,
 
         is_exist = User.objects.filter(username=username).count()
         if is_exist:
-            return Response({'msg': '手机号已存在!', 'success': False}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                'msg': '手机号已存在!',
+                'success': False
+            },
+                            status=status.HTTP_202_ACCEPTED)
 
         user = User()
         user.username = username
@@ -1024,8 +1140,14 @@ class UserViewSet(mixins.ListModelMixin,
         user.is_superuser = is_superuser
         user.save()
 
-        return Response({'msg': '创建成功!', 'success': True, 'id': user.id, 'name': user.first_name},
-                        status=status.HTTP_200_OK)
+        return Response(
+            {
+                'msg': '创建成功!',
+                'success': True,
+                'id': user.id,
+                'name': user.first_name
+            },
+            status=status.HTTP_200_OK)
 
     # 修改用户资料
     @action(methods=['put'], detail=False, url_path='edit_user')
@@ -1050,12 +1172,9 @@ class UserViewSet(mixins.ListModelMixin,
         return Response({'msg': '修改成功!'}, status=status.HTTP_200_OK)
 
 
-class SysRefillViewSet(mixins.ListModelMixin,
-                       mixins.CreateModelMixin,
-                       mixins.UpdateModelMixin,
-                       mixins.DestroyModelMixin,
-                       mixins.RetrieveModelMixin,
-                       viewsets.GenericViewSet):
+class SysRefillViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                       mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                       mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     list:
         补货推荐设置列表

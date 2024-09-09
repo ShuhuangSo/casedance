@@ -9,6 +9,7 @@ from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrac
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
     PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack, StockLog, \
     FileUploadNotify, PlatformCategoryRate
+from devproduct.models import DevProduct
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -661,6 +662,11 @@ class MLOperateLogSerializer(serializers.ModelSerializer):
                 shop_stock = ShopStock.objects.filter(id=obj.target_id).first()
                 if shop_stock:
                     name = shop_stock.sku
+        if obj.target_type == 'DEVP_P' or obj.target_type == 'DEVP_BUY':
+            if obj.target_id:
+                devp = DevProduct.objects.filter(id=obj.target_id).first()
+                if devp:
+                    name = devp.sku
 
         return name
 

@@ -3,7 +3,7 @@ from django.contrib import admin
 from mercado.models import Listing, ListingTrack, ApiSetting, Seller, Categories, TransApiSetting, Keywords, \
     SellerTrack, Shop, ShopStock, Ship, ShipDetail, ShipBox, TransStock, MLSite, FBMWarehouse, MLOrder, ExRate, Finance, \
     Packing, MLOperateLog, ShopReport, PurchaseManage, UPC, RefillRecommend, RefillSettings, CarrierTrack, \
-    GeneralSettings, PlatformCategoryRate, ShippingPrice
+    GeneralSettings, PlatformCategoryRate, ShippingPrice, ShippingAreaCode
 
 
 @admin.register(Listing)
@@ -205,3 +205,12 @@ class ShippingPriceAdmin(admin.ModelAdmin):
     ]
     list_filter = ['country']
     search_fields = ['carrier_name']
+
+
+@admin.register(ShippingAreaCode)
+class ShippingAreaCodeAdmin(admin.ModelAdmin):
+    list_display = [
+        'carrier_name', 'country', 'postcode', 'area', 'is_avaiable'
+    ]
+    list_filter = ['carrier_name', 'is_avaiable']
+    search_fields = ['postcode']

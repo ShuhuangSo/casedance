@@ -20,7 +20,7 @@ from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify, PlatformCategoryRate, ShippingPrice
+    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify, PlatformCategoryRate, ShippingPrice, ShippingAreaCode
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
@@ -2433,7 +2433,7 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             },
             status=status.HTTP_200_OK)
 
-    # 导出物流申报单
+    # 导出盛德物流申报单
     @action(methods=['post'], detail=False, url_path='export_logistic_decl')
     def export_logistic_decl(self, request):
         ship_id = request.data['id']
@@ -3205,6 +3205,119 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         return Response({
             'ships': ships,
             'msg': '操作成功！',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 导出OZON产品入仓单
+    @action(methods=['post'],
+            detail=False,
+            url_path='export_ozon_product_import')
+    def export_ozon_product_import(self, request):
+        from openpyxl.styles import Font
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.title = 'Sheet1'
+        title_font = Font(name='Arial')
+        sh['A1'] = 'артикул'
+        sh['A1'].font = title_font
+        sh['B1'] = 'имя (необязательно)'
+        sh['B1'].font = title_font
+        sh['C1'] = 'количество'
+        sh['C1'].font = title_font
+        ship_detail = ShipDetail.objects.filter(ship__id=ship_id)
+        num = 0
+        for i in ship_detail:
+            sh['A' + str(num + 2)] = i.sku
+            sh['C' + str(num + 2)] = i.qty
+            num += 1
+        wb.save('media/export/OZON产品入仓单-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/OZON产品入仓单-' + ship.shop + '.xlsx'
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出OZON产品入仓单'
+        log.user = request.user
+        log.save()
+
+        return Response({
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 导出OZON产品装箱单
+    @action(methods=['post'], detail=False, url_path='export_ozon_package')
+    def export_ozon_package(self, request):
+        from openpyxl.styles import Font
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+
+        sd_set = ShipDetail.objects.filter(ship__id=ship_id)
+        # 检查货品装箱情况
+        for i in sd_set:
+            if not i.box_number:
+                return Response({
+                    'msg': '有货品未装箱，请装箱后再导出!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+        boxes = ShipBox.objects.filter(ship__id=ship_id)
+        # 检查ozon箱唛号是否有填写
+        for i in boxes:
+            if not i.note:
+                return Response({
+                    'msg': '有平台箱唛未备注，请填写后再导出!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.title = 'Состав ГМ поставки'
+        title_font = Font(name='Arial')
+        sh['A1'] = 'ШК или артикул товара'
+        sh['A1'].font = title_font
+        sh['B1'] = 'Кол-во товаров'
+        sh['B1'].font = title_font
+        sh['C1'] = 'ШК ГМ'
+        sh['C1'].font = title_font
+        sh['D1'] = 'Тип ГМ (не обязательно)'
+        sh['D1'].font = title_font
+        sh['E1'] = 'Срок годности ДО в формате YYYY-MM-DD (не более 1 СГ на 1 SKU в 1 ГМ)'
+        sh['E1'].font = title_font
+        ship_detail = ShipDetail.objects.filter(ship__id=ship_id)
+        num = 0
+        for i in ship_detail:
+            box = ShipBox.objects.filter(ship__id=ship_id,
+                                         box_number=i.box_number).first()
+            sh['A' + str(num + 2)] = i.sku
+            sh['B' + str(num + 2)] = i.qty
+            sh['C' + str(num + 2)] = box.note
+            sh['D' + str(num + 2)] = 'Коробка'
+            sh['D' + str(num + 2)].font = title_font
+            num += 1
+        wb.save('media/export/OZON产品装箱单-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/OZON产品装箱单-' + ship.shop + '.xlsx'
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出OZON产品装箱单'
+        log.user = request.user
+        log.save()
+
+        return Response({
+            'url': url,
             'status': 'success'
         },
                         status=status.HTTP_200_OK)
@@ -5658,6 +5771,33 @@ class PlatformCategoryRateViewSet(mixins.ListModelMixin,
 
         return Response({'message': 'ok'}, status=status.HTTP_200_OK)
 
+    # 上传虚拟仓物流分区表
+    @action(methods=['get'],
+            detail=False,
+            url_path='upload_shipping_area_code')
+    def upload_shipping_area_code(self, request):
+        import warnings
+        import openpyxl
+        warnings.filterwarnings('ignore')
+        ShippingAreaCode.objects.all().delete()
+
+        data = MEDIA_ROOT + '/upload_file/物流分区表.xlsx'
+        wb = openpyxl.load_workbook(data)
+        sheet = wb.active
+
+        for cell_row in list(sheet)[1:]:
+            pc = ShippingAreaCode()
+            pc.country = cell_row[0].value
+            pc.carrier_name = cell_row[1].value
+            pc.carrier_code = cell_row[2].value
+            pc.postcode = cell_row[3].value
+            pc.area = cell_row[4].value
+            pc.is_avaiable = False if cell_row[
+                5].value == 'out of network' else True
+            pc.save()
+
+        return Response({'message': 'ok'}, status=status.HTTP_200_OK)
+
     # 获取计算物流运费和利润
     @action(methods=['post'], detail=False, url_path='get_shipping_price')
     def get_shipping_price(self, request):
@@ -5740,5 +5880,61 @@ class PlatformCategoryRateViewSet(mixins.ListModelMixin,
         return Response({
             'value': value,
             'update': update
+        },
+                        status=status.HTTP_200_OK)
+
+    # 查询邮编分区
+    @action(methods=['post'], detail=False, url_path='get_postcode_area')
+    def get_postcode_area(self, request):
+        postcode = request.data['postcode'].strip()
+        postage = request.data['postage']
+        weight = request.data['weight']
+        cost = 0
+
+        sac_list = ShippingAreaCode.objects.filter(postcode=postcode)
+        add_list = []
+        for i in sac_list:
+            # 计算运费
+            if i.is_avaiable and postage:
+                sp = ShippingPrice.objects.filter(country=i.country,
+                                                  carrier_code=i.carrier_code,
+                                                  area=i.area).first()
+                if sp:
+                    cost = weight * sp.calc_price / 1000 + sp.basic_price
+            add_list.append({
+                'id': i.id,
+                'country': i.country,
+                'carrier_name': i.carrier_name,
+                'area': i.area,
+                'postcode': i.postcode,
+                'is_avaiable': i.is_avaiable,
+                'note': i.note,
+                'update_time': i.update_time,
+                'cost': cost,
+            })
+
+        if not len(add_list):
+            return Response({
+                'msg': '找不到邮编分区!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        return Response(add_list, status=status.HTTP_200_OK)
+
+    # 修改邮编服务
+    @action(methods=['post'], detail=False, url_path='change_postcode_tag')
+    def change_postcode_tag(self, request):
+        id = request.data['id']
+        is_avaiable = request.data['is_avaiable']
+
+        sac = ShippingAreaCode.objects.filter(id=id).first()
+        sac.is_avaiable = not is_avaiable
+        sac.note = '{name}修改了服务标记'.format(name=request.user.first_name)
+        sac.update_time = datetime.now()
+        sac.save()
+
+        return Response({
+            'msg': '成功修改!',
+            'status': 'success'
         },
                         status=status.HTTP_200_OK)

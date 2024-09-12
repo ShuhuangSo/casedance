@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from casedance.settings import BASE_URL
 from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount
+from datetime import datetime, timedelta
 
 
 class DevPriceSerializer(serializers.ModelSerializer):
@@ -40,6 +41,8 @@ class DevListingAccountSerializer(serializers.ModelSerializer):
     en_name = serializers.SerializerMethodField()
     # 产品定价
     price = serializers.SerializerMethodField()
+    # 上线时间
+    life_time = serializers.SerializerMethodField()
 
     def get_sale_url(self, obj):
         url = ''
@@ -84,12 +87,25 @@ class DevListingAccountSerializer(serializers.ModelSerializer):
         else:
             return 0
 
+    def get_life_time(self, obj):
+        life_time = ''
+        if obj.is_online:
+            # 天数
+            days = (datetime.now() - obj.online_time).days
+            hours = round((datetime.now() - obj.online_time).seconds / 3600, 1)
+            if days > 0:
+                life_time = '{day} 天'.format(day=days)
+            else:
+                life_time = '{hour} 小时'.format(hour=hours)
+        return life_time
+
     class Meta:
         model = DevListingAccount
         fields = ('id', 'dev_p', 'platform', 'site', 'account_name', 'user_id',
                   'user_name', 'item_id', 'is_online', 'online_time',
                   'offline_time', 'note', 'sale_url', 'notify', 'is_paused',
-                  'image', 'sku', 'cn_name', 'en_name', 'price', 'create_time')
+                  'image', 'sku', 'cn_name', 'en_name', 'price', 'create_time',
+                  'life_time')
 
 
 class DevProductSerializer(serializers.ModelSerializer):

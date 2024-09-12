@@ -251,6 +251,56 @@ class DevPrice(models.Model):
                                        blank=True,
                                        verbose_name='更新时间',
                                        help_text='更新时间')
+    note = models.TextField(null=True,
+                            blank=True,
+                            default='',
+                            verbose_name='备注',
+                            help_text='备注')
+    upc = models.CharField(max_length=30,
+                           null=True,
+                           blank=True,
+                           verbose_name='UPC',
+                           help_text='UPC')
+    custom_code = models.CharField(null=True,
+                                   blank=True,
+                                   max_length=20,
+                                   verbose_name='海关编码',
+                                   help_text='海关编码')
+    custom_cn_name = models.CharField(null=True,
+                                      blank=True,
+                                      max_length=30,
+                                      verbose_name='申报中文品名',
+                                      help_text='申报中文品名')
+    custom_en_name = models.CharField(null=True,
+                                      blank=True,
+                                      max_length=30,
+                                      verbose_name='申报英文品名',
+                                      help_text='申报英文品名')
+    brand = models.CharField(null=True,
+                             blank=True,
+                             max_length=20,
+                             verbose_name='品牌',
+                             help_text='品牌')
+    declared_value = models.FloatField(null=True,
+                                       blank=True,
+                                       max_length=30,
+                                       verbose_name='申报价值USD',
+                                       help_text='申报价值USD')
+    cn_material = models.CharField(null=True,
+                                   blank=True,
+                                   max_length=30,
+                                   verbose_name='中文材质',
+                                   help_text='中文材质')
+    en_material = models.CharField(null=True,
+                                   blank=True,
+                                   max_length=30,
+                                   verbose_name='英文材质',
+                                   help_text='英文材质')
+    use = models.CharField(null=True,
+                           blank=True,
+                           max_length=50,
+                           verbose_name='用途',
+                           help_text='用途')
 
     class Meta:
         verbose_name = '产品开发定价'

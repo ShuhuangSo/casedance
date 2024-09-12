@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 import openpyxl
 from datetime import datetime, timedelta
 import numpy
+from casedance.settings import BASE_URL
 
 from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount
 from devproduct.serializers import DevProductSerializer, DevPriceSerializer, DevChannelDataSerializer, DevListingChannelSerializer, DevListingAccountSerializer
@@ -195,8 +196,11 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             log.desc = '创建产品'
             log.user = request.user
             log.save()
-
-        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '成功上传!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # DEV产品图片上传
     @action(methods=['post'], detail=False, url_path='image_upload')
@@ -234,7 +238,11 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         log.user = request.user
         log.save()
 
-        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
     # 发布产品
     @action(methods=['post'], detail=False, url_path='list_product')
@@ -562,13 +570,15 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             ac_list = DevListingAccount.objects.filter(
                 dev_p__p_status='ONLINE', user_id=user_id, is_online=True)
             time_list = []
+            avg_days = 0
             for i in ac_list:
                 # 天数
                 days = (i.online_time - i.create_time).days
                 micro_day = round(
                     (i.online_time - i.create_time).seconds / 3600 / 24, 3)
                 time_list.append(days + micro_day)
-            avg_days = round(numpy.average(time_list), 1)
+            if len(time_list):
+                avg_days = round(numpy.average(time_list), 1)
 
             data_list.append({
                 'offline_product_qty': offline_product_qty,
@@ -578,6 +588,7 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 'user_name': item.name,
                 'avg_days': avg_days,
             })
+
         return Response(data_list, status=status.HTTP_200_OK)
 
     # 产品开发数据
@@ -712,6 +723,38 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         },
                         status=status.HTTP_200_OK)
 
+    # 获取产品关联数据
+    @action(methods=['post'], detail=False, url_path='get_cp_list')
+    def get_cp_list(self, request):
+        id = request.data['id']
+        dp = DevProduct.objects.filter(id=id).first()
+        p_list = []
+        if dp.cp_id:
+            # 查出关联数据
+            cps = DevProduct.objects.filter(cp_id=dp.cp_id).exclude(id=id)
+            for i in cps:
+                p_list.append({
+                    'id': i.id,
+                    'sku': i.sku,
+                    'p_status': i.p_status,
+                    'cn_name': i.cn_name,
+                    'en_name': i.en_name,
+                    'image': BASE_URL + i.image.url if i.image else '',
+                    'main': False
+                })
+            # 将本产品数据插入到列表最前面
+            p_list.insert(
+                0, {
+                    'id': dp.id,
+                    'sku': dp.sku,
+                    'p_status': dp.p_status,
+                    'cn_name': dp.cn_name,
+                    'en_name': dp.en_name,
+                    'image': BASE_URL + dp.image.url if dp.image else '',
+                    'main': True
+                })
+        return Response(p_list, status=status.HTTP_200_OK)
+
 
 class DevPriceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                       mixins.UpdateModelMixin, mixins.DestroyModelMixin,
@@ -747,6 +790,7 @@ class DevPriceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         currency = data['currency']  # 币种
         ex_rate = data['ex_rate']  # 汇率
         profit = data['profit']  # 毛利润
+        note = data['note']  # 备注
 
         product = DevProduct.objects.filter(id=dev_p_id).first()
         if product:
@@ -757,6 +801,7 @@ class DevPriceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             dp.price = price
             dp.currency = currency
             dp.ex_rate = ex_rate
+            dp.note = note
             dp.profit = profit
             dp.gross_margin = profit / (price * ex_rate)
             dp.save()
@@ -791,9 +836,11 @@ class DevPriceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         price = data['price']  # 定价
         ex_rate = data['ex_rate']  # 汇率
         profit = data['profit']  # 毛利润
+        note = data['note']  # 备注
 
         dp = DevPrice.objects.filter(id=id).first()
         if dp:
+            desc = '修改定价信息'
             # 查看调价状态，发送调价通知
             is_change = False if dp.price == price else True
             if is_change:
@@ -837,6 +884,7 @@ class DevPriceViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
             dp.price = price
             dp.ex_rate = ex_rate
+            dp.note = note
             dp.profit = profit
             dp.gross_margin = profit / (price * ex_rate)
             dp.save()
@@ -1078,12 +1126,20 @@ class DevListingAccountViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         id = data['id']
 
         dla = DevListingAccount.objects.filter(id=id).first()
+        # 检查是否下架的是自己的链接
+        if not request.user.is_superuser and dla.user_id != request.user.id:
+            return Response({
+                'msg': '只能下架自己的链接!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
         old_item_id = dla.item_id
         if dla:
             dla.item_id = ''
             dla.is_online = False
             dla.notify = 0
             dla.offline_time = datetime.now()
+            dla.online_time = None
             dla.save()
         else:
             return Response({
@@ -1115,6 +1171,17 @@ class DevListingAccountViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     def bulk_end_listing(self, request):
         data = request.data
         ids = data['ids']
+        # 检查是否下架的是自己的链接
+        if not request.user.is_superuser:
+            for id in ids:
+                dla = DevListingAccount.objects.filter(id=id).first()
+                if dla.user_id != request.user.id:
+                    return Response(
+                        {
+                            'msg': '批量下架只能下架自己的链接!',
+                            'status': 'error'
+                        },
+                        status=status.HTTP_202_ACCEPTED)
 
         for id in ids:
             dla = DevListingAccount.objects.filter(id=id).first()
@@ -1124,6 +1191,7 @@ class DevListingAccountViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 dla.is_online = False
                 dla.notify = 0
                 dla.offline_time = datetime.now()
+                dla.online_time = None
                 dla.save()
             else:
                 return Response({

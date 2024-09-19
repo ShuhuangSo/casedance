@@ -5673,6 +5673,9 @@ class FileUploadNotifyViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         data = request.data
         shop_id = data['id']
         shop = Shop.objects.filter(id=shop_id).first()
+        # 开发产品订单记录
+        if shop_id == 0:
+            shop = None
 
         res = FileUploadNotify.objects.filter(shop=shop).first()
         if not res:

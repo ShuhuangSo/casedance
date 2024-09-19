@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from casedance.settings import BASE_URL
-from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount
+from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount, DevOrder
 from datetime import datetime, timedelta
 
 
@@ -105,7 +105,7 @@ class DevListingAccountSerializer(serializers.ModelSerializer):
                   'user_name', 'item_id', 'is_online', 'online_time',
                   'offline_time', 'note', 'sale_url', 'notify', 'is_paused',
                   'image', 'sku', 'cn_name', 'en_name', 'price', 'create_time',
-                  'life_time')
+                  'life_time', 'total_sold')
 
 
 class DevProductSerializer(serializers.ModelSerializer):
@@ -158,7 +158,9 @@ class DevProductSerializer(serializers.ModelSerializer):
                   'online_time', 'offline_time', 'user_id', 'qty', 'percent',
                   'rate', 'p_status', 'buy_status', 'tag_name', 'tag_color',
                   'dev_price', 'dev_listing_channel', 'cp_id', 'cp_count',
-                  'notify', 'user_name', 'local_category')
+                  'notify', 'user_name', 'local_category', 'day7_sold',
+                  'day15_sold', 'day30_sold', 'total_sold', 'total_profit',
+                  'avg_profit', 'avg_profit_rate')
 
 
 class DevChannelDataSerializer(serializers.ModelSerializer):
@@ -169,3 +171,49 @@ class DevChannelDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = DevChannelData
         fields = "__all__"
+
+
+class DevOrderSerializer(serializers.ModelSerializer):
+    """
+    开发产品订单
+    """
+    # 销售链接
+    sale_url = serializers.SerializerMethodField()
+    # 负责人名称
+    user_name = serializers.SerializerMethodField()
+
+    def get_sale_url(self, obj):
+        url = ''
+        if obj.item_id:
+            if obj.platform == 'eBay':
+                if obj.site == 'AU':
+                    url = 'https://www.ebay.com.au/itm/' + obj.item_id
+                if obj.site == 'UK':
+                    url = 'https://www.ebay.co.uk/itm/' + obj.item_id
+            if obj.platform == 'MERCADO':
+                url = 'https://articulo.mercadolibre.com.mx/' + obj.site + '-' + obj.item_id
+            if obj.platform == 'NOON':
+                url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(
+                    item_id=obj.item_id)
+            if obj.platform == 'OZON':
+                url = 'https://www.ozon.ru/product/{item_id}'.format(
+                    item_id=obj.item_id)
+        return url
+
+    def get_user_name(self, obj):
+        name = ''
+        dla = DevListingAccount.objects.filter(
+            account_name=obj.account_name).first()
+        if dla:
+            return dla.user_name
+        return name
+
+    class Meta:
+        model = DevOrder
+        fields = ('id', 'dev_p_id', 'platform', 'site', 'currency', 'sku',
+                  'cn_name', 'image', 'account_name', 'item_id', 'unit_cost',
+                  'order_number', 'order_status', 'order_time', 'qty',
+                  'ex_rate', 'item_price', 'postage_price', 'total_price',
+                  'fees', 'postage', 'receive_fund', 'profit', 'profit_rate',
+                  'is_ad', 'ad_fee', 'is_combined', 'is_settled', 'is_resent',
+                  'sale_url', 'user_name')

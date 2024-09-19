@@ -190,6 +190,30 @@ class DevProduct(models.Model):
                                          default=0,
                                          verbose_name='产品目录',
                                          help_text='产品目录')
+    day7_sold = models.IntegerField(default=0,
+                                    verbose_name='7天销量',
+                                    help_text='7天销量')
+    day15_sold = models.IntegerField(default=0,
+                                     verbose_name='15天销量',
+                                     help_text='15天销量')
+    day30_sold = models.IntegerField(default=0,
+                                     verbose_name='30天销量',
+                                     help_text='30天销量')
+    total_sold = models.IntegerField(default=0,
+                                     verbose_name='累计销量',
+                                     help_text='累计销量')
+    total_profit = models.FloatField(null=True,
+                                     blank=True,
+                                     verbose_name='累计利润',
+                                     help_text='累计利润')
+    avg_profit = models.FloatField(null=True,
+                                   blank=True,
+                                   verbose_name='平均毛利润',
+                                   help_text='平均毛利润')
+    avg_profit_rate = models.FloatField(null=True,
+                                        blank=True,
+                                        verbose_name='平均毛利率',
+                                        help_text='平均毛利率')
 
     class Meta:
         verbose_name = '产品开发列表'
@@ -413,6 +437,9 @@ class DevListingAccount(models.Model):
                                        blank=True,
                                        verbose_name='创建时间',
                                        help_text='创建时间')
+    total_sold = models.IntegerField(default=0,
+                                     verbose_name='累计销量',
+                                     help_text='累计销量')
 
     # create_time.editable = True
 
@@ -454,3 +481,143 @@ class DevChannelData(models.Model):
 
     def __str__(self):
         return self.platform
+
+
+class DevOrder(models.Model):
+    """
+    开发产品订单
+    """
+
+    dev_p_id = models.IntegerField(null=True,
+                                   blank=True,
+                                   verbose_name='开发产品id',
+                                   help_text='开发产品id')
+    platform = models.CharField(max_length=20,
+                                null=True,
+                                blank=True,
+                                verbose_name='平台',
+                                help_text='平台')
+    site = models.CharField(max_length=20,
+                            null=True,
+                            blank=True,
+                            verbose_name='站点',
+                            help_text='站点')
+    currency = models.CharField(max_length=10,
+                                null=True,
+                                blank=True,
+                                verbose_name='币种',
+                                help_text='币种')
+    sku = models.CharField(max_length=30,
+                           null=True,
+                           blank=True,
+                           verbose_name='产品SKU',
+                           help_text='产品SKU')
+    cn_name = models.CharField(max_length=100,
+                               null=True,
+                               blank=True,
+                               verbose_name='产品中文名称',
+                               help_text='产品中文名称')
+    image = models.ImageField(null=True,
+                              blank=True,
+                              max_length=200,
+                              verbose_name='产品图片',
+                              help_text='产品图片')
+    account_name = models.CharField(max_length=50,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='账号名称',
+                                    help_text='账号名称')
+    item_id = models.CharField(max_length=30,
+                               null=True,
+                               blank=True,
+                               verbose_name='产品在线id',
+                               help_text='产品在线id')
+    order_number = models.CharField(max_length=30,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='订单编号',
+                                    help_text='订单编号')
+    order_status = models.CharField(max_length=10,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='订单状态',
+                                    help_text='订单状态')
+    order_time = models.DateTimeField(null=True,
+                                      blank=True,
+                                      verbose_name='订单时间',
+                                      help_text='订单时间')
+    qty = models.IntegerField(default=0, verbose_name='数量', help_text='数量')
+    ex_rate = models.FloatField(default=0,
+                                null=True,
+                                blank=True,
+                                verbose_name='汇率',
+                                help_text='汇率')
+    item_price = models.FloatField(default=0,
+                                   null=True,
+                                   blank=True,
+                                   verbose_name='销售单价',
+                                   help_text='销售单价')
+    postage_price = models.FloatField(default=0,
+                                      null=True,
+                                      blank=True,
+                                      verbose_name='收取运费',
+                                      help_text='收取运费')
+    total_price = models.FloatField(default=0,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='销售总价',
+                                    help_text='销售总价')
+    fees = models.FloatField(default=0,
+                             null=True,
+                             blank=True,
+                             verbose_name='佣金',
+                             help_text='佣金')
+    postage = models.FloatField(default=0,
+                                null=True,
+                                blank=True,
+                                verbose_name='发货邮费',
+                                help_text='发货邮费')
+    receive_fund = models.FloatField(default=0,
+                                     null=True,
+                                     blank=True,
+                                     verbose_name='收入资金',
+                                     help_text='收入资金')
+    profit = models.FloatField(default=0,
+                               null=True,
+                               blank=True,
+                               verbose_name='利润rmb',
+                               help_text='利润rmb')
+    profit_rate = models.FloatField(default=0,
+                                    null=True,
+                                    blank=True,
+                                    verbose_name='毛利率',
+                                    help_text='毛利率')
+    is_ad = models.BooleanField(default=False,
+                                verbose_name='是否广告卖出',
+                                help_text='是否广告卖出')
+    ad_fee = models.FloatField(default=0,
+                               null=True,
+                               blank=True,
+                               verbose_name='广告费',
+                               help_text='广告费')
+    is_combined = models.BooleanField(default=False,
+                                      verbose_name='是否合并订单',
+                                      help_text='是否合并订单')
+    is_settled = models.BooleanField(default=False,
+                                     verbose_name='是否已结算',
+                                     help_text='是否已结算')
+    is_resent = models.BooleanField(default=False,
+                                    verbose_name='是否重发订单',
+                                    help_text='是否重发订单')
+    unit_cost = models.FloatField(null=True,
+                                  blank=True,
+                                  verbose_name='成本价',
+                                  help_text='成本价')
+
+    class Meta:
+        verbose_name = '开发产品订单'
+        verbose_name_plural = verbose_name
+        ordering = ['order_time']
+
+    def __str__(self):
+        return self.order_number

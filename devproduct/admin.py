@@ -1,5 +1,5 @@
 from django.contrib import admin
-from devproduct.models import DevProduct, DevPrice, DevListingChannel, DevListingAccount, DevChannelData
+from devproduct.models import DevProduct, DevPrice, DevListingChannel, DevListingAccount, DevChannelData, DevOrder
 
 
 # Register your models here.
@@ -39,3 +39,10 @@ class DevChannelDataAdmin(admin.ModelAdmin):
     list_display = ['platform', 'site', 'default_active']
     list_filter = ['platform']
     search_fields = ['platform']
+
+
+@admin.register(DevOrder)
+class DevOrderAdmin(admin.ModelAdmin):
+    list_display = ['platform', 'site', 'order_number']
+    list_filter = ['order_status']
+    search_fields = ['order_number']

@@ -12,10 +12,11 @@ from datetime import datetime, timedelta
 import numpy
 from casedance.settings import BASE_URL
 
-from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount
-from devproduct.serializers import DevProductSerializer, DevPriceSerializer, DevChannelDataSerializer, DevListingChannelSerializer, DevListingAccountSerializer
+from devproduct.models import DevProduct, DevPrice, DevChannelData, DevListingChannel, DevListingAccount, DevOrder
+from devproduct.serializers import DevProductSerializer, DevPriceSerializer, DevChannelDataSerializer, DevListingChannelSerializer, DevListingAccountSerializer, DevOrderSerializer
 from bonus.models import Accounts, Manager
-from mercado.models import MLOperateLog
+from mercado.models import MLOperateLog, FileUploadNotify
+from devproduct import tasks
 
 
 # Create your views here.
@@ -1504,3 +1505,272 @@ def calc_listing_online_rate(id):
     else:
         dp.percent = 0
     dp.save()
+
+
+class DevOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
+                      mixins.UpdateModelMixin, mixins.DestroyModelMixin,
+                      mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """
+    list:
+        开发产品订单列表,分页,过滤,搜索,排序
+    create:
+        开发产品订单新增
+    retrieve:
+        开发产品订单详情页
+    update:
+        开发产品订单修改
+    destroy:
+        开发产品订单删除
+    """
+    queryset = DevOrder.objects.all()
+    serializer_class = DevOrderSerializer  # 序列化
+    pagination_class = DefaultPagination  # 分页
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)  # 过滤,搜索,排序
+    filterset_fields = {
+        'order_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'order_status': ['exact'],
+        'platform': ['exact'],
+        'site': ['exact', 'in'],
+        'account_name': ['exact'],
+        'item_id': ['exact'],
+        'is_ad': ['exact'],
+        'is_combined': ['exact'],
+        'is_settled': ['exact'],
+        'is_resent': ['exact'],
+        'dev_p_id': ['exact'],
+    }
+    search_fields = ('sku', 'cn_name', 'item_id', 'order_number')  # 配置搜索字段
+    ordering_fields = ('order_time', 'total_price')  # 配置排序字段
+
+    # test
+    @action(methods=['get'], detail=False, url_path='test')
+    def test(self, request):
+        from devproduct import tasks
+        tasks.calc_product_sales.delay()
+
+        return Response('OK,', status=status.HTTP_200_OK)
+
+    # 订单上传
+    @action(methods=['post'], detail=False, url_path='bulk_upload')
+    def bulk_upload(self, request):
+        import warnings
+        warnings.filterwarnings('ignore')
+
+        data = request.data
+        wb = openpyxl.load_workbook(data['excel'])
+        sheet = wb['Sheet1']
+
+        if sheet.max_row <= 1:
+            return Response({
+                'msg': '表格不能为空',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        if sheet['A1'].value != '订单编号':
+            return Response({
+                'msg': '表格有误，请下载最新模板',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
+        c_num = 0  # 空单号标记码
+        for cell_row in list(sheet)[1:]:
+            order_number = cell_row[0].value
+            account_name = cell_row[1].value
+            platform = cell_row[2].value
+            if platform == 'ebay':
+                platform = 'eBay'
+            site = cell_row[3].value
+            if site == 'GB':
+                site = 'UK'
+            currency = cell_row[4].value
+            sku = cell_row[5].value
+            qty = cell_row[6].value
+            item_price = cell_row[7].value
+            postage_price = cell_row[8].value
+            total_price = cell_row[9].value
+            postage = cell_row[10].value
+            profit = cell_row[11].value
+            profit_rate = cell_row[12].value
+            if not type(profit_rate) in [float, int]:
+                if profit_rate:
+                    profit_rate = float(profit_rate.replace('%', '')) / 100
+                else:
+                    profit_rate = 0
+            ad_fee = cell_row[13].value
+            item_id = cell_row[14].value
+            order_time = cell_row[15].value
+            is_resent = False if cell_row[16].value == '否' else True
+            ex_rate = cell_row[17].value
+
+            is_exist = DevOrder.objects.filter(
+                order_number=order_number).count()
+            # 订单号已存在情况
+            if is_exist:
+                # 合并订单的条数
+                if order_number:
+                    c_num = is_exist - 1
+                if postage:
+                    if is_exist == 1:
+                        od = DevOrder.objects.filter(
+                            order_number=order_number).first()
+                        # 未结算订单
+                        if not od.is_settled:
+                            od.postage = postage
+                            od.profit = profit
+                            od.profit_rate = profit_rate
+                            od.is_settled = True
+                            od.save()
+                    if is_exist > 1:
+                        # 合并订单情况
+                        od_list = DevOrder.objects.filter(
+                            order_number=order_number)
+                        for i in od_list:
+                            # 未结算订单
+                            if not i.is_settled:
+                                i.postage = postage
+                                i.profit = profit
+                                i.profit_rate = profit_rate
+                                i.is_settled = True
+                                i.save()
+
+                continue
+
+            # 判断该无单号行是新订单还是重复订单
+            if not order_number:
+                if c_num:
+                    c_num -= 1
+                    continue
+            if order_number and sku:
+                dp = DevProduct.objects.filter(sku=sku).first()
+                if dp:
+                    # 创建订单
+                    od = DevOrder()
+                    od.dev_p_id = dp.id
+                    od.unit_cost = dp.unit_cost
+                    od.sku = dp.sku
+                    od.cn_name = dp.cn_name
+                    od.image = dp.image
+                    od.order_number = order_number
+                    od.platform = platform
+                    od.site = site
+                    od.account_name = account_name
+                    od.currency = currency
+                    od.qty = qty
+                    od.item_price = item_price
+                    od.item_id = item_id
+                    od.postage_price = postage_price
+                    od.total_price = total_price
+                    od.postage = postage
+                    od.is_settled = True if postage else False  # 有发货运费则视为已结算
+                    od.profit = profit if postage else 0
+                    od.profit_rate = profit_rate if postage else 0
+                    od.ad_fee = ad_fee
+                    od.is_ad = True if ad_fee else False
+                    od.order_time = order_time
+                    od.is_resent = is_resent
+                    od.ex_rate = ex_rate
+                    od.save()
+                    # 账号销量记录
+                    # 不计算重发订单
+                    if not od.is_resent:
+                        dla = DevListingAccount.objects.filter(
+                            dev_p=dp, account_name=account_name).first()
+                        if dla:
+                            dla.total_sold += qty
+                            dla.save()
+            elif not order_number and sku:
+                # 合并订单产品
+                dp = DevProduct.objects.filter(sku=sku).first()
+                if dp:
+                    last_order = DevOrder.objects.order_by('id').last()
+                    # 创建订单
+                    od = DevOrder()
+                    od.dev_p_id = dp.id
+                    od.unit_cost = dp.unit_cost
+                    od.sku = dp.sku
+                    od.cn_name = dp.cn_name
+                    od.image = dp.image
+                    od.order_number = last_order.order_number
+                    od.platform = last_order.platform
+                    od.site = last_order.site
+                    od.account_name = last_order.account_name
+                    od.currency = last_order.currency
+                    od.qty = qty
+                    od.item_price = item_price
+                    od.item_id = item_id
+                    od.postage_price = last_order.postage_price
+                    od.total_price = last_order.total_price
+                    od.postage = last_order.postage
+                    od.is_settled = last_order.is_settled
+                    od.profit = last_order.profit
+                    od.profit_rate = last_order.profit_rate
+                    od.ad_fee = last_order.ad_fee
+                    od.is_ad = last_order.is_ad
+                    od.order_time = last_order.order_time
+                    od.is_resent = last_order.is_resent
+                    od.is_combined = True  # 合并订单
+                    od.ex_rate = last_order.ex_rate
+                    od.save()
+                    last_order.is_combined = True
+                    last_order.save()
+                    # 账号销量记录
+                    # 不计算重发订单
+                    if not od.is_resent:
+                        dla = DevListingAccount.objects.filter(
+                            dev_p=dp, account_name=account_name).first()
+                        if dla:
+                            dla.total_sold += qty
+                            dla.save()
+            else:
+                continue
+
+        return Response({
+            'msg': '成功上传!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 订单上传2
+    @action(methods=['post'], detail=False, url_path='bulk_upload2')
+    def bulk_upload2(self, request):
+        data = request.data
+        # 保存上传excel文件
+        path = 'media/upload_file/dev_order_excel.xlsx'
+        excel = data['excel']
+        content = excel.chunks()
+        with open(path, 'wb') as f:
+            for i in content:
+                f.write(i)
+
+        # 创建上传通知
+        file_upload = FileUploadNotify()
+        file_upload.shop = None
+        file_upload.user_id = request.user.id
+        file_upload.upload_type = 'ORDER'
+        file_upload.upload_status = 'LOADING'
+        file_upload.desc = '订单正在上传中...'
+        file_upload.save()
+
+        # 处理订单
+        tasks.upload_dev_order.delay(file_upload.id)
+
+        # 计算产品销量
+        tasks.calc_product_sales.delay()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'DEVP'
+        log.op_type = 'CREATE'
+        log.target_type = 'ORDER'
+        log.desc = '开发产品销售订单导入'
+        log.user = request.user
+        log.save()
+
+        return Response({
+            'msg': '文件已上传，后台处理中，稍微刷新查看结果',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)

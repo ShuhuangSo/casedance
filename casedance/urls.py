@@ -41,7 +41,7 @@ from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSe
 from rest_framework.routers import DefaultRouter
 
 from store.views import StoreViewSet, StockInOutViewSet, StockLogViewSet, StockViewSet
-from devproduct.views import DevProductViewSet, DevPriceViewSet, DevChannelDataViewSet, DevListingChannelViewSet, DevListingAccountViewSet
+from devproduct.views import DevProductViewSet, DevPriceViewSet, DevChannelDataViewSet, DevListingChannelViewSet, DevListingAccountViewSet, DevOrderViewSet
 
 router = DefaultRouter()
 
@@ -276,6 +276,8 @@ router.register('dev_channel',
 router.register('dev_listing_account',
                 DevListingAccountViewSet,
                 basename='dev_listing_account')
+# 开发产品订单列表
+router.register('dev_order', DevOrderViewSet, basename='dev_order')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

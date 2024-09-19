@@ -26,22 +26,27 @@ class ManagerAdmin(admin.ModelAdmin):
 
 @admin.register(AccountSales)
 class AccountSalesAdmin(admin.ModelAdmin):
-    list_display = ['platform', 'platform_base', 'account_name', 'manager', 'month', 'ori_currency', 'currency_rate']
+    list_display = [
+        'platform', 'platform_base', 'account_name', 'manager', 'month',
+        'ori_currency', 'currency_rate'
+    ]
     list_filter = ['platform']
     search_fields = ['account_name']
 
 
 @admin.register(AccountBonus)
 class AccountBonusAdmin(admin.ModelAdmin):
-    list_display = ['platform', 'platform_base', 'account_name', 'manager', 'month']
+    list_display = [
+        'platform', 'platform_base', 'account_name', 'manager', 'month'
+    ]
     list_filter = ['platform']
     search_fields = ['account_name']
 
 
 @admin.register(Accounts)
 class AccountsAdmin(admin.ModelAdmin):
-    list_display = ['type', 'name', 'note']
-    list_filter = ['type']
+    list_display = ['type', 'name', 'site', 'is_active']
+    list_filter = ['is_active']
     search_fields = ['name']
 
 

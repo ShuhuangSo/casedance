@@ -3286,12 +3286,14 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         sh['A1'].font = title_font
         sh['B1'] = 'Кол-во товаров'
         sh['B1'].font = title_font
-        sh['C1'] = 'ШК ГМ'
+        sh['C1'] = 'Зона размещения'
         sh['C1'].font = title_font
-        sh['D1'] = 'Тип ГМ (не обязательно)'
+        sh['D1'] = 'ШК ГМ'
         sh['D1'].font = title_font
-        sh['E1'] = 'Срок годности ДО в формате YYYY-MM-DD (не более 1 СГ на 1 SKU в 1 ГМ)'
+        sh['E1'] = 'Тип ГМ (не обязательно)'
         sh['E1'].font = title_font
+        sh['F1'] = 'Срок годности ДО в формате YYYY-MM-DD (не более 1 СГ на 1 SKU в 1 ГМ)'
+        sh['F1'].font = title_font
         ship_detail = ShipDetail.objects.filter(ship__id=ship_id)
         num = 0
         for i in ship_detail:
@@ -3299,9 +3301,9 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                                          box_number=i.box_number).first()
             sh['A' + str(num + 2)] = i.sku
             sh['B' + str(num + 2)] = i.qty
-            sh['C' + str(num + 2)] = box.note
-            sh['D' + str(num + 2)] = 'Коробка'
-            sh['D' + str(num + 2)].font = title_font
+            sh['D' + str(num + 2)] = box.note
+            sh['E' + str(num + 2)] = 'Коробка'
+            sh['E' + str(num + 2)].font = title_font
             num += 1
         wb.save('media/export/OZON产品装箱单-' + ship.shop + '.xlsx')
         url = BASE_URL + '/media/export/OZON产品装箱单-' + ship.shop + '.xlsx'

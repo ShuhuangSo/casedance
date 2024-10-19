@@ -354,6 +354,10 @@ class DevListingChannel(models.Model):
                             blank=True,
                             verbose_name='站点',
                             help_text='站点')
+    include_china = models.BooleanField(default=False,
+                                        null=True,
+                                        verbose_name='包含跨境号',
+                                        help_text='包含跨境号')
     is_active = models.BooleanField(default=True,
                                     verbose_name='是否启用',
                                     help_text='是否启用')
@@ -386,6 +390,12 @@ class DevListingAccount(models.Model):
                             blank=True,
                             verbose_name='站点',
                             help_text='站点')
+    ac_type = models.CharField(null=True,
+                               blank=True,
+                               default='CHINA',
+                               max_length=10,
+                               verbose_name='账号类型',
+                               help_text='账号类型')
     account_name = models.CharField(max_length=50,
                                     null=True,
                                     blank=True,
@@ -466,6 +476,10 @@ class DevChannelData(models.Model):
                             blank=True,
                             verbose_name='站点',
                             help_text='站点')
+    include_china = models.BooleanField(default=False,
+                                        null=True,
+                                        verbose_name='包含跨境号',
+                                        help_text='包含跨境号')
     default_active = models.BooleanField(default=False,
                                          null=True,
                                          verbose_name='是否默认激活',

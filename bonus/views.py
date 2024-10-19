@@ -549,9 +549,15 @@ class AccountsViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
     filter_backends = (DjangoFilterBackend, filters.SearchFilter,
                        filters.OrderingFilter)  # 过滤,搜索,排序
-    filter_fields = ('type', 'is_active')  # 配置过滤字段
+    filter_fields = ('type', 'ac_type', 'is_active')  # 配置过滤字段
     search_fields = ('name', )  # 配置搜索字段
     ordering_fields = ('name', 'manager__id')  # 配置排序字段
+
+    # 创建默认账号型号
+    @action(methods=['get'], detail=False, url_path='create_default_type')
+    def create_default_type(self, request):
+        Accounts.objects.update(ac_type='CHINA')
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
     # 重写create，让depth序列号字段能保存数据
     def create(self, request):

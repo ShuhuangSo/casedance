@@ -272,13 +272,18 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             dlc.dev_p = product
             dlc.platform = i['platform']
             dlc.site = i['site']
+            dlc.include_china = i['include_china']
             dlc.is_active = i['default_active']
             dlc.save()
 
             # 开发产品上架账号
             if dlc.is_active:
+                ac_type = 'LOCAL'
+                if dlc.include_china:
+                    ac_type = 'CHINA'
                 # 列出可上架账号
                 ac_list = Accounts.objects.filter(type=dlc.platform,
+                                                  ac_type=ac_type,
                                                   site=dlc.site,
                                                   is_active=True)
                 for item in ac_list:
@@ -1284,6 +1289,7 @@ class DevListingAccountViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     def sync_account(self, request):
         platform = request.data['platform']
         site = request.data['site']
+        ac_type = request.data['ac_type']
         account_name = request.data['account_name']
         user_name = request.data['user_name']
         op_type = request.data['op_type']
@@ -1300,6 +1306,13 @@ class DevListingAccountViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             for i in dla_list:
                 i.user_id = user.id
                 i.user_name = user_name
+                i.save()
+
+        # 修改账号类型
+        if op_type == 'AC_TYPE':
+
+            for i in dla_list:
+                i.ac_type = ac_type
                 i.save()
         # 修改站点
         if op_type == 'SITE':
@@ -1382,13 +1395,24 @@ class DevListingChannelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend, filters.SearchFilter,
                        filters.OrderingFilter)  # 过滤,搜索,排序
     filter_fields = ('dev_p__id', 'platform')  # 配置过滤字段
+    # 设置初始数据
+    @action(methods=['get'], detail=False, url_path='set_default')
+    def set_default(self, request):
+        DevListingChannel.objects.filter(is_active=True).update(
+            include_china=True)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
 
-    # 修改
+    # 修改发布
     @action(methods=['post'], detail=False, url_path='update_channel')
     def update_channel(self, request):
         data = request.data
         id = data['id']
         is_active = data['is_active']
+        include_china = data['include_china']
         dlc = DevListingChannel.objects.get(id=id)
 
         # 取消发布
@@ -1433,8 +1457,95 @@ class DevListingChannelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 },
                                 status=status.HTTP_202_ACCEPTED)
             # 列出可上架账号
+            if include_china:
+                ac_list = Accounts.objects.filter(type=dlc.platform,
+                                                  site=dlc.site,
+                                                  is_active=True)
+            else:
+                ac_list = Accounts.objects.filter(type=dlc.platform,
+                                                  site=dlc.site,
+                                                  ac_type='LOCAL',
+                                                  is_active=True)
+            for item in ac_list:
+                # 通过姓名获取用户id
+                User = get_user_model()
+                user = User.objects.filter(
+                    first_name=item.manager.name).first()
+
+                dla = DevListingAccount()
+                dla.dev_p = dlc.dev_p
+                dla.platform = dlc.platform
+                dla.site = dlc.site
+                dla.ac_type = item.ac_type
+                dla.account_name = item.name
+                dla.user_name = item.manager.name
+                if user:
+                    dla.user_id = user.id
+                dla.save()
+            dlc.is_active = True
+            dlc.include_china = include_china
+            dlc.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'DEVP'
+            log.op_type = 'EDIT'
+            log.target_type = 'DEVP_P'
+            log.target_id = dlc.dev_p.id
+            log.desc = '{platform} {site} 渠道发布'.format(platform=dlc.platform,
+                                                       site=dlc.site)
+            log.user = request.user
+            log.save()
+
+        # 计算开发产品上架率
+        calc_listing_online_rate(dlc.dev_p.id)
+        return Response({
+            'msg': '操作成功!',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 修改包含跨境号
+    @action(methods=['post'], detail=False, url_path='update_include_china')
+    def update_include_china(self, request):
+        data = request.data
+        id = data['id']
+        include_china = data['include_china']
+        dlc = DevListingChannel.objects.get(id=id)
+        # 不包含跨境号
+        if not include_china:
+            # 检查账号链接在线情况
+            dla_list = DevListingAccount.objects.filter(dev_p=dlc.dev_p,
+                                                        ac_type='CHINA',
+                                                        platform=dlc.platform,
+                                                        site=dlc.site)
+            for i in dla_list:
+                if i.is_online:
+                    return Response(
+                        {
+                            'msg': '删除失败！该站点还有在线链接，请先下架该站点所有链接！',
+                            'status': 'error'
+                        },
+                        status=status.HTTP_202_ACCEPTED)
+            # 删除对应账号
+            for i in dla_list:
+                i.delete()
+            dlc.include_china = include_china
+            dlc.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'DEVP'
+            log.op_type = 'EDIT'
+            log.target_type = 'DEVP_P'
+            log.target_id = dlc.dev_p.id
+            log.desc = '{platform} {site} 渠道取消包含跨境号'.format(
+                platform=dlc.platform, site=dlc.site)
+            log.user = request.user
+            log.save()
+        else:
+            # 包含跨境号
             ac_list = Accounts.objects.filter(type=dlc.platform,
                                               site=dlc.site,
+                                              ac_type='CHINA',
                                               is_active=True)
             for item in ac_list:
                 # 通过姓名获取用户id
@@ -1446,12 +1557,13 @@ class DevListingChannelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 dla.dev_p = dlc.dev_p
                 dla.platform = dlc.platform
                 dla.site = dlc.site
+                dla.ac_type = item.ac_type
                 dla.account_name = item.name
                 dla.user_name = item.manager.name
                 if user:
                     dla.user_id = user.id
                 dla.save()
-            dlc.is_active = True
+            dlc.include_china = include_china
             dlc.save()
             # 创建操作日志
             log = MLOperateLog()
@@ -1459,8 +1571,8 @@ class DevListingChannelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             log.op_type = 'EDIT'
             log.target_type = 'DEVP_P'
             log.target_id = dlc.dev_p.id
-            log.desc = '{platform} {site} 渠道发布'.format(platform=dlc.platform,
-                                                       site=dlc.site)
+            log.desc = '{platform} {site} 渠道激活包括跨境号'.format(
+                platform=dlc.platform, site=dlc.site)
             log.user = request.user
             log.save()
 

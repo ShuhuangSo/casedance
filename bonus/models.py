@@ -128,6 +128,12 @@ class Accounts(models.Model):
                             max_length=30,
                             verbose_name='平台',
                             help_text='平台')
+    ac_type = models.CharField(null=True,
+                               blank=True,
+                               default='CHINA',
+                               max_length=10,
+                               verbose_name='账号类型',
+                               help_text='账号类型')
     site = models.CharField(null=True,
                             blank=True,
                             max_length=30,

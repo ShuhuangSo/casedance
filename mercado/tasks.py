@@ -19,45 +19,25 @@ from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories
 from setting.models import TaskLog
 
 user_agent_list = [
-
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1",
-
     "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11",
-
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6",
-
     "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6",
-
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1",
-
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5",
-
     "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5",
-
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-
     "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3",
-
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
-
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
-
     "Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) App leWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53"
-
 ]
 UA = random.choice(user_agent_list)  # 获取随机的User_Agent
 main_headers = {
@@ -65,7 +45,8 @@ main_headers = {
     'Accept-Language': 'en-US,en;q=0.8',
     'Upgrade-Insecure-Requests': '1',
     'User-Agent': UA,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept':
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Cache-Control': 'max-age=0',
 }
 # 商品api获取字段
@@ -109,22 +90,29 @@ def create_listing(item_id):
         ss = Seller.objects.filter(seller_id=data['seller_id'])
         if not ss:
             # 获取卖家信息
-            seller_url = 'https://api.mercadolibre.com/users/' + str(data['seller_id'])
+            seller_url = 'https://api.mercadolibre.com/users/' + str(
+                data['seller_id'])
             resp2 = requests.get(seller_url, headers=headers)
             if resp2.status_code == 200:
                 seller_data = resp2.json()
                 seller = Seller()
                 seller.seller_id = seller_data['id']
                 seller.nickname = seller_data['nickname']
-                seller.registration_date = dateparse.parse_datetime(seller_data['registration_date'])
+                seller.registration_date = dateparse.parse_datetime(
+                    seller_data['registration_date'])
                 seller.site_id = seller_data['site_id']
                 seller.link = seller_data['permalink']
                 seller.level_id = seller_data['seller_reputation']['level_id']
-                seller.total = seller_data['seller_reputation']['transactions']['total']
-                seller.canceled = seller_data['seller_reputation']['transactions']['canceled']
-                seller.negative = seller_data['seller_reputation']['transactions']['ratings']['negative']
-                seller.neutral = seller_data['seller_reputation']['transactions']['ratings']['neutral']
-                seller.positive = seller_data['seller_reputation']['transactions']['ratings']['positive']
+                seller.total = seller_data['seller_reputation'][
+                    'transactions']['total']
+                seller.canceled = seller_data['seller_reputation'][
+                    'transactions']['canceled']
+                seller.negative = seller_data['seller_reputation'][
+                    'transactions']['ratings']['negative']
+                seller.neutral = seller_data['seller_reputation'][
+                    'transactions']['ratings']['neutral']
+                seller.positive = seller_data['seller_reputation'][
+                    'transactions']['ratings']['positive']
                 seller.save()
                 listing.seller_name = seller_data['nickname']
                 listing.save()
@@ -215,7 +203,8 @@ def get_listing_info(url):
             listing.save()
 
             # 获取评价信息
-            review_url = 'https://api.mercadolibre.com/reviews/item/' + i['body']['id']
+            review_url = 'https://api.mercadolibre.com/reviews/item/' + i[
+                'body']['id']
             resp4 = requests.get(review_url, headers=headers)
             if resp4.status_code == 200:
                 review_data = resp4.json()
@@ -236,26 +225,30 @@ def get_listing_info(url):
                     listing.save()
 
             # 补充计算昨天当天销量
-            lt = ListingTrack.objects.filter(listing=listing,
-                                             create_time__date=datetime.now().date() - timedelta(days=1)).first()
+            lt = ListingTrack.objects.filter(
+                listing=listing,
+                create_time__date=datetime.now().date() -
+                timedelta(days=1)).first()
             if lt:
                 lt.today_sold = listing.total_sold - lt.total_sold
                 lt.save()
 
-            is_exits = ListingTrack.objects.filter(listing=listing, create_time__date=datetime.now().date()).count()
+            is_exits = ListingTrack.objects.filter(
+                listing=listing,
+                create_time__date=datetime.now().date()).count()
             if not is_exits:
-                add_list.append(ListingTrack(
-                    listing=listing,
-                    currency=listing.currency,
-                    price=listing.price,
-                    total_sold=listing.total_sold,
-                    reviews=listing.reviews,
-                    rating_average=listing.rating_average,
-                    health=listing.health
-                ))
+                add_list.append(
+                    ListingTrack(listing=listing,
+                                 currency=listing.currency,
+                                 price=listing.price,
+                                 total_sold=listing.total_sold,
+                                 reviews=listing.reviews,
+                                 rating_average=listing.rating_average,
+                                 health=listing.health))
             else:
-                listing_track = ListingTrack.objects.filter(listing=listing,
-                                                            create_time__date=datetime.now().date()).first()
+                listing_track = ListingTrack.objects.filter(
+                    listing=listing,
+                    create_time__date=datetime.now().date()).first()
                 today_sold = listing.total_sold - listing_track.total_sold
                 listing_track.today_sold = today_sold
                 listing_track.reviews = listing.reviews
@@ -281,7 +274,8 @@ def update_categories(site_id):
     if resp.status_code == 200:
         data = resp.json()
         for i in data:
-            categories = Categories.objects.filter(categ_id=i['id'], site_id=site_id).first()
+            categories = Categories.objects.filter(categ_id=i['id'],
+                                                   site_id=site_id).first()
             # 如果目录存在，则检查需不需要更新
             if categories:
                 if categories.name != i['name']:
@@ -316,7 +310,7 @@ def translate(q):
     sign = hashlib.md5(sign.encode()).hexdigest()
     myurl = myurl + '?appid=' + appid + '&q=' + urllib.parse.quote(
         q) + '&from=' + fromLang + '&to=' + toLang + '&salt=' + str(
-        salt) + '&sign=' + sign
+            salt) + '&sign=' + sign
     resp = requests.get(myurl)
     time.sleep(0.01)
     if resp.status_code == 200:
@@ -342,13 +336,19 @@ def create_or_update_seller(site_id, seller_id):
         seller = Seller.objects.filter(seller_id=seller_id).first()
         if seller:
             seller.level_id = data['seller']['seller_reputation']['level_id']
-            seller.total = data['seller']['seller_reputation']['transactions']['total']
-            seller.canceled = data['seller']['seller_reputation']['transactions']['canceled']
-            seller.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
-            seller.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
-            seller.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            seller.total = data['seller']['seller_reputation']['transactions'][
+                'total']
+            seller.canceled = data['seller']['seller_reputation'][
+                'transactions']['canceled']
+            seller.negative = data['seller']['seller_reputation'][
+                'transactions']['ratings']['negative']
+            seller.neutral = data['seller']['seller_reputation'][
+                'transactions']['ratings']['neutral']
+            seller.positive = data['seller']['seller_reputation'][
+                'transactions']['ratings']['positive']
             seller.link = data['seller']['permalink']
-            seller.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            seller.sold_60d = data['seller']['seller_reputation']['metrics'][
+                'sales']['completed']
             seller.total_items = data['paging']['total']
             seller.update_time = datetime.now()
             seller.save()
@@ -357,15 +357,22 @@ def create_or_update_seller(site_id, seller_id):
             seller.seller_id = seller_id
             seller.site_id = site_id
             seller.nickname = data['seller']['nickname']
-            seller.registration_date = dateparse.parse_datetime(data['seller']['registration_date'])
+            seller.registration_date = dateparse.parse_datetime(
+                data['seller']['registration_date'])
             seller.level_id = data['seller']['seller_reputation']['level_id']
-            seller.total = data['seller']['seller_reputation']['transactions']['total']
-            seller.canceled = data['seller']['seller_reputation']['transactions']['canceled']
-            seller.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
-            seller.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
-            seller.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            seller.total = data['seller']['seller_reputation']['transactions'][
+                'total']
+            seller.canceled = data['seller']['seller_reputation'][
+                'transactions']['canceled']
+            seller.negative = data['seller']['seller_reputation'][
+                'transactions']['ratings']['negative']
+            seller.neutral = data['seller']['seller_reputation'][
+                'transactions']['ratings']['neutral']
+            seller.positive = data['seller']['seller_reputation'][
+                'transactions']['ratings']['positive']
             seller.link = data['seller']['permalink']
-            seller.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            seller.sold_60d = data['seller']['seller_reputation']['metrics'][
+                'sales']['completed']
             seller.total_items = data['paging']['total']
             seller.update_time = datetime.now()
             seller.save()
@@ -384,29 +391,40 @@ def track_seller():
     }
     url = 'https://api.mercadolibre.com/sites/'
     for i in queryset:
-        resp = requests.get(url + i.site_id + '/search?seller_id=' + i.seller_id, headers=headers)
+        resp = requests.get(url + i.site_id + '/search?seller_id=' +
+                            i.seller_id,
+                            headers=headers)
         if resp.status_code == 200:
             data = resp.json()
             # 更新卖家信息
             i.level_id = data['seller']['seller_reputation']['level_id']
-            i.total = data['seller']['seller_reputation']['transactions']['total']
-            i.canceled = data['seller']['seller_reputation']['transactions']['canceled']
-            i.negative = data['seller']['seller_reputation']['transactions']['ratings']['negative']
-            i.neutral = data['seller']['seller_reputation']['transactions']['ratings']['neutral']
-            i.positive = data['seller']['seller_reputation']['transactions']['ratings']['positive']
+            i.total = data['seller']['seller_reputation']['transactions'][
+                'total']
+            i.canceled = data['seller']['seller_reputation']['transactions'][
+                'canceled']
+            i.negative = data['seller']['seller_reputation']['transactions'][
+                'ratings']['negative']
+            i.neutral = data['seller']['seller_reputation']['transactions'][
+                'ratings']['neutral']
+            i.positive = data['seller']['seller_reputation']['transactions'][
+                'ratings']['positive']
             i.link = data['seller']['permalink']
-            i.sold_60d = data['seller']['seller_reputation']['metrics']['sales']['completed']
+            i.sold_60d = data['seller']['seller_reputation']['metrics'][
+                'sales']['completed']
             i.total_items = data['paging']['total']
             i.update_time = datetime.now()
             i.save()
 
             # 补充计算昨天当天销量
-            st = SellerTrack.objects.filter(seller=i, create_time__date=today - timedelta(days=1)).first()
+            st = SellerTrack.objects.filter(seller=i,
+                                            create_time__date=today -
+                                            timedelta(days=1)).first()
             if st:
                 st.today_sold = i.total - st.total
                 st.save()
 
-            seller_track = SellerTrack.objects.filter(seller=i, create_time__date=today).first()
+            seller_track = SellerTrack.objects.filter(
+                seller=i, create_time__date=today).first()
             if seller_track:
                 seller_track.today_sold = i.total - seller_track.total
                 seller_track.negative = i.negative
@@ -447,7 +465,10 @@ def ship_tracking(num):
         if data['message'] == 'SUCCESS':
             if len(data['data']):
                 for i in data['data']:
-                    is_exist = CarrierTrack.objects.filter(carrier_name=carrier, carrier_number=num, context=i['context']).first()
+                    is_exist = CarrierTrack.objects.filter(
+                        carrier_name=carrier,
+                        carrier_number=num,
+                        context=i['context']).first()
                     if not is_exist:
                         ct = CarrierTrack()
                         ct.carrier_name = carrier
@@ -455,9 +476,11 @@ def ship_tracking(num):
                         ct.context = i['context']
                         ct.location = i['location']
                         if i['time']:
-                            ct.time = datetime.strptime(i['time'], '%Y-%m-%d %H:%M:%S')
+                            ct.time = datetime.strptime(
+                                i['time'], '%Y-%m-%d %H:%M:%S')
                         if i['optime']:
-                            ct.optime = datetime.strptime(i['optime'], '%Y-%m-%d %H:%M:%S')
+                            ct.optime = datetime.strptime(
+                                i['optime'], '%Y-%m-%d %H:%M:%S')
                         ct.save()
                     else:
                         is_exist.create_time = datetime.now()
@@ -472,7 +495,9 @@ def ship_tracking(num):
 # 批量更新运单物流运输跟踪
 @shared_task
 def bulk_ship_tracking():
-    queryset = Ship.objects.filter(send_from='CN', carrier='盛德物流').filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
+    queryset = Ship.objects.filter(
+        send_from='CN',
+        carrier='盛德物流').filter(Q(s_status='SHIPPED') | Q(s_status='BOOKED'))
     for i in queryset:
         if i.s_number:
             ship_tracking(i.s_number)
@@ -500,58 +525,69 @@ def calc_product_sales():
             sum_day7 = MLOrder.objects.filter(shop=s,
                                               sku=st.sku,
                                               item_id=st.item_id,
-                                              order_time__gte=day7).aggregate(Sum('qty'))
+                                              order_time__gte=day7).aggregate(
+                                                  Sum('qty'))
             day7_sold = sum_day7['qty__sum']
 
             # 15天销量
             day15 = datetime.now().date() - timedelta(days=15)
-            sum_day15 = MLOrder.objects.filter(shop=s,
-                                               sku=st.sku,
-                                               item_id=st.item_id,
-                                               order_time__gte=day15).aggregate(Sum('qty'))
+            sum_day15 = MLOrder.objects.filter(
+                shop=s, sku=st.sku, item_id=st.item_id,
+                order_time__gte=day15).aggregate(Sum('qty'))
             day15_sold = sum_day15['qty__sum']
 
             # 30天销量
             day30 = datetime.now().date() - timedelta(days=30)
-            sum_day30 = MLOrder.objects.filter(shop=s,
-                                               sku=st.sku,
-                                               item_id=st.item_id,
-                                               order_time__gte=day30).aggregate(Sum('qty'))
+            sum_day30 = MLOrder.objects.filter(
+                shop=s, sku=st.sku, item_id=st.item_id,
+                order_time__gte=day30).aggregate(Sum('qty'))
             day30_sold = sum_day30['qty__sum']
 
             # 累计销量
-            sum_total = MLOrder.objects.filter(shop=s,
-                                               sku=st.sku,
-                                               item_id=st.item_id, ).aggregate(Sum('qty'))
+            sum_total = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).aggregate(Sum('qty'))
             total_sold = sum_total['qty__sum']
 
             # 累计利润
-            sum_profit = MLOrder.objects.filter(shop=s,
-                                                sku=st.sku,
-                                                item_id=st.item_id, ).aggregate(Sum('profit'))
+            sum_profit = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).aggregate(Sum('profit'))
             total_profit = sum_profit['profit__sum']
 
             # 平均毛利润
-            avg_profit = MLOrder.objects.filter(shop=s,
-                                                sku=st.sku,
-                                                item_id=st.item_id, ).aggregate(Avg('profit'))
+            avg_profit = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).aggregate(Avg('profit'))
             avg_profit = avg_profit['profit__avg']
 
             # 平均毛利率
-            a_profit_rate = MLOrder.objects.filter(shop=s,
-                                                   sku=st.sku,
-                                                   item_id=st.item_id, ).aggregate(Avg('profit_rate'))
+            a_profit_rate = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).aggregate(Avg('profit_rate'))
             avg_profit_rate = a_profit_rate['profit_rate__avg']
 
             from django.db.models import Q
             # 退款率
-            refund_count = MLOrder.objects.filter(shop=s,
-                                                  sku=st.sku,
-                                                  item_id=st.item_id, ).filter(
-                Q(order_status='RETURN') | Q(order_status='CASE')).count()
-            total_count = MLOrder.objects.filter(shop=s,
-                                                 sku=st.sku,
-                                                 item_id=st.item_id, ).count()
+            refund_count = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).filter(Q(order_status='RETURN')
+                     | Q(order_status='CASE')).count()
+            total_count = MLOrder.objects.filter(
+                shop=s,
+                sku=st.sku,
+                item_id=st.item_id,
+            ).count()
             if total_count:
                 refund_rate = refund_count / total_count
             else:
@@ -610,13 +646,12 @@ def calc_shop_sale():
                 sr.profit = profit
                 sr.save()
             else:
-                add_list.append(ShopReport(
-                    qty=qty,
-                    amount=amount,
-                    profit=profit,
-                    shop=s,
-                    calc_date=date
-                ))
+                add_list.append(
+                    ShopReport(qty=qty,
+                               amount=amount,
+                               profit=profit,
+                               shop=s,
+                               calc_date=date))
         if len(add_list):
             ShopReport.objects.bulk_create(add_list)
     # 记录执行日志
@@ -634,7 +669,9 @@ def get_shop_quota(shop_id):
     shop = Shop.objects.filter(id=shop_id).first()
 
     # FBM库存统计
-    queryset = ShopStock.objects.filter(is_active=True, qty__gt=0, shop__id=shop_id).exclude(p_status='OFFLINE')
+    queryset = ShopStock.objects.filter(
+        is_active=True, qty__gt=0,
+        shop__id=shop_id).exclude(p_status='OFFLINE')
     total_amount = 0
     for i in queryset:
         total_amount += (i.unit_cost + i.first_ship_cost) * i.qty
@@ -655,9 +692,12 @@ def get_shop_quota(shop_id):
         onway_amount += i.products_cost
 
     # 在途中转运单统计,含备货中
-    ship_detail = ShipDetail.objects.filter(Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED') | Q(ship__s_status='PREPARING')).filter(ship__target='TRANSIT')
+    ship_detail = ShipDetail.objects.filter(
+        Q(ship__s_status='SHIPPED') | Q(ship__s_status='BOOKED')
+        | Q(ship__s_status='PREPARING')).filter(ship__target='TRANSIT')
     for i in ship_detail:
-        is_shop_product = MLProduct.objects.filter(shop=shop.name, sku=i.sku).first()
+        is_shop_product = MLProduct.objects.filter(shop=shop.name,
+                                                   sku=i.sku).first()
         # 如果是该店铺下的产品
         if is_shop_product:
             onway_amount += (i.unit_cost + i.avg_ship_fee) * i.qty
@@ -679,9 +719,20 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
     wb = openpyxl.load_workbook(data)
     sheet = wb.active
 
-    month_dict = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
-                  'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11',
-                  'diciembre': '12'}
+    month_dict = {
+        'enero': '01',
+        'febrero': '02',
+        'marzo': '03',
+        'abril': '04',
+        'mayo': '05',
+        'junio': '06',
+        'julio': '07',
+        'agosto': '08',
+        'septiembre': '09',
+        'octubre': '10',
+        'noviembre': '11',
+        'diciembre': '12'
+    }
 
     shop = Shop.objects.filter(id=shop_id).first()
     er = ExRate.objects.filter(currency=shop.currency).first()
@@ -707,7 +758,9 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         format_checked = False
     if sheet['O' + mel_row].value != '# de publicación':
         format_checked = False
-    if sheet['R' + mel_row].value != 'Precio unitario de venta de la publicación (MXN)':
+    if sheet[
+            'R' +
+            mel_row].value != 'Precio unitario de venta de la publicación (MXN)':
         format_checked = False
     if sheet['AB' + mel_row].value != 'Comprador':
         format_checked = False
@@ -738,7 +791,9 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         item_id = cell_row[14].value[3:]
 
         # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-        shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+        shop_stock = ShopStock.objects.filter(sku=sku,
+                                              item_id=item_id,
+                                              shop=shop).first()
         if not shop_stock:
             continue
         first_ship_cost = shop_stock.first_ship_cost
@@ -756,9 +811,11 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         year = t[de_locate[1] + 3:de_locate[1] + 7]
         hour = t[de_locate[1] + 8:de_locate[1] + 10]
         min = t[de_locate[1] + 11:de_locate[1] + 13]
-        order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour, min)
+        order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day, hour,
+                                            min)
 
-        bj = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+        bj = datetime.strptime(order_time,
+                               '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
         order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
         price = cell_row[17].value if cell_row[17].value else 0
@@ -774,8 +831,9 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         buyer_postcode = cell_row[32].value
         buyer_country = cell_row[33].value
 
-        profit = (float(
-            receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
+        profit = (
+            float(receive_fund) * 0.99
+        ) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
         profit_rate = profit / (price * ex_rate)
         if profit_rate < 0:
             profit_rate = 0
@@ -795,38 +853,40 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
             order_status = 'RETURN'
 
         # 检查同一店铺订单编号是否存在
-        ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+        ml_order = MLOrder.objects.filter(order_number=order_number,
+                                          shop=shop).first()
         if not ml_order:
-            add_list.append(MLOrder(
-                shop=shop,
-                platform='MERCADO',
-                order_number=order_number,
-                order_status=order_status,
-                order_time=order_time,
-                order_time_bj=order_time_bj,
-                qty=qty,
-                currency=shop.currency,
-                ex_rate=ex_rate,
-                price=price,
-                fees=fees,
-                postage=postage,
-                receive_fund=receive_fund,
-                is_ad=is_ad,
-                sku=sku,
-                p_name=shop_stock.p_name,
-                item_id=item_id,
-                image=shop_stock.image,
-                unit_cost=shop_stock.unit_cost * qty,
-                first_ship_cost=first_ship_cost * qty,
-                profit=profit,
-                profit_rate=profit_rate,
-                buyer_name=buyer_name,
-                buyer_address=buyer_address,
-                buyer_city=buyer_city,
-                buyer_state=buyer_state,
-                buyer_postcode=buyer_postcode,
-                buyer_country=buyer_country,
-            ))
+            add_list.append(
+                MLOrder(
+                    shop=shop,
+                    platform='MERCADO',
+                    order_number=order_number,
+                    order_status=order_status,
+                    order_time=order_time,
+                    order_time_bj=order_time_bj,
+                    qty=qty,
+                    currency=shop.currency,
+                    ex_rate=ex_rate,
+                    price=price,
+                    fees=fees,
+                    postage=postage,
+                    receive_fund=receive_fund,
+                    is_ad=is_ad,
+                    sku=sku,
+                    p_name=shop_stock.p_name,
+                    item_id=item_id,
+                    image=shop_stock.image,
+                    unit_cost=shop_stock.unit_cost * qty,
+                    first_ship_cost=first_ship_cost * qty,
+                    profit=profit,
+                    profit_rate=profit_rate,
+                    buyer_name=buyer_name,
+                    buyer_address=buyer_address,
+                    buyer_city=buyer_city,
+                    buyer_state=buyer_state,
+                    buyer_postcode=buyer_postcode,
+                    buyer_country=buyer_country,
+                ))
             shop_stock.qty -= qty
             shop_stock.save()
 
@@ -950,7 +1010,9 @@ def upload_noon_order(shop_id, notify_id):
             item_id = cell_row[14].value[:-2]
 
             # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+            shop_stock = ShopStock.objects.filter(sku=sku,
+                                                  item_id=item_id,
+                                                  shop=shop).first()
             if not shop_stock:
                 continue
             first_ship_cost = shop_stock.first_ship_cost
@@ -972,30 +1034,32 @@ def upload_noon_order(shop_id, notify_id):
             order_status = 'UNCHECK'
 
             # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+            ml_order = MLOrder.objects.filter(order_number=order_number,
+                                              shop=shop).first()
             if not ml_order:
-                add_list.append(MLOrder(
-                    shop=shop,
-                    platform='NOON',
-                    order_number=order_number,
-                    order_status=order_status,
-                    order_time=order_time,
-                    qty=1,
-                    currency=shop.currency,
-                    ex_rate=ex_rate,
-                    VAT=VAT,
-                    invoice_price=invoice_price,
-                    sku=sku,
-                    p_name=shop_stock.p_name,
-                    item_id=item_id,
-                    image=shop_stock.image,
-                    unit_cost=shop_stock.unit_cost * 1,
-                    first_ship_cost=first_ship_cost * 1,
-                    buyer_name=buyer_name,
-                    buyer_id=buyer_id,
-                    buyer_city=buyer_city,
-                    buyer_country=buyer_country,
-                ))
+                add_list.append(
+                    MLOrder(
+                        shop=shop,
+                        platform='NOON',
+                        order_number=order_number,
+                        order_status=order_status,
+                        order_time=order_time,
+                        qty=1,
+                        currency=shop.currency,
+                        ex_rate=ex_rate,
+                        VAT=VAT,
+                        invoice_price=invoice_price,
+                        sku=sku,
+                        p_name=shop_stock.p_name,
+                        item_id=item_id,
+                        image=shop_stock.image,
+                        unit_cost=shop_stock.unit_cost * 1,
+                        first_ship_cost=first_ship_cost * 1,
+                        buyer_name=buyer_name,
+                        buyer_id=buyer_id,
+                        buyer_city=buyer_city,
+                        buyer_country=buyer_country,
+                    ))
                 shop_stock.qty -= 1
                 shop_stock.save()
 
@@ -1047,7 +1111,8 @@ def upload_noon_order(shop_id, notify_id):
                 break
 
             # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number, shop=shop).first()
+            ml_order = MLOrder.objects.filter(order_number=order_number,
+                                              shop=shop).first()
             if ml_order:
                 order_status = cell_row[13].value
                 price = cell_row[26].value if cell_row[26].value else 0
@@ -1069,7 +1134,9 @@ def upload_noon_order(shop_id, notify_id):
                         delivered_date = cell_row[17].value + ' 00:00:00'
 
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-                shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()
+                shop_stock = ShopStock.objects.filter(sku=ml_order.sku,
+                                                      item_id=ml_order.item_id,
+                                                      shop=shop).first()
                 if not shop_stock:
                     continue
                 first_ship_cost = shop_stock.first_ship_cost
@@ -1093,8 +1160,9 @@ def upload_noon_order(shop_id, notify_id):
                         if delivered_date:
                             ml_order.delivered_date = delivered_date
 
-                        profit = (float(
-                            receive_fund) * 0.99) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                        profit = (
+                            float(receive_fund) * 0.99
+                        ) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
                         profit_rate = profit / (price * ex_rate)
                         if profit_rate < 0:
                             profit_rate = 0
@@ -1116,8 +1184,9 @@ def upload_noon_order(shop_id, notify_id):
                         if delivered_date:
                             ml_order.delivered_date = delivered_date
 
-                        profit = (float(
-                            payment_due) * 0.99) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                        profit = (
+                            float(payment_due) * 0.99
+                        ) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
                         profit_rate = profit / (price * ex_rate)
                         if profit_rate < 0:
                             profit_rate = 0
@@ -1171,7 +1240,8 @@ def upload_ozon_order(shop_id, notify_id):
     title_group_l = ['Артикул', '货号']
     title_group_q = ['Количество', '数量']
     # 如果是订单表
-    if sheet['A' + str(oz_row)].value in title_group_a and sheet['B' + str(oz_row)].value in title_group_b:
+    if sheet['A' + str(oz_row)].value in title_group_a and sheet[
+            'B' + str(oz_row)].value in title_group_b:
         # 模板格式检查
         format_checked = True
         if sheet['C' + str(oz_row)].value not in title_group_c:
@@ -1209,7 +1279,9 @@ def upload_ozon_order(shop_id, notify_id):
             item_id = cell_row[10].value
 
             # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-            shop_stock = ShopStock.objects.filter(sku=sku, item_id=item_id, shop=shop).first()
+            shop_stock = ShopStock.objects.filter(sku=sku,
+                                                  item_id=item_id,
+                                                  shop=shop).first()
             if not shop_stock:
                 continue
             first_ship_cost = shop_stock.first_ship_cost
@@ -1228,7 +1300,7 @@ def upload_ozon_order(shop_id, notify_id):
             status_group_ship = ['Ожидает отгрузки', '等待发运']
             status_group_deliver = ['Доставляется', '运输中']
             status_group_finish = ['Доставлен', '已签收']
-            status_group_cancel = ['Отменен', '已被取消']
+            status_group_cancel = ['Отменен', '已取消']
             if oz_status in status_group_ass:
                 order_status = 'WAIT_ASS'
             if oz_status in status_group_ship:
@@ -1241,28 +1313,34 @@ def upload_ozon_order(shop_id, notify_id):
                 order_status = 'CANCEL'
 
             # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number, dispatch_number=dispatch_number, sku=sku, shop=shop).first()
+            ml_order = MLOrder.objects.filter(order_number=order_number,
+                                              dispatch_number=dispatch_number,
+                                              sku=sku,
+                                              shop=shop).first()
             if not ml_order:
-                add_list.append(MLOrder(
-                    shop=shop,
-                    platform='OZON',
-                    order_number=order_number,
-                    dispatch_number=dispatch_number,
-                    order_status=order_status,
-                    order_time=order_time,
-                    qty=qty,
-                    currency=shop.currency,
-                    ex_rate=ex_rate,
-                    price=price,
-                    sku=sku,
-                    p_name=shop_stock.p_name,
-                    item_id=item_id,
-                    image=shop_stock.image,
-                    unit_cost=shop_stock.unit_cost * qty,
-                    first_ship_cost=first_ship_cost * qty,
-                ))
-                shop_stock.qty -= qty
-                shop_stock.save()
+                add_list.append(
+                    MLOrder(
+                        shop=shop,
+                        platform='OZON',
+                        order_number=order_number,
+                        dispatch_number=dispatch_number,
+                        order_status=order_status,
+                        order_time=order_time,
+                        qty=qty,
+                        currency=shop.currency,
+                        ex_rate=ex_rate,
+                        price=price,
+                        sku=sku,
+                        p_name=shop_stock.p_name,
+                        item_id=item_id,
+                        image=shop_stock.image,
+                        unit_cost=shop_stock.unit_cost * qty,
+                        first_ship_cost=first_ship_cost * qty,
+                    ))
+                # 取消订单不扣库存
+                if order_status != 'CANCEL':
+                    shop_stock.qty -= qty
+                    shop_stock.save()
 
                 # 创建库存日志
                 stock_log = StockLog()
@@ -1301,7 +1379,8 @@ def upload_ozon_order(shop_id, notify_id):
             MLOrder.objects.bulk_create(add_list)
 
     # 如果是费用更新表
-    elif sheet['A1'].value == 'Дата начисления' and sheet['B1'].value == 'Тип начисления':
+    elif sheet['A1'].value == 'Дата начисления' and sheet[
+            'B1'].value == 'Тип начисления':
         # 模板格式检查
         format_checked = True
         if sheet['B1'].value != 'Тип начисления':
@@ -1314,7 +1393,8 @@ def upload_ozon_order(shop_id, notify_id):
             format_checked = False
         if sheet['L1'].value != 'Комиссия за продажу':
             format_checked = False
-        if sheet['P1'].value != 'Последняя миля (разбивается по товарам пропорционально доле цены товара в сумме отправления)':
+        if sheet[
+                'P1'].value != 'Последняя миля (разбивается по товарам пропорционально доле цены товара в сумме отправления)':
             format_checked = False
         if sheet['U1'].value != 'Логистика':
             format_checked = False
@@ -1339,7 +1419,9 @@ def upload_ozon_order(shop_id, notify_id):
             if order_type == 'Оплата эквайринга':
                 # 收单费用
                 # 检查同一店铺订单编号是否存在
-                ml_order = MLOrder.objects.filter(order_number=item_number, sku=sku, shop=shop).first()
+                ml_order = MLOrder.objects.filter(order_number=item_number,
+                                                  sku=sku,
+                                                  shop=shop).first()
                 if ml_order:
                     # 保存收单费用
                     if not ml_order.payment_fee:
@@ -1347,13 +1429,17 @@ def upload_ozon_order(shop_id, notify_id):
                         ml_order.save()
             elif order_type == 'Доставка покупателю':
                 # 平台物流费用
-                ml_order = MLOrder.objects.filter(dispatch_number=item_number,sku=sku, shop=shop).first()
+                ml_order = MLOrder.objects.filter(dispatch_number=item_number,
+                                                  sku=sku,
+                                                  shop=shop).first()
                 if not ml_order:
                     continue
                 if ml_order.finance_check1:
                     continue
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-                shop_stock = ShopStock.objects.filter(sku=ml_order.sku, item_id=ml_order.item_id, shop=shop).first()
+                shop_stock = ShopStock.objects.filter(sku=ml_order.sku,
+                                                      item_id=ml_order.item_id,
+                                                      shop=shop).first()
                 if not shop_stock:
                     continue
                 first_ship_cost = shop_stock.first_ship_cost
@@ -1361,16 +1447,21 @@ def upload_ozon_order(shop_id, notify_id):
                     first_ship_cost = 0
 
                 # 计算收入资金
-                receive_fund = round(ml_order.price - abs(fees) - abs(postage) - abs(ml_order.payment_fee), 2)
+                receive_fund = round(
+                    ml_order.price - abs(fees) - abs(postage) -
+                    abs(ml_order.payment_fee), 2)
                 # 计算服务商费用
-                sp = GeneralSettings.objects.filter(item_name='ozon_sp').first()
+                sp = GeneralSettings.objects.filter(
+                    item_name='ozon_sp').first()
                 sp_fee = 0
                 sp_fee_rate = 0
                 if sp:
                     sp_fee_rate = sp.value1
                     sp_fee = receive_fund * sp_fee_rate
                 # 计算利润
-                profit = (receive_fund - sp_fee) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
+                profit = (
+                    receive_fund - sp_fee
+                ) * ex_rate - shop_stock.unit_cost * ml_order.qty - first_ship_cost * ml_order.qty
                 profit_rate = profit / (ml_order.price * ex_rate)
 
                 # 保存数据
@@ -1422,7 +1513,7 @@ def sd_place_order(ship_id, data):
         'country_code': '墨西哥',
         'd_code': data['d_code'],  # fbm仓库代码
         'fbano': '',
-        'address1': data['address1'], # fbm仓库地址
+        'address1': data['address1'],  # fbm仓库地址
         'zip_code': data['zip_code'],  # fbm仓库邮编
         'channelcode': '',
         'delivertype': '卡派',
@@ -1511,14 +1602,21 @@ def sd_place_order(ship_id, data):
         extension = i.name.split(".")[-1]
         if extension == 'pdf':
             f_name = i.name
-    path = '{batch}_{id}/{name}'.format(batch=ship.batch, id=ship.id, name=f_name)
+    path = '{batch}_{id}/{name}'.format(batch=ship.batch,
+                                        id=ship.id,
+                                        name=f_name)
     book_file = MEDIA_ROOT + '/ml_ships/' + path
     files['txtupload' + f_id] = open(book_file, 'rb')  # 上传箱唛附件
 
     # 箱唛附件描述信息
-    payload['filegrid'] = json.dumps(
-        [{"id": f_id, "filename": f_name, "filetype": "箱唛", "size": "2.805KB", "fileurl": ""}],
-        ensure_ascii=False)
+    payload['filegrid'] = json.dumps([{
+        "id": f_id,
+        "filename": f_name,
+        "filetype": "箱唛",
+        "size": "2.805KB",
+        "fileurl": ""
+    }],
+                                     ensure_ascii=False)
 
     p_list = []  # 运单产品列表
     boxes = ShipBox.objects.filter(ship=ship)
@@ -1533,40 +1631,75 @@ def sd_place_order(ship_id, data):
             files['txtimg' + str(num + 1)] = open(product_pic, 'rb')
 
             p_list.append({
-                'ContainerNo': i.ship.batch + '/' + str(box_num + 1),  # 货箱编号
-                'ContaineNum': box_tag,  # 件数
-                'ContainerWeight': '0.00',
-                'ContainerLength': '0.00',
-                'ContainerWidth': '0.00',
-                'ContainerHeight': '0.00',
-                'GoodsSKU': i.brand,  # 品牌
-                'EnglishProduct': i.en_name,  # 英文品名
-                'ChineseProduct': i.cn_name,  # 中文品名
-                'DeclaredValue': i.declared_value,  # 单个产品申报价值(usd)
-                'DeclaredNum': i.qty,  # 单箱申报数量
-                'Material': i.cn_material,  # 材质
-                'Purpose': i.use,  # 用途
-                'CustomsCode': i.custom_code,  # 海关编码
-                'SalesWebsite': 'https://articulo.mercadolibre.com.mx/MLM-' + i.item_id,  # 销售网址
-                'SellingPice': '0.00',
-                "PicturesLink": "1",
-                "ProductWeight": "0.00",
-                "ProductSize": "",
-                "ASIN": "无",
-                "FNSKU": "无",
-                "model": "",
-                "netweight": "0.00",
-                "roughweight": "0.00",
-                "english_material": i.cn_material,  # 英文材质
-                "id": num + 1,
-                "isdd": "",
-                "isdc": "",
-                "GoodsSKUtype": "",
-                "custom1": "",
-                "custom2": "",
-                "custom3": "",
-                "custom4": "",
-                "custom5": ""
+                'ContainerNo':
+                i.ship.batch + '/' + str(box_num + 1),  # 货箱编号
+                'ContaineNum':
+                box_tag,  # 件数
+                'ContainerWeight':
+                '0.00',
+                'ContainerLength':
+                '0.00',
+                'ContainerWidth':
+                '0.00',
+                'ContainerHeight':
+                '0.00',
+                'GoodsSKU':
+                i.brand,  # 品牌
+                'EnglishProduct':
+                i.en_name,  # 英文品名
+                'ChineseProduct':
+                i.cn_name,  # 中文品名
+                'DeclaredValue':
+                i.declared_value,  # 单个产品申报价值(usd)
+                'DeclaredNum':
+                i.qty,  # 单箱申报数量
+                'Material':
+                i.cn_material,  # 材质
+                'Purpose':
+                i.use,  # 用途
+                'CustomsCode':
+                i.custom_code,  # 海关编码
+                'SalesWebsite':
+                'https://articulo.mercadolibre.com.mx/MLM-' +
+                i.item_id,  # 销售网址
+                'SellingPice':
+                '0.00',
+                "PicturesLink":
+                "1",
+                "ProductWeight":
+                "0.00",
+                "ProductSize":
+                "",
+                "ASIN":
+                "无",
+                "FNSKU":
+                "无",
+                "model":
+                "",
+                "netweight":
+                "0.00",
+                "roughweight":
+                "0.00",
+                "english_material":
+                i.cn_material,  # 英文材质
+                "id":
+                num + 1,
+                "isdd":
+                "",
+                "isdc":
+                "",
+                "GoodsSKUtype":
+                "",
+                "custom1":
+                "",
+                "custom2":
+                "",
+                "custom3":
+                "",
+                "custom4":
+                "",
+                "custom5":
+                ""
             })
             box_tag = 0
             num += 1
@@ -1596,7 +1729,8 @@ def sd_place_order(ship_id, data):
             log.op_type = 'EDIT'
             log.target_type = 'SHIP'
             log.target_id = ship.id
-            log.desc = '盛德交运成功，获取运单号-{track_num}'.format(track_num=ship.s_number)
+            log.desc = '盛德交运成功，获取运单号-{track_num}'.format(
+                track_num=ship.s_number)
             log.save()
             return {'status': 'success', 'msg': resp.json()['msg']}
         else:
@@ -1627,7 +1761,8 @@ def query_sd_order_status():
             data = resp.json()['rows']
 
     if len(data):
-        ship_set = Ship.objects.filter(s_status='PREPARING', carrier_order_status='WAIT')
+        ship_set = Ship.objects.filter(s_status='PREPARING',
+                                       carrier_order_status='WAIT')
         for i in ship_set:
             for d in data:
                 if i.s_number == d['sono']:

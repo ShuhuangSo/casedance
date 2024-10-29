@@ -5943,3 +5943,66 @@ class PlatformCategoryRateViewSet(mixins.ListModelMixin,
             'status': 'success'
         },
                         status=status.HTTP_200_OK)
+
+    # 批量查询邮编分区
+    @action(methods=['post'], detail=False, url_path='bulk_get_postcode_area')
+    def bulk_get_postcode_area(self, request):
+        import warnings
+        warnings.filterwarnings('ignore')
+
+        data = request.data
+        carrier_code = request.data['carrier_code']
+        is_remote = request.data['is_remote']
+        wb = openpyxl.load_workbook(data['excel'])
+        # sheet = wb['Sheet1']
+        sheet = wb.active
+
+        if sheet.max_row <= 1:
+            return Response({
+                'msg': '表格不能为空',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        if sheet['A1'].value != '订单编号' or sheet['B1'].value != '邮政编码':
+            return Response({
+                'msg': '表格有误，请下载最新模板',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
+        new_wb = openpyxl.Workbook()
+        sh = new_wb.active
+        sh.title = 'Sheet1'
+        sh['A1'] = '订单编号'
+        sh['B1'] = '邮政编码'
+        sh['C1'] = '分区'
+        num = 0
+        for cell_row in list(sheet)[1:]:
+            order_number = cell_row[0].value.strip()
+            postcode = cell_row[1].value.strip()
+            sac = ShippingAreaCode.objects.filter(
+                postcode=postcode, carrier_code=carrier_code).first()
+            area = '分区不存在'
+            if sac:
+                area = sac.area
+
+            # 仅筛选偏远分区
+            if is_remote == 'true':
+                if area == '1区' or area == '2区':
+                    continue
+
+            sh['A' + str(num + 2)] = order_number
+            sh['B' + str(num + 2)] = postcode
+            sh['C' + str(num + 2)] = area
+            num += 1
+
+        new_wb.save('media/export/批量邮编查询结果-' + carrier_code + '.xlsx')
+        url = BASE_URL + '/media/export/批量邮编查询结果-' + carrier_code + '.xlsx'
+        print(is_remote)
+
+        return Response({
+            'msg': '操作成功!',
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)

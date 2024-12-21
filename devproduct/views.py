@@ -279,13 +279,18 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             # 开发产品上架账号
             if dlc.is_active:
                 ac_type = 'LOCAL'
+                if not dlc.include_china:
+                    # 列出可上架账号(仅本土号)
+                    ac_list = Accounts.objects.filter(type=dlc.platform,
+                                                      ac_type=ac_type,
+                                                      site=dlc.site,
+                                                      is_active=True)
                 if dlc.include_china:
                     ac_type = 'CHINA'
-                # 列出可上架账号
-                ac_list = Accounts.objects.filter(type=dlc.platform,
-                                                  ac_type=ac_type,
-                                                  site=dlc.site,
-                                                  is_active=True)
+                    # 列出可上架账号(包含本土+跨境号)
+                    ac_list = Accounts.objects.filter(type=dlc.platform,
+                                                      site=dlc.site,
+                                                      is_active=True)
                 for item in ac_list:
                     # 通过姓名获取用户id
                     User = get_user_model()
@@ -298,6 +303,7 @@ class DevProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                     dla.site = dlc.site
                     dla.account_name = item.name
                     dla.user_name = item.manager.name
+                    dla.ac_type = item.ac_type
                     if user:
                         dla.user_id = user.id
                     dla.save()

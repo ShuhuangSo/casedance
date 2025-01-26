@@ -3324,6 +3324,84 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         },
                         status=status.HTTP_200_OK)
 
+    # 导出OZON产品装箱单-跨箱
+    @action(methods=['post'],
+            detail=False,
+            url_path='export_ozon_package_in_muti_box')
+    def export_ozon_package_in_muti_box(self, request):
+        ship_id = request.data['id']
+        p_list = request.data['p_list']
+        print(p_list)
+        url = ''
+
+        return Response({
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 导出OZON物流箱唛号映射表
+    @action(methods=['post'],
+            detail=False,
+            url_path='export_ozon_package_match')
+    def export_ozon_package_match(self, request):
+        from openpyxl.styles import Font, Alignment
+        alignment = Alignment(horizontal='center', vertical='center')
+        title_font = Font(name='微软雅黑', sz=15, b=True)
+        zi_font = Font(name='微软雅黑', sz=15)
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+
+        boxes = ShipBox.objects.filter(ship__id=ship_id)
+        # 检查ozon箱唛号是否有填写
+        for i in boxes:
+            if not i.note:
+                return Response({
+                    'msg': '有平台箱唛未备注，请填写后再导出!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.column_dimensions['A'].width = 40
+        sh.row_dimensions[1].height = 30
+        sh['A1'] = '箱唛号'
+        sh['A1'].alignment = alignment
+        sh['A1'].font = title_font
+        sh['B1'] = '箱序号'
+        sh['B1'].font = title_font
+        sh['B1'].alignment = alignment
+
+        num = 0
+        for i in boxes:
+            sh.row_dimensions[num + 2].height = 30
+            sh['A' + str(num + 2)] = i.note
+            sh['A' + str(num + 2)].alignment = alignment
+            sh['A' + str(num + 2)].font = zi_font
+            sh['B' + str(num + 2)] = i.box_number
+            sh['B' + str(num + 2)].alignment = alignment
+            sh['B' + str(num + 2)].font = zi_font
+            num += 1
+        wb.save('media/export/OZON物流箱唛号映射表-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/OZON物流箱唛号映射表-' + ship.shop + '.xlsx'
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出OZON物流箱唛号映射表'
+        log.user = request.user
+        log.save()
+
+        return Response({
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
     # 重写
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

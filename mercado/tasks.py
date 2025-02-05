@@ -746,7 +746,7 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         format_checked = False
     if sheet['C' + mel_row].value != 'Estado':
         format_checked = False
-    if sheet['I' + mel_row].value != 'Cargo por venta e impuestos':
+    if sheet['H' + mel_row].value != 'Cargo por venta e impuestos':
         format_checked = False
     if sheet['J' + mel_row].value != 'Costos de envío':
         format_checked = False
@@ -819,7 +819,7 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
         price = cell_row[17].value if cell_row[17].value else 0
-        fees = cell_row[8].value if cell_row[8].value else 0
+        fees = cell_row[7].value if cell_row[7].value else 0
         postage = cell_row[9].value if cell_row[9].value else 0
         receive_fund = cell_row[11].value if cell_row[11].value else 0
         is_ad = True if cell_row[12].value == 'Sí' else False

@@ -3329,10 +3329,67 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             detail=False,
             url_path='export_ozon_package_in_muti_box')
     def export_ozon_package_in_muti_box(self, request):
+        from openpyxl.styles import Font
         ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+
         p_list = request.data['p_list']
-        print(p_list)
-        url = ''
+        sku_list = []  # 跨箱的sku
+        for i in p_list:
+            sku_list.append(i[0])
+            # 检查格式
+            if not ShipDetail.objects.filter(ship__id=ship_id,
+                                             sku=i[0]).first():
+                return Response({
+                    'msg': '有平台箱唛备注有误，请检查!',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.title = 'Состав ГМ поставки'
+        title_font = Font(name='Arial')
+        sh['A1'] = 'ШК или артикул товара'
+        sh['A1'].font = title_font
+        sh['B1'] = 'Кол-во товаров'
+        sh['B1'].font = title_font
+        sh['C1'] = 'Зона размещения'
+        sh['C1'].font = title_font
+        sh['D1'] = 'ШК ГМ'
+        sh['D1'].font = title_font
+        sh['E1'] = 'Тип ГМ (не обязательно)'
+        sh['E1'].font = title_font
+        sh['F1'] = 'Срок годности ДО в формате YYYY-MM-DD (не более 1 СГ на 1 SKU в 1 ГМ)'
+        sh['F1'].font = title_font
+        ship_detail = ShipDetail.objects.filter(ship__id=ship_id)
+        # 不跨箱sku加入跨箱sku列表
+        for i in ship_detail:
+            if i.sku not in sku_list:
+                p_list.append([i.sku, i.box_number, i.qty])
+
+        num = 0
+        for i in p_list:
+            box = ShipBox.objects.filter(ship__id=ship_id,
+                                         box_number=i[1]).first()
+            sh['A' + str(num + 2)] = i[0]
+            sh['B' + str(num + 2)] = int(i[2])
+            sh['D' + str(num + 2)] = box.note
+            sh['E' + str(num + 2)] = 'Коробка'
+            sh['E' + str(num + 2)].font = title_font
+            num += 1
+        wb.save('media/export/OZON产品装箱单-' + ship.shop + '.xlsx')
+        url = BASE_URL + '/media/export/OZON产品装箱单-' + ship.shop + '.xlsx'
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'CREATE'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出OZON产品装箱单-跨箱'
+        log.user = request.user
+        log.save()
 
         return Response({
             'url': url,

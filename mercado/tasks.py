@@ -1039,11 +1039,10 @@ def upload_noon_order(shop_id, notify_id):
                 first_ship_cost = 0
 
             order_number = cell_row[13].value
-            order_time = cell_row[header_index['Estado']].value
+            order_time = cell_row[2].value
             # 该字段可能有datetime和str 2种类型, 需要进行判断
-            if type(cell_row[header_index['Estado']].value) == 'str':
-                order_time = cell_row[
-                    header_index['Estado']].value + ' 00:00:00'
+            if type(cell_row[2].value) == 'str':
+                order_time = cell_row[2].value + ' 00:00:00'
 
             buyer_name = cell_row[19].value
             buyer_id = cell_row[18].value
@@ -1310,7 +1309,7 @@ def upload_ozon_order(shop_id, notify_id):
 
             order_number = cell_row[0].value
             dispatch_number = cell_row[1].value
-            order_time = cell_row[header_index['Estado']].value
+            order_time = cell_row[2].value
             qty = cell_row[16].value
             price = cell_row[7].value
 
@@ -1423,7 +1422,7 @@ def upload_ozon_order(shop_id, notify_id):
         if not format_checked:
             return 'ERROR'
         for cell_row in list(sheet)[1:]:
-            item_number = cell_row[header_index['Estado']].value
+            item_number = cell_row[2].value
             order_type = cell_row[1].value
             sku = cell_row[6].value
             fee_rate = cell_row[10].value

@@ -1406,7 +1406,7 @@ def upload_ozon_order(shop_id, notify_id):
             format_checked = False
         if sheet['L2'].value != 'Вознаграждение Ozon, %':
             format_checked = False
-        if sheet['N2'].value != 'Сумма итого, руб':
+        if sheet['O2'].value != 'Сумма итого, руб':
             format_checked = False
         if not format_checked:
             return 'ERROR'
@@ -1419,7 +1419,7 @@ def upload_ozon_order(shop_id, notify_id):
             order_type = cell_row[3].value
             sku = cell_row[4].value
             fee_rate = cell_row[11].value
-            fees = cell_row[13].value  # 各种费用类型
+            fees = cell_row[14].value  # 各种费用类型
 
             if not order_type:
                 break

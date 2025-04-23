@@ -737,8 +737,8 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         # 定义所需表头
         required_headers = [
             '# de venta', 'Fecha de venta', 'Estado', 'Unidades',
-            'Cargo por venta e impuestos', 'Costos de envío', 'Total (MXN)',
-            'Venta por publicidad', 'SKU', '# de publicación',
+            'Cargo por venta e impuestos (MXN)', 'Costos de envío (MXN)',
+            'Total (MXN)', 'Venta por publicidad', 'SKU', '# de publicación',
             'Precio unitario de venta de la publicación (MXN)', 'Comprador',
             'Domicilio', 'Municipio/Alcaldía', 'Estado', 'Código postal',
             'País'
@@ -814,11 +814,13 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
                 'Precio unitario de venta de la publicación (MXN)']].value if cell_row[
                     header_index[
                         'Precio unitario de venta de la publicación (MXN)']].value else 0
-            fees = cell_row[header_index['Costos de envío']].value if cell_row[
-                header_index['Costos de envío']].value else 0
-            postage = cell_row[
-                header_index['Cargo por venta e impuestos']].value if cell_row[
-                    header_index['Cargo por venta e impuestos']].value else 0
+            fees = cell_row[
+                header_index['Costos de envío (MXN)']].value if cell_row[
+                    header_index['Costos de envío (MXN)']].value else 0
+            postage = cell_row[header_index[
+                'Cargo por venta e impuestos (MXN)']].value if cell_row[
+                    header_index[
+                        'Cargo por venta e impuestos (MXN)']].value else 0
             receive_fund = cell_row[
                 header_index['Total (MXN)']].value if cell_row[
                     header_index['Total (MXN)']].value else 0

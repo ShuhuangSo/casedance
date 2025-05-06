@@ -3209,6 +3209,40 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         },
                         status=status.HTTP_200_OK)
 
+    # 盛德cookies设置
+    @action(methods=['post', 'get'],
+            detail=False,
+            url_path='sd_cookies_setting')
+    def sd_cookies_setting(self, request):
+        from pathlib import Path
+        config_path = Path(__file__).parent.parent / "site_config.json"
+        # 读取现有配置
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        if request.method == 'GET':
+            return Response({
+                'sd_cookies': config['sd_cookies'],
+            },
+                            status=status.HTTP_200_OK)
+
+        elif request.method == 'POST':
+            cookies = request.data['sd_cookies']
+            config['sd_cookies'] = cookies
+            # 写回文件
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+            return Response({
+                'msg': '操作成功！',
+                'status': 'success'
+            },
+                            status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'msg': '请求方法错误!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
     # 导出OZON产品入仓单
     @action(methods=['post'],
             detail=False,

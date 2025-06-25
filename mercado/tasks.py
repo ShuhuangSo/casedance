@@ -814,10 +814,10 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
                 'Precio unitario de venta de la publicación (MXN)']].value if cell_row[
                     header_index[
                         'Precio unitario de venta de la publicación (MXN)']].value else 0
-            fees = cell_row[
+            postage = cell_row[
                 header_index['Costos de envío (MXN)']].value if cell_row[
                     header_index['Costos de envío (MXN)']].value else 0
-            postage = cell_row[header_index[
+            fees = cell_row[header_index[
                 'Cargo por venta e impuestos (MXN)']].value if cell_row[
                     header_index[
                         'Cargo por venta e impuestos (MXN)']].value else 0

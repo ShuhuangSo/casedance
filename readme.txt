@@ -236,4 +236,6 @@ v1.6.6
 修复ml订单上传格式
 v1.6.7
 增加sd cookies设置
+v1.6.8
+修复ml订单上传格式 postage 和 fees 字段
 

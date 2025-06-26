@@ -664,6 +664,66 @@ class MLProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
         return Response({'id': pid}, status=status.HTTP_200_OK)
 
+    # 复制产品
+    @action(methods=['post'], detail=False, url_path='cp_product')
+    def cp_product(self, request):
+        old_id = request.data['old_id']
+        new_sku = request.data['new_sku']
+        is_exist = MLProduct.objects.filter(sku=new_sku).first()
+        if is_exist:
+            return Response({'msg': 'SKU已存在'}, status=status.HTTP_202_ACCEPTED)
+
+        product = MLProduct.objects.filter(id=old_id).first()
+        if product:
+            new_product = MLProduct(
+                sku=new_sku,
+                p_name=product.p_name,
+                image=product.image,
+                platform=product.platform,
+                upc=product.upc,
+                label_code=product.label_code,
+                site=product.site,
+                shop=product.shop,
+                unit_cost=product.unit_cost,
+                weight=product.weight,
+                length=product.length,
+                width=product.width,
+                heigth=product.heigth,
+                first_ship_cost=product.first_ship_cost,
+                custom_code=product.custom_code,
+                cn_name=product.cn_name,
+                en_name=product.en_name,
+                brand=product.brand,
+                declared_value=product.declared_value,
+                cn_material=product.cn_material,
+                en_material=product.en_material,
+                use=product.use,
+                is_elec=product.is_elec,
+                is_water=product.is_water,
+                buy_url=product.buy_url,
+                sale_url=product.sale_url,
+                refer_url=product.refer_url,
+                user_id=request.user.id,
+            )
+            new_product.save()
+            # 创建操作日志
+            log = MLOperateLog()
+            log.op_module = 'PRODUCT'
+            log.op_type = 'EDIT'
+            log.target_type = 'PRODUCT'
+            log.target_id = new_product.id
+            log.desc = '复制产品创建'
+            log.user = request.user
+            log.save()
+        else:
+            return Response({'msg': '源产品不存在'}, status=status.HTTP_202_ACCEPTED)
+
+        return Response({
+            'msg': '产品复制成功',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
     #  重写产品删除
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()
@@ -3191,6 +3251,35 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 sp.save()
 
                 i['logi_fee_clear'] = True
+
+                # 计算每个产品运费占比
+                all_fee = sp.shipping_fee + sp.extra_fee
+                queryset = ShipDetail.objects.filter(ship=sp)
+                total_weight = 0
+                total_cbm = 0
+
+                if sp.ship_type == '空运':
+                    for i in queryset:
+                        total_weight += (i.weight * i.qty)
+                    for i in queryset:
+                        if total_weight:
+                            percent = (i.weight * i.qty) / total_weight
+                        else:
+                            percent = 0
+                        avg_ship_fee = percent * all_fee / i.qty
+                        i.avg_ship_fee = avg_ship_fee
+                        i.save()
+
+                if sp.ship_type == '海运':
+                    for i in queryset:
+                        cbm = i.length * i.width * i.heigth / 1000000
+                        total_cbm += (cbm * i.qty)
+                    for i in queryset:
+                        cbm = i.length * i.width * i.heigth / 1000000
+                        percent = cbm / total_cbm
+                        avg_ship_fee = percent * all_fee
+                        i.avg_ship_fee = avg_ship_fee
+                        i.save()
 
                 # 创建操作日志
                 log = MLOperateLog()

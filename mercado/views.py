@@ -2778,9 +2778,15 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             sh['E' + str(num + 2)] = i.p_name
 
             sh.row_dimensions[num + 2].height = 100
-            img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
-            img.width, img.height = 100, 100
-            sh.add_image(img, 'F' + str(num + 2))
+            if i.image:
+                # 获取完整文件名（含路径，如 "uploads/images/2025/07/01/test.jpg"）
+                full_name = i.image.name
+                # 提取仅文件名（不含路径和扩展名，如 "test"）
+                file_base_name = os.path.basename(full_name)  # 结果："test.jpg"
+                img_name = os.path.splitext(file_base_name)[0]  # 结果："test"
+                img = Image('media/ml_product/' + img_name + '_100x100.jpg')
+                img.width, img.height = 100, 100
+                sh.add_image(img, 'F' + str(num + 2))
 
             sh['G' + str(num + 2)] = i.packing_name
             sh['H' + str(num + 2)] = i.packing_size
@@ -2872,11 +2878,17 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             sh['C' + str(num + 2)].border = border
 
             sh.row_dimensions[num + 2].height = 100
-            img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
-            img.width, img.height = 100, 100
-            sh.add_image(img, 'D' + str(num + 2))
-            sh['D' + str(num + 2)].alignment = alignment
-            sh['D' + str(num + 2)].border = border
+            if i.image:
+                # 获取完整文件名（含路径，如 "uploads/images/2025/07/01/test.jpg"）
+                full_name = i.image.name
+                # 提取仅文件名（不含路径和扩展名，如 "test"）
+                file_base_name = os.path.basename(full_name)  # 结果："test.jpg"
+                img_name = os.path.splitext(file_base_name)[0]  # 结果："test"
+                img = Image('media/ml_product/' + img_name + '_100x100.jpg')
+                img.width, img.height = 100, 100
+                sh.add_image(img, 'D' + str(num + 2))
+                sh['D' + str(num + 2)].alignment = alignment
+                sh['D' + str(num + 2)].border = border
 
             sh['E' + str(num + 2)] = i.packing_name
             sh['E' + str(num + 2)].border = border

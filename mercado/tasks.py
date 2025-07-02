@@ -1414,7 +1414,8 @@ def upload_ozon_order(shop_id, notify_id):
             return 'ERROR'
         # 费用类型
         fees_type_group = [
-            'Последняя миля', 'Логистика', 'Вознаграждение за продажу'
+            'Последняя миля', 'Логистика', 'Вознаграждение за продажу',
+            'Выручка'
         ]
         for cell_row in list(sheet)[2:]:
             item_number = cell_row[0].value
@@ -1449,13 +1450,15 @@ def upload_ozon_order(shop_id, notify_id):
                     continue
 
                 # 保存数据
-                if order_type == 'Последняя миля':
+                if order_type == 'Выдача товара':
                     ml_order.last_mile_fee = fees  #最后一公里
                 if order_type == 'Логистика':
                     ml_order.fbo_fee = fees  #fbo物流费
                 if order_type == 'Вознаграждение за продажу':
                     ml_order.fees = fees  #平台佣金
                     ml_order.fee_rate = fee_rate  #平台佣金率
+                if order_type == 'Выручка':  #收入资金
+                    ml_order.receive_fund = fees
                 ml_order.save()
             else:
                 continue
@@ -1463,7 +1466,7 @@ def upload_ozon_order(shop_id, notify_id):
         orders = MLOrder.objects.filter(shop=shop, finance_check1=False)
         sp = GeneralSettings.objects.filter(item_name='ozon_sp').first()
         for i in orders:
-            if i.last_mile_fee and i.fbo_fee and i.fees:
+            if i.last_mile_fee and i.fbo_fee and i.fees and i.receive_fund:
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
                 shop_stock = ShopStock.objects.filter(sku=i.sku,
                                                       item_id=i.item_id,
@@ -1475,9 +1478,10 @@ def upload_ozon_order(shop_id, notify_id):
                     first_ship_cost = 0
                 postage = round(i.fbo_fee + i.last_mile_fee, 2)  # 平台物流总费用
                 # 计算收入资金
-                receive_fund = round(
-                    i.price - abs(i.fees) - abs(postage) - abs(i.payment_fee),
-                    2)
+                # receive_fund = round(
+                #     i.price - abs(i.fees) - abs(postage) - abs(i.payment_fee),
+                #     2)
+                receive_fund = i.receive_fund
                 # 计算服务商费用
                 sp_fee = 0
                 sp_fee_rate = 0

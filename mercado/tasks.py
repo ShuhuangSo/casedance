@@ -1466,7 +1466,7 @@ def upload_ozon_order(shop_id, notify_id):
         orders = MLOrder.objects.filter(shop=shop, finance_check1=False)
         sp = GeneralSettings.objects.filter(item_name='ozon_sp').first()
         for i in orders:
-            if i.last_mile_fee and i.fbo_fee and i.fees and i.receive_fund:
+            if i.fbo_fee and i.fees and i.receive_fund:
                 # 如果不在fmb库存中，或者所在店铺不对应，则跳出
                 shop_stock = ShopStock.objects.filter(sku=i.sku,
                                                       item_id=i.item_id,
@@ -1500,7 +1500,8 @@ def upload_ozon_order(shop_id, notify_id):
                 i.sp_fee_rate = sp_fee_rate
                 i.profit = profit
                 i.profit_rate = profit_rate
-                i.finance_check1 = True
+                if i.last_mile_fee:
+                    i.finance_check1 = True
                 i.save()
     else:
         # 修改上传通知

@@ -724,6 +724,66 @@ class MLProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         },
                         status=status.HTTP_200_OK)
 
+    # 产品标签生成(upc 标签)
+    @action(methods=['post'], detail=False, url_path='create_label')
+    def create_label(self, request):
+        from fpdf import FPDF
+        import barcode
+        data = request.data['products']
+
+        # 检查是否有upc
+        for item in data:
+            sku = item['sku']
+            product = MLProduct.objects.filter(sku=sku).first()
+            if not product.upc:
+                return Response({
+                    'msg': '产品没有upc码, 无法打印标签',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+        path = 'media/label/'
+        # pdf文件信息
+        pdf = FPDF('P', 'mm', (60, 40))
+        pdf.set_font('Helvetica', size=12)
+        pdf.set_margin(0.5)
+
+        # 条码图片信息
+        options = {
+            'module_height': 4,  # 默认值15.0，条码高度，单位为毫米
+            'module_width': 0.13,  # 默认值0.2，每个条码宽度（？），单位为毫米
+            'quiet_zone': 2,  # 默认值6.5，两端空白宽度，单位为毫米
+            'font_size': 3,  # 默认值10，文本字体大小，单位为磅
+            'text_distance': 1,  # 默认值5.0，文本和条码之间的距离，单位为毫米
+            'dpi': 600,  # 图片分辨率
+        }
+        if data:
+            file_name = 'product_label'
+            for item in data:
+                sku = item['sku']
+                qty = item['qty']
+                product = MLProduct.objects.filter(sku=sku).first()
+                if len(data) == 1:
+                    file_name = sku
+
+                # 生成条码图片png
+                barcode.generate(
+                    'code128',
+                    product.upc,
+                    writer=barcode.writer.ImageWriter(),
+                    output=path + product.sku,
+                    writer_options=options,
+                )
+                for i in range(qty):
+                    pdf.add_page()
+                    # pdf.image("media/sys/logo.png", x=17, y=2, w=25)
+                    pdf.cell(0, 20, align='C', txt=product.sku)
+                    pdf.image(path + product.sku + '.png', x=-5, y=13, w=70)
+            output_name = path + file_name + '.pdf'
+            pdf.output(output_name)
+            url = BASE_URL + '/' + output_name
+        return Response({'url': url}, status=status.HTTP_200_OK)
+
     #  重写产品删除
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()

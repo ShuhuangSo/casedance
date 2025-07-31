@@ -1661,6 +1661,8 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     # filter_fields = ('s_status', 'shop', 'target', 'ship_type', 'carrier', 'user_id')  # 配置过滤字段
     filterset_fields = {
         'book_date': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'create_time': ['gte', 'lte', 'exact', 'gt', 'lt'],
+        'total_box': ['gte', 'lte', 'exact', 'gt', 'lt'],
         'shop': ['exact'],
         'platform': ['exact'],
         's_status': ['exact', 'in'],
@@ -2386,6 +2388,9 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                             item_id=i.item_id)
                     if shop.platform == 'OZON':
                         url = 'https://www.ozon.ru/product/{item_id}'.format(
+                            item_id=i.item_id)
+                    if shop.platform == 'EMAG':
+                        url = 'http://emag.ro/preview/pd/{item_id}/'.format(
                             item_id=i.item_id)
                     shop_stock.shop = shop
                     shop_stock.sku = i.sku

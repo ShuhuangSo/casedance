@@ -587,6 +587,9 @@ class MLOrderSerializer(serializers.ModelSerializer):
         if obj.shop.platform == 'OZON':
             url = 'https://www.ozon.ru/product/{item_id}'.format(
                 item_id=obj.item_id)
+        if obj.shop.platform == 'EMAG':
+            url = 'http://emag.ro/preview/pd/{item_id}/'.format(
+                item_id=obj.item_id)
         return url
 
     class Meta:

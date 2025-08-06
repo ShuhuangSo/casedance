@@ -1408,10 +1408,16 @@ def upload_ozon_order(shop_id, notify_id):
             format_checked = False
         if sheet['L2'].value != 'Вознаграждение Ozon, %':
             format_checked = False
-        if sheet['O2'].value != 'Сумма итого, руб':
+        if sheet['O2'].value != 'Сумма итого, руб.':
             format_checked = False
         if not format_checked:
+            # 修改上传通知
+            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+            file_upload.upload_status = 'ERROR'
+            file_upload.desc = '模板格式有误，请检查!'
+            file_upload.save()
             return 'ERROR'
+
         # 费用类型
         fees_type_group = [
             'Последняя миля', 'Логистика', 'Вознаграждение за продажу',

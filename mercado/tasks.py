@@ -967,6 +967,194 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         return 'ERROR'
 
 
+# 上传Emag订单
+@shared_task()
+def upload_emag_order(shop_id, notify_id, mel_row):
+    import warnings
+    import re
+    import openpyxl
+
+    warnings.filterwarnings('ignore')
+
+    try:
+        data = MEDIA_ROOT + '/upload_file/order_excel_' + shop_id + '.xlsx'
+        wb = openpyxl.load_workbook(data)
+        sheet = wb.active
+
+        # 定义所需表头
+        required_headers = [
+            '订单编号', '订单日期', '产品代码', 'PNK', '数量', '不含增值税价格/件', '含增值税价格', '货币',
+            '增值税', '订单状态', '客户姓名', '电话号码', '送货地址'
+        ]
+
+        shop = Shop.objects.filter(id=shop_id).first()
+
+        # 模板格式检查
+        # 记录表头对应的列索引
+        header_index = {}
+        header_row = sheet[mel_row]
+        if header_row is None:
+            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+            file_upload.upload_status = 'ERROR'
+            file_upload.desc = '未找到表头行'
+            file_upload.save()
+            return 'ERROR'
+        for col_index, cell in enumerate(header_row, start=0):
+            header = cell.value
+            if header in required_headers and header not in header_index:
+                header_index[header] = col_index
+
+        # 检查是否所有必需的表头都存在
+        if not all(header in header_index for header in required_headers):
+            # 修改上传通知
+            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+            file_upload.upload_status = 'ERROR'
+            file_upload.desc = '模板格式有误，缺少必要的表头，请检查!'
+            file_upload.save()
+            return 'ERROR'
+
+        add_list = []
+        for cell_row in list(sheet)[int(mel_row):]:
+            if cell_row is None:
+                continue
+            qty = float(cell_row[header_index['数量']].value)
+            if not qty:
+                continue
+            sku = cell_row[header_index['产品代码']].value
+            item_id = cell_row[header_index['PNK']].value
+
+            # 如果不在fmb库存中，或者所在店铺不对应，则跳出
+            shop_stock = ShopStock.objects.filter(sku=sku,
+                                                  item_id=item_id,
+                                                  shop=shop).first()
+            if not shop_stock:
+                continue
+            first_ship_cost = shop_stock.first_ship_cost
+            if not first_ship_cost:
+                first_ship_cost = 0
+
+            order_number = cell_row[header_index['订单编号']].value
+
+            order_time = cell_row[header_index['订单日期']].value
+            currency = cell_row[header_index['货币']].value
+            VAT = cell_row[header_index['增值税']].value
+
+            price = float(cell_row[header_index['不含增值税价格/件']].value
+                          if cell_row[header_index['不含增值税价格/件']].value else 0)
+            invoice_price = cell_row[header_index['含增值税价格']].value if cell_row[
+                header_index['含增值税价格']].value else 0
+
+            buyer_name = cell_row[header_index['客户姓名']].value
+            buyer_address = cell_row[header_index['送货地址']].value
+
+            # 汇率 订单有不同货币，汇率不同
+            er = ExRate.objects.filter(currency=currency).first()
+            ex_rate = er.value
+
+            postage = 8.00  # 尾程运费按100g重计算
+            fees = round(price * 0.23, 2)  # 佣金率固定按23%计算
+
+            profit = (
+                price - fees
+            ) * ex_rate * qty - postage * qty - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
+            profit_rate = profit / (price * ex_rate)
+            if profit_rate < 0:
+                profit_rate = 0
+
+            order_status = 'FINISHED'
+
+            if cell_row[header_index['订单状态']].value == 'Storno':
+                order_status = 'CANCEL'
+
+            # 检查同一店铺订单编号是否存在
+            ml_order = MLOrder.objects.filter(order_number=order_number,
+                                              shop=shop).first()
+            if not ml_order:
+                add_list.append(
+                    MLOrder(
+                        shop=shop,
+                        platform='EMAG',
+                        order_number=order_number,
+                        order_status=order_status,
+                        order_time=order_time,
+                        qty=qty,
+                        currency=currency,
+                        ex_rate=ex_rate,
+                        price=price,
+                        fees=fees,
+                        invoice_price=invoice_price,
+                        postage=postage,
+                        receive_fund=round(
+                            (price - fees) * ex_rate * qty - postage * qty, 2),
+                        sku=sku,
+                        p_name=shop_stock.p_name,
+                        item_id=item_id,
+                        image=shop_stock.image,
+                        unit_cost=shop_stock.unit_cost * qty,
+                        first_ship_cost=first_ship_cost * qty,
+                        profit=profit,
+                        profit_rate=profit_rate,
+                        buyer_name=buyer_name,
+                        buyer_address=buyer_address,
+                    ))
+                shop_stock.qty -= qty
+                shop_stock.save()
+
+                # 创建库存日志
+                stock_log = StockLog()
+                stock_log.shop_stock = shop_stock
+                stock_log.current_stock = shop_stock.qty
+                stock_log.qty = qty
+                stock_log.in_out = 'OUT'
+                stock_log.action = 'SALE'
+                stock_log.desc = '销售订单号: ' + order_number
+                stock_log.user_id = 0
+                stock_log.save()
+                stock_log.create_time = order_time  # order_time
+                stock_log.save()
+            else:
+                # 如果订单状态更新
+                if ml_order.order_status != order_status:
+                    ml_order.order_status = order_status
+                    ml_order.save()
+
+                    # 如果订单是取消状态，库存增加回来
+                    if order_status == 'CANCEL':
+                        shop_stock.qty += qty
+                        shop_stock.save()
+
+                        # 创建库存日志
+                        stock_log = StockLog()
+                        stock_log.shop_stock = shop_stock
+                        stock_log.current_stock = shop_stock.qty
+                        stock_log.qty = qty
+                        stock_log.in_out = 'IN'
+                        stock_log.action = 'CANCEL'
+                        stock_log.desc = '取消订单入库, 订单号: ' + order_number
+                        stock_log.user_id = 0
+                        stock_log.save()
+        if len(add_list):
+            MLOrder.objects.bulk_create(add_list)
+
+        # 修改上传通知
+        file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+        file_upload.upload_status = 'SUCCESS'
+        file_upload.desc = '上传成功!'
+        file_upload.save()
+
+        return 'SUCESS'
+    except Exception as e:
+        print("堆栈信息:")
+        import traceback
+        traceback.print_exc()  # 直接打印到控制台
+        # 处理异常并更新上传通知
+        file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
+        file_upload.upload_status = 'ERROR'
+        file_upload.desc = f'上传过程中出现错误: {str(e)}'
+        file_upload.save()
+        return 'ERROR'
+
+
 # 上传NOON订单
 @shared_task()
 def upload_noon_order(shop_id, notify_id):

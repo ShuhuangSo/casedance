@@ -114,6 +114,7 @@ class FBMWarehouseStockAdmin(admin.ModelAdmin):
 @admin.register(MLOrder)
 class MLOrderAdmin(admin.ModelAdmin):
     list_display = ['order_number', 'sku', 'qty']
+    list_filter = ['shop']
     search_fields = ['sku', 'order_number']
 
 

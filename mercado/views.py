@@ -2648,10 +2648,18 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                     sh['X' + str(num + 2)] = ''
                     sh['Y' + str(num + 2)] = ''
                     sh['Z' + str(num + 2)] = ''
-
-                    img = Image('media/ml_product/' + i.sku + '_100x100.jpg')
-                    img.width, img.height = 80, 80
-                    sh.add_image(img, 'AA' + str(num + 2))
+                    if i.image:
+                        # 获取完整文件名（含路径，如 "uploads/images/2025/07/01/test.jpg"）
+                        full_name = i.image.name
+                        # 提取仅文件名（不含路径和扩展名，如 "test"）
+                        file_base_name = os.path.basename(
+                            full_name)  # 结果："test.jpg"
+                        img_name = os.path.splitext(file_base_name)[
+                            0]  # 结果："test"
+                        img = Image('media/ml_product/' + img_name +
+                                    '_100x100.jpg')
+                        img.width, img.height = 80, 80
+                        sh.add_image(img, 'AA' + str(num + 2))
 
                     box_tag = 0
                     num += 1
@@ -4993,6 +5001,9 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
         if shop.platform == 'MERCADO':
             tasks.upload_mercado_order.delay(shop_id, file_upload.id, mel_row)
+        if shop.platform == 'EMAG':
+            tasks.upload_emag_order.delay(shop_id, file_upload.id, 1)
+            # tasks.upload_emag_order(shop_id, file_upload.id, 1)
         if shop.platform == 'NOON':
             tasks.upload_noon_order.delay(shop_id, file_upload.id)
         if shop.platform == 'OZON':

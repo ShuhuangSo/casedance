@@ -372,6 +372,8 @@ class ShipSerializer(serializers.ModelSerializer):
     fbm_name = serializers.SerializerMethodField()
     fbm_address = serializers.SerializerMethodField()
     shop_color = serializers.SerializerMethodField()
+    shop_id = serializers.SerializerMethodField()
+    shop_type = serializers.SerializerMethodField()
     book_days = serializers.SerializerMethodField()
     products_weight = serializers.SerializerMethodField()
     is_attach = serializers.SerializerMethodField()
@@ -414,6 +416,14 @@ class ShipSerializer(serializers.ModelSerializer):
         shop = Shop.objects.filter(name=obj.shop).first()
         return shop.name_color if shop else ''
 
+    def get_shop_id(self, obj):
+        shop = Shop.objects.filter(name=obj.shop).first()
+        return shop.seller_id if shop else ''
+
+    def get_shop_type(self, obj):
+        shop = Shop.objects.filter(name=obj.shop).first()
+        return shop.shop_type if shop else ''
+
     def get_fbm_name(self, obj):
         fbm = FBMWarehouse.objects.filter(w_code=obj.fbm_warehouse).first()
         if fbm:
@@ -439,15 +449,16 @@ class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = ('id', 's_number', 'batch', 's_status', 'shop', 'shop_color',
-                  'target', 'envio_number', 'ship_type', 'shipping_fee',
-                  'sent_time', 'platform', 'extra_fee', 'fbm_warehouse',
-                  'fbm_name', 'fbm_address', 'send_from', 'tag_name',
-                  'tag_color', 'carrier', 'end_date', 'ship_date', 'book_date',
-                  'book_days', 'total_box', 'total_qty', 'weight', 'cbm',
-                  'note', 'create_time', 'products_cost', 'products_weight',
-                  'user_id', 'manager', 'logi_fee_clear', 'is_attach',
-                  'is_remove_items', 'ship_shipDetail', 'latest_track',
-                  'carrier_order_status', 'carrier_rec_check')
+                  'shop_id', 'shop_type', 'target', 'envio_number',
+                  'ship_type', 'shipping_fee', 'sent_time', 'platform',
+                  'extra_fee', 'fbm_warehouse', 'fbm_name', 'fbm_address',
+                  'send_from', 'tag_name', 'tag_color', 'carrier', 'end_date',
+                  'ship_date', 'book_date', 'book_days', 'total_box',
+                  'total_qty', 'weight', 'cbm', 'note', 'create_time',
+                  'products_cost', 'products_weight', 'user_id', 'manager',
+                  'logi_fee_clear', 'is_attach', 'is_remove_items',
+                  'ship_shipDetail', 'latest_track', 'carrier_order_status',
+                  'carrier_rec_check')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

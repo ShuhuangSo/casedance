@@ -1735,7 +1735,7 @@ def sd_place_order(ship_id, data):
         'zip_code': data['zip_code'],  # fbm仓库邮编
         'channelcode': '',
         'delivertype': '卡派',
-        'warehousename': '深圳石岩仓(必须预约)',
+        'warehousename': '东莞塘厦仓',
         'channeltype2': '墨西哥极速达',
         'jfunit': 'kg',
         'postcode': 'mx',
@@ -1844,9 +1844,17 @@ def sd_place_order(ship_id, data):
         sd_set = ShipDetail.objects.filter(ship=ship, box_number=b.box_number)
         box_tag = 1
         for i in sd_set:
-            product_pic = MEDIA_ROOT + '/ml_product/' + i.sku + '_100x100.jpg'
-            # 上传产品图片
-            files['txtimg' + str(num + 1)] = open(product_pic, 'rb')
+            if i.image:
+                # 获取完整文件名（含路径，如 "uploads/images/2025/07/01/test.jpg"）
+                full_name = i.image.name
+                # 提取仅文件名（不含路径和扩展名，如 "test"）
+                file_base_name = os.path.basename(full_name)  # 结果："test.jpg"
+                img_name = os.path.splitext(file_base_name)[0]  # 结果："test"
+                product_pic = MEDIA_ROOT + '/ml_product/' + img_name + '_100x100.jpg'
+                # 上传产品图片
+                files['txtimg' + str(num + 1)] = open(product_pic, 'rb')
+            else:
+                return {'status': 'error', 'msg': '产品图片缺失，请补充'}
 
             p_list.append({
                 'ContainerNo':

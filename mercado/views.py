@@ -5000,7 +5000,12 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         file_upload.save()
 
         if shop.platform == 'MERCADO':
-            tasks.upload_mercado_order.delay(shop_id, file_upload.id, mel_row)
+            if shop.shop_type == 'LOCAL':
+                tasks.upload_mercado_order.delay(shop_id, file_upload.id,
+                                                 mel_row)
+            else:
+                tasks.upload_mercado_kj_order.delay(shop_id, file_upload.id,
+                                                    mel_row)
         if shop.platform == 'EMAG':
             tasks.upload_emag_order.delay(shop_id, file_upload.id, 1)
             # tasks.upload_emag_order(shop_id, file_upload.id, 1)

@@ -1081,7 +1081,11 @@ def upload_mercado_kj_order(shop_id, notify_id, mel_row):
             profit = (
                 float(receive_fund) * 0.99
             ) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
-            profit_rate = profit / (price * ex_rate)
+            # 合并订单，导出的表中没有价格显示
+            if price:
+                profit_rate = profit / (price * ex_rate)
+            else:
+                profit_rate = 0
             if profit_rate < 0:
                 profit_rate = 0
 
@@ -1204,6 +1208,14 @@ def upload_mercado_kj_order(shop_id, notify_id, mel_row):
 
         return 'SUCESS'
     except Exception as e:
+        import sys
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+
+        print("异常类型：", exc_type.__name__)
+        print("异常描述：", exc_value)
+        print("错误文件：", exc_traceback.tb_frame.f_code.co_filename)  # 出错文件
+        print("错误行号：", exc_traceback.tb_lineno)  # 出错行号
+        print("错误函数：", exc_traceback.tb_frame.f_code.co_name)  # 出错函数
         # 处理异常并更新上传通知
         file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
         file_upload.upload_status = 'ERROR'
@@ -1690,7 +1702,7 @@ def upload_ozon_order(shop_id, notify_id):
     title_group_g = ['Фактическая дата передачи в доставку', '实际转移配送日期']
     title_group_h = ['Сумма отправления', '发货的金额']
     title_group_i = ['Код валюты отправления', '货件的货币代码']
-    title_group_k = ['OZON id', 'Ozon ID']
+    title_group_k = ['OZON id', 'Ozon ID', 'SKU']
     title_group_l = ['Артикул', '货号']
     title_group_q = ['Количество', '数量']
     # 如果是订单表

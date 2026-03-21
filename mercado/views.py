@@ -3811,6 +3811,7 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                                     status=status.HTTP_202_ACCEPTED)
 
         sd_set = ShipDetail.objects.filter(ship=ship)
+
         for i in product_list:
             item_remove = ShipItemRemove.objects.filter(id=i['id']).first()
             p = sd_set.filter(sku=i['sku']).first()
@@ -3905,6 +3906,16 @@ class ShipItemRemoveViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 log.user = request.user
                 log.save()
                 continue
+
+        # 更新运单数量和成本
+        total_qty = 0  # 总数量
+        products_cost = 0  # 总货品成本
+        for i in sd_set:
+            total_qty += i.qty
+            products_cost += i.unit_cost * i.qty
+        ship.total_qty = total_qty
+        ship.products_cost = products_cost
+        ship.save()
 
         return Response({
             'msg': '操作成功!',

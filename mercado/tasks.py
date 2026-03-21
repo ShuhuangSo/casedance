@@ -746,7 +746,9 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
 
         shop = Shop.objects.filter(id=shop_id).first()
         er = ExRate.objects.filter(currency=shop.currency).first()
-        ex_rate = er.value
+        ex_rate = er.value  # 获取汇率
+        sp = GeneralSettings.objects.filter(
+            item_name='mel_sp').first()  # 获取服务商费用
 
         # 模板格式检查
         # 记录表头对应的列索引
@@ -834,8 +836,15 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
             buyer_postcode = cell_row[header_index['Código postal']].value
             buyer_country = cell_row[header_index['País']].value
 
+            # 计算服务商费用
+            sp_fee = 0
+            sp_fee_rate = 0
+            if sp:
+                sp_fee_rate = sp.value1
+                sp_fee = price * sp_fee_rate
+            # 利润计算
             profit = (
-                float(receive_fund) * 0.99
+                (float(receive_fund) - sp_fee) * 0.99
             ) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
             profit_rate = profit / (price * ex_rate)
             if profit_rate < 0:
@@ -900,6 +909,8 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
                         buyer_state=buyer_state,
                         buyer_postcode=buyer_postcode,
                         buyer_country=buyer_country,
+                        sp_fee=sp_fee,
+                        sp_fee_rate=sp_fee_rate,
                     ))
                 shop_stock.qty -= qty
                 shop_stock.save()
@@ -1851,9 +1862,9 @@ def upload_ozon_order(shop_id, notify_id):
         format_checked = True
         if sheet['E2'].value != 'Артикул':
             format_checked = False
-        if sheet['L2'].value != 'Вознаграждение Ozon, %':
+        if sheet['M2'].value != 'Вознаграждение Ozon, %':
             format_checked = False
-        if sheet['O2'].value != 'Сумма итого, руб.':
+        if sheet['P2'].value != 'Сумма итого, руб.':
             format_checked = False
         if not format_checked:
             # 修改上传通知
@@ -1872,8 +1883,8 @@ def upload_ozon_order(shop_id, notify_id):
             item_number = cell_row[0].value
             order_type = cell_row[3].value
             sku = cell_row[4].value
-            fee_rate = cell_row[11].value
-            fees = cell_row[14].value  # 各种费用类型
+            fee_rate = cell_row[12].value
+            fees = cell_row[15].value  # 各种费用类型
 
             if not order_type:
                 break

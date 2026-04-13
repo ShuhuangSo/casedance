@@ -10,7 +10,9 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'casedance.settings')
 
 # 为我们的项目myproject创建一个Celery实例。这里不指定broker backend 容易出现错误。
 # 如果没有密码 使用 'redis://127.0.0.1:6379/0'
-app = Celery('casedance', broker='redis://127.0.0.1:6379/0', backend='redis://127.0.0.1:6379/0')
+app = Celery('casedance',
+             broker='redis://127.0.0.1:6379/0',
+             backend='redis://127.0.0.1:6379/0')
 
 # 这里指定从django的settings.py里读取celery配置
 app.config_from_object('django.conf:settings')
@@ -53,6 +55,10 @@ app.conf.beat_schedule = {
     'delete_logs': {
         'task': 'product.tasks.delete_logs',  # 删除1个月前任务执行日志
         'schedule': crontab(minute=0, hour=2, day_of_month=1),  # 每月1号执行
+    },
+    'every-30-minues': {
+        'task': 'mercado.tasks.sd_auto_sync',  # 每30分钟处理物流问题
+        'schedule': timedelta(minutes=30),  # 每30分钟一次
     },
 }
 # 自动从所有已注册的django app中加载任务

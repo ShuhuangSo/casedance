@@ -11,11 +11,12 @@ from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
+from django.db import transaction
 
-from casedance.settings import MEDIA_ROOT, BASE_DIR
+from casedance.settings import MEDIA_ROOT, BASE_DIR, BASE_URL, MEDIA_URL
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
     MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog, \
-    FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog, GeneralSettings
+    FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog, GeneralSettings, FBMWarehouse
 from setting.models import TaskLog
 
 user_agent_list = [
@@ -453,9 +454,9 @@ def track_seller():
     return 'OK'
 
 
-# 跟踪运单物流运输
+# 跟踪运单物流运输-旧
 @shared_task
-def ship_tracking(num):
+def ship_tracking_old(num):
     url = 'https://client.morelink56.com/baiduroute/get_routeinfo'
     carrier = 'SHENGDE'
 
@@ -492,6 +493,90 @@ def ship_tracking(num):
         return '网络异常'
 
 
+# 跟踪运单物流运输
+@shared_task
+def ship_tracking(num):
+    # ================= 1. 读取配置文件获取 token/cookies =================
+    try:
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        sd_cookies = config.get('sd_cookies', '')
+    except:
+        return '读取配置失败'
+
+    # ================= 2. 新接口地址 =================
+    url = 'http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/routeinfo'
+
+    # ================= 3. 请求头（带认证） =================
+    headers = {'Authorization': sd_cookies, 'Content-Type': 'application/json'}
+
+    # ================= 4. 请求参数 =================
+    payload = {
+        "param": num  # 跟踪号
+    }
+
+    carrier = 'SHENGDE'
+
+    try:
+        # 发送请求
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+
+        if resp.status_code != 200:
+            return '网络异常'
+
+        # 解析返回
+        result = resp.json()
+        if not result.get('success', False):
+            return result.get('message', '获取轨迹失败')
+
+        # 获取轨迹列表
+        data = result.get('data', {})
+        track_list = data.get('list', [])
+
+        if not track_list:
+            return '暂无轨迹信息'
+
+        # 遍历保存（只存中文 + 时间）
+        for item in track_list:
+            # 中文轨迹内容 + 时间
+            context = item.get('route_wlzz', '')
+            track_time = item.get('route_date', '')
+
+            if not context or not track_time:
+                continue
+
+            # 去重：同一个运单 + 同一个内容不重复保存
+            is_exist = CarrierTrack.objects.filter(carrier_name=carrier,
+                                                   carrier_number=num,
+                                                   context=context).exists()
+
+            if is_exist:
+                continue
+
+            # 保存新轨迹
+            ct = CarrierTrack()
+            ct.carrier_name = carrier
+            ct.carrier_number = num
+            ct.context = context  # 中文轨迹
+            ct.location = ''  # 新接口没有 location，留空
+
+            # 时间格式化
+            try:
+                ct.time = datetime.strptime(track_time, '%Y-%m-%d %H:%M:%S')
+            except:
+                ct.time = None
+
+            ct.save()
+
+        return 'SUCCESS'
+
+    except requests.exceptions.Timeout:
+        return '请求超时'
+    except Exception as e:
+        return f'解析异常：{str(e)}'
+
+
 # 批量更新运单物流运输跟踪
 @shared_task
 def bulk_ship_tracking():
@@ -507,6 +592,105 @@ def bulk_ship_tracking():
     task_log.task_type = 14
     task_log.note = '美客多物流跟踪信息更新'
     task_log.save()
+    return 'SUCCESS'
+
+
+# sd物流自动同步/跟踪
+@shared_task
+def sd_auto_sync():
+    # 1.自动检查备货中已打包运单
+    shipset = Ship.objects.filter(carrier='盛德物流').filter(
+        s_status='PREPARING').filter(carrier_order_status='')
+    for ship in shipset:
+        sd_set = ShipDetail.objects.filter(ship=ship)
+        is_packed = True  # 产品打包状态
+        for i in sd_set:
+            if not i.box_number:
+                is_packed = False
+        if is_packed:
+            ship.carrier_order_status = 'PACKED'
+            ship.save()
+            # 记录日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '检测到运单已装箱'
+            log.save()
+
+    # 2.检查资料是否齐全
+    shipset = Ship.objects.filter(carrier_order_status='PACKED').filter(
+        s_status='PREPARING')
+    for ship in shipset:
+        sd_set = ShipDetail.objects.filter(ship=ship)
+        is_declare = True  # 产品申报状态
+        is_file = False  # 箱唛附件
+        for i in sd_set:
+            if not i.custom_code or not i.en_name or not i.brand or not i.declared_value or not i.cn_material:
+                is_declare = False
+
+        sa_set = ShipAttachment.objects.filter(ship=ship, a_type='BOX_LABEL')
+        for i in sa_set:
+            extension = i.name.split(".")[-1]
+            if extension == 'pdf':
+                is_file = True
+
+        if is_declare and is_file:
+            ship.carrier_order_status = 'UNSUBMIT'
+            ship.save()
+            # 记录日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '检测到运单资料已上传'
+            log.save()
+
+    # 3，自动预报交运
+    shipset = Ship.objects.filter(carrier='盛德物流').filter(
+        carrier_order_status='UNSUBMIT').filter(s_status='PREPARING')
+    today_time = datetime.now().strftime('%Y-%m-%d 18:00')  # 默认今天日期
+    for ship in shipset:
+        fbm = FBMWarehouse.objects.filter(w_code=ship.fbm_warehouse).first()
+        shop = Shop.objects.filter(name=ship.shop).first()
+        ship_data = {
+            'd_code': ship.fbm_warehouse,  # fbm仓库编号
+            'sh_addr': fbm.address,  # fbm仓库地址
+            'sh_zip_code': fbm.zip if fbm.zip else ' ',  # fbm仓库邮编
+            'delivery_time': today_time,  # 预约日期
+            'transport_type': '空运',  # 货运方式
+            'ck_name': '东莞凤岗仓',  # 送货仓库名称
+            'refid':
+            'Local' if shop.shop_type == 'LOCAL' else shop.seller_id,  #店铺账号id
+            'fbx_no': ship.envio_number,  # 运单编号
+            'product': '手机壳',  # 品名
+            'ProductNature': '普货',  # 产品性质
+        }
+
+        info = sd_place_order_api(ship.id, ship_data)
+        # 记录日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        if info['status'] == 'success':
+            log.desc = '自动交运成功'
+        else:
+            log.desc = '自动交运失败:' + info['msg']
+        log.save()
+
+    # 4. 查询受理情况
+    query_sd_order_status()
+
+    # 记录执行日志
+    task_log = TaskLog()
+    task_log.task_type = 4
+    task_log.note = '自动检查sd物流交运'
+    task_log.save()
+
     return 'SUCCESS'
 
 
@@ -1980,7 +2164,7 @@ def upload_ozon_order(shop_id, notify_id):
     return 'SUCESS'
 
 
-# 盛德交运运单
+# 盛德交运运单-旧
 @shared_task()
 def sd_place_order(ship_id, data):
     ship = Ship.objects.filter(id=ship_id).first()
@@ -2233,43 +2417,352 @@ def sd_place_order(ship_id, data):
     return 'SUCESS'
 
 
+# 盛德交运运单-新api
+@shared_task()
+def sd_place_order_api(ship_id, data):
+    ship = Ship.objects.filter(id=ship_id).first()
+    if not ship:
+        return {'status': 'error', 'msg': '运单不存在！'}
+    if ship.carrier != '盛德物流':
+        return {'status': 'error', 'msg': '仅支持盛德物流交运！'}
+    if not ship.envio_number:
+        return {'status': 'error', 'msg': 'envio号不能为空！'}
+
+    # 交运数据
+    payload = {
+        "order": {
+            "sono": "",
+            "transport_type": "空运",
+            "is_tax": True,
+            "start_city": "东莞市",
+            "country_name": "墨西哥",
+            "country_code": "MX",
+            "delivery_mode": 2,
+            "delivery_time": data['delivery_time'],  # 预约日期
+            "fh_contacts": "",
+            "fh_phone": "",
+            "fh_province": "",
+            "fh_city": "",
+            "fh_area": "",
+            "fh_addr": "",
+            "fh_longitude": "",
+            "fh_latitude": "",
+            "ckid": "695128929226885",
+            "ck_name": "东莞凤岗仓",
+            "is_insure": False,
+            "tb_jine": "",
+            "tb_currency": "",
+            "insured": "",
+            "kh_chid": "650521541155397",
+            "kh_channel_name": "墨西哥极速达",
+            "fbx_name": "美客多MELI",
+            "addr_type": 0,
+            "fbx_code": "FBL",
+            "d_code": data['d_code'],  # fbm仓库代码
+            "fbx_no": data['fbx_no'],  # fbm入仓号
+            "sh_province": "",
+            "sh_city": "",
+            "sh_addr": data['sh_addr'],  # fbm仓库地址
+            "sh_email": "",
+            "sh_zip_code": data['sh_zip_code'],  # fbm仓库邮编
+            "sh_company": "",
+            "final_delivery": "",
+            "sh_contacts": "",
+            "sh_phone": "",
+            "product": data['product'],  # 品名
+            "product_nature": data['ProductNature'],  # 产品性质，可能多个
+            "packing": "箱",
+            "yj_qty": ship.total_box,  # 预计箱数
+            "yj_kg": ship.weight,  # 预计重量
+            "yj_cbm": round(ship.cbm, 4),  # 预计体积
+            "bg_mode": "无单证",
+            "qg_mode": "无",
+            "have_no": "",
+            "ve_vat_tax": "",
+            "ve_eori_tax": "",
+            "ve_company": "",
+            "ve_addr": "",
+            "ve_contacts": "",
+            "ve_tel": "",
+            "billing_unit": "KG",
+            "offer_price": "",
+            "kh_remark": "",
+            "order_state": 0,
+            "infoid": "",
+            "coupon_name": "",
+            "vid": "",
+            "v_title": ""
+        }
+    }
+
+    boxgauge_list = []  # 箱列表
+    boxes = ShipBox.objects.filter(ship=ship)
+    box_num = 0
+    for b in boxes:
+        sd_set = ShipDetail.objects.filter(ship=ship, box_number=b.box_number)
+        one_box = {
+            "bgid": "",
+            'container_no':
+            b.ship.envio_number + '/' + str(box_num + 1),  # 货箱编号
+            'tracking_no': data['refid'],  #店铺账号id
+            "length": b.length,
+            "width": b.width,
+            "height": b.heigth,
+            "build_date": "",
+            "singlebox_kg": 0,
+            "refid": data['refid'],  #店铺账号id
+            "ps_timeslot": "",
+            # 预留字段，后面赋值
+            "product_list": [],
+            "qty": 0
+        }
+        p_list = []  # 运单产品列表
+        product_qty_in_box = 0  #箱内产品数量
+        for i in sd_set:
+            product_qty_in_box += i.qty
+            if i.image:
+                # 获取完整文件名（含路径，如 "uploads/images/2025/07/01/test.jpg"）
+                full_name = i.image.name
+                # 提取仅文件名（不含路径和扩展名，如 "test"）
+                file_base_name = os.path.basename(full_name)  # 结果："test.jpg"
+                img_name = os.path.splitext(file_base_name)[0]  # 结果："test"
+                product_pic_url = BASE_URL + MEDIA_URL + '/ml_product/' + img_name + '_100x100.jpg'  # 产品图片链接
+            else:
+                return {'status': 'error', 'msg': '产品图片缺失，请补充'}
+
+            p_list.append({
+                "cn_product_name": i.cn_name,  # 中文品名
+                "us_product_name": i.en_name,  # 英文品名
+                "brand": i.brand,  # 品牌
+                "model": i.sku,  #型号
+                "purpose": i.use,  # 用途
+                "material": i.cn_material,  # 材质
+                "hs_code": i.custom_code,  # 海关编码
+                "single_cost": i.declared_value,  # 单个产品申报价值(usd)
+                "currency": "USD",
+                "total_declared": "",
+                "asin": "",
+                "product_nature": "",
+                "sales_links": "",
+                "back_map": "",
+                "sales_records_map": "",
+                "product_map": product_pic_url,  # 图片地址
+                "sales_price": "",
+                "attestation": "",
+                "product_pcs": i.qty,  #数量
+                "sku": i.sku,  #型号
+                "pt_gross_weight": "",
+                "pt_net_weight": "",
+                "tax_rate": "",
+                "bgid": "",
+                "product_dx_pcs": 0
+            })
+        one_box['product_list'] = p_list  #该箱产品列表
+        one_box['qty'] = product_qty_in_box  #该箱产品数量
+        boxgauge_list.append(one_box)  #  把这个箱子加入总列表
+        box_num += 1
+    payload['boxgauge_list'] = boxgauge_list  # 箱列表
+
+    c_path = os.path.join(BASE_DIR, "site_config.json")
+    with open(c_path, "r", encoding="utf-8") as f:
+        config = json.load(f)  # 加载配置数据
+    header = {
+        'Authorization': config['sd_cookies'],
+        'Content-Type': 'application/json'
+    }
+    url = 'http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/create'
+
+    try:
+        resp = requests.post(url, json=payload, headers=header, timeout=20)
+        print(f"接口状态码：{resp.status_code}")
+        print(f"接口返回原始内容：{resp.text}")
+
+        # 1. 先判断 HTTP 状态码
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "msg": f"接口异常，HTTP状态码：{resp.status_code}"
+            }
+
+        # 2. 只解析一次 json（避免多次解析报错）
+        result = resp.json()
+
+        # 3. 业务状态判断
+        if not result.get("success", False):
+            msg = result.get("message", "接口返回失败，无错误信息")
+            return {"status": "error", "msg": f"交运失败：{msg}"}
+
+        # 4. 成功 → 拿 sono
+        data_info = result.get("data", {})
+        sono = data_info.get("sono", "")
+        if not sono:
+            return {"status": "error", "msg": "接口返回成功，但未获取到 sono"}
+
+        # ====================== 开始上传箱唛文件 ======================
+        def upload_box_label_files(ship, sono, config):
+            """上传箱唛附件到盛德"""
+            sa_set = ShipAttachment.objects.filter(ship=ship,
+                                                   a_type='BOX_LABEL')
+            if not sa_set.exists():
+                return True  # 无附件，跳过
+
+            upload_url = "http://api.more56.com/api/v1/fss/sys_files_client/filesadd"
+
+            form_data = {}
+            files = {}
+
+            # 遍历多个附件，自动生成 ifs[0], ifs[1], ifs[2]...
+            for idx, att in enumerate(sa_set):
+                # 拼接文件路径
+                path = f"{ship.batch}_{ship.id}/{att.name}"
+                file_path = os.path.join(MEDIA_ROOT, 'ml_ships', path)
+
+                if not os.path.exists(file_path):
+                    continue
+
+                with open(file_path, 'rb') as f_obj:
+                    form_data[f"ifs[{idx}].file_no"] = sono
+                    form_data[f"ifs[{idx}].file_classify"] = "箱唛"
+                    form_data[f"ifs[{idx}].fileposition"] = "customerfiles"
+                    form_data[f"ifs[{idx}].fields"] = "file"
+                    files[f"ifs[{idx}].files"] = (att.name, f_obj.read(),
+                                                  'application/pdf')
+
+                # 文件
+                files[f"ifs[{idx}].files"] = (att.name, open(file_path, 'rb'),
+                                              'application/pdf')
+
+            if not files:
+                return True
+
+            # 上传请求头（不要 Content-Type，requests 自动生成 form-data）
+            upload_headers = {'Authorization': config['sd_cookies']}
+
+            try:
+                res = requests.post(upload_url,
+                                    data=form_data,
+                                    files=files,
+                                    headers=upload_headers,
+                                    timeout=30)
+                print(f"上传附件返回：{res.status_code} | {res.text}")
+                return res.status_code == 200
+            except Exception as e:
+                print(f"上传附件失败：{str(e)}")
+                return False
+
+        # 执行上传
+        upload_ok = upload_box_label_files(ship, sono, config)
+
+        # ====================== 保存数据（事务保证安全） ======================
+        with transaction.atomic():
+            ship.s_number = sono
+            ship.carrier_order_status = "WAIT"
+            ship.carrier_rec_check = "UNCHECK"
+            ship.carrier_order_time = datetime.now()
+            ship.save()
+
+            # 日志
+            log = MLOperateLog()
+            log.op_module = "SHIP"
+            log.op_type = "EDIT"
+            log.target_type = "SHIP"
+            log.target_id = ship.id
+            log.desc = f"盛德交运成功，运单号：{sono}"
+            log.save()
+
+        return {"status": "success", "msg": f"交运成功，运单号：{sono}"}
+
+    except requests.exceptions.Timeout:
+        return {"status": "error", "msg": "请求盛德接口超时"}
+    except ValueError:
+        return {"status": "error", "msg": "接口返回非JSON格式数据"}
+    except Exception as e:
+        return {"status": "error", "msg": f"系统异常：{str(e)}"}
+
+    return 'SUCESS'
+
+
 # 查询盛德运单受理状态
 @shared_task()
 def query_sd_order_status():
+    # ===================== 1. 读取配置获取认证 =====================
+    try:
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        sd_cookies = config.get('sd_cookies', '')
+    except:
+        return '读取配置失败'
+
+    # ===================== 2. 新接口地址 =====================
+    url = 'http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/orderinfo'
+
+    # ===================== 3. 请求头（认证） =====================
+    headers = {'Authorization': sd_cookies, 'Content-Type': 'application/json'}
+
+    # ===================== 4. 自动计算日期（30天前 ~ 今天） =====================
+    today = datetime.now().date()
+    s_date = today - timedelta(days=30)  # 30天前
+    e_date = today  # 今天
+
+    # ===================== 5. 请求参数（ids 留空，按时间批量查询） =====================
     payload = {
-        'model': '下单日期',
-        'stime': datetime.now().date() - timedelta(days=14),
-        'etime': datetime.now().date(),
-        'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
+        "sel_type": "系统SO号",  # 固定
+        "ids": [],  # 留空 = 按时间查询
+        "pagesize": 50,  # 固定
+        "pageindex": 1,  # 固定
+        "s_date": s_date.strftime('%Y-%m-%d'),  # 30天前
+        "e_date": e_date.strftime('%Y-%m-%d'),  # 今天
+        "order_state": "2"  # 固定
     }
-    c_path = os.path.join(BASE_DIR, "site_config.json")
-    with open(c_path, "r", encoding="utf-8") as f:
-        data = json.load(f)  # 加载配置数据
-    header = {'Cookie': data['sd_cookies']}
-    url = 'http://client.sanstar.net.cn/Common/IDATA_MK?type=list&proc=cliect_select_BigWaybill'
 
-    resp = requests.post(url, data=payload, headers=header)
-    data = []
-    if resp.json():
-        if 'rows' in resp.json():
-            data = resp.json()['rows']
+    try:
+        # ===================== 6. 请求接口 =====================
+        resp = requests.post(url, json=payload, headers=headers, timeout=20)
+        if resp.status_code != 200:
+            return f'接口异常 {resp.status_code}'
 
-    if len(data):
-        ship_set = Ship.objects.filter(s_status='PREPARING',
-                                       carrier_order_status='WAIT')
-        for i in ship_set:
-            for d in data:
-                if i.s_number == d['sono']:
-                    i.carrier_order_status = 'ACCEPTED'
-                    i.save()
+        result = resp.json()
+        if not result.get('success', False):
+            return result.get('message', '查询失败')
 
-                    # 创建操作日志
-                    log = MLOperateLog()
-                    log.op_module = 'SHIP'
-                    log.op_type = 'EDIT'
-                    log.target_type = 'SHIP'
-                    log.target_id = i.id
-                    log.desc = '盛德运单已受理'
-                    log.save()
+        # ===================== 7. 获取订单列表 =====================
+        data = result.get('data', {})
+        order_list = data.get('list', [])
+        if not order_list:
+            return '暂无订单数据'
 
-    return 'SUCESS'
+        # ===================== 8. 取出所有返回的 sono 列表（加速查询） =====================
+        sono_list = [
+            item.get('sono') for item in order_list if item.get('sono')
+        ]
+
+        # ===================== 9. 匹配并更新运单状态 =====================
+        # 只更新：待受理 + 盛德物流 的运单
+        ship_set = Ship.objects.filter(
+            carrier='盛德物流',
+            s_status='PREPARING',
+            carrier_order_status='WAIT',
+            s_number__in=sono_list  # 只查接口返回的运单，速度极快
+        )
+
+        for ship in ship_set:
+            # 状态改为：已受理
+            ship.carrier_order_status = 'ACCEPTED'
+            ship.save()
+
+            # 记录日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship.id
+            log.desc = '盛德运单已受理'
+            log.save()
+
+        return 'SUCCESS'
+
+    except requests.exceptions.Timeout:
+        return '请求超时'
+    except Exception as e:
+        return f'系统异常：{str(e)}'

@@ -1632,7 +1632,7 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         message = 'runing'
-        tasks.bulk_ship_tracking.delay()
+        tasks.sd_auto_sync()
 
         return Response({'message': message}, status=status.HTTP_200_OK)
 
@@ -2081,48 +2081,6 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             sd.note = i['note']
             sd.save()
             products_cost += sd.unit_cost * sd.qty
-
-            # 发货后减去打包库存数量(旧代码)
-            # if ship_action == 'SHIPPED':
-            #     pm = PurchaseManage.objects.filter(sku=sd.sku, p_status='PACKED').first()
-            #
-            #     if pm:
-            #         # 创建操作日志
-            #         log = MLOperateLog()
-            #         log.op_module = 'PURCHASE'
-            #         log.op_type = 'CREATE'
-            #         log.target_type = 'PURCHASE'
-            #         log.desc = '库存扣除 {qty}个 {sku} {p_name}'.format(sku=pm.sku, p_name=pm.p_name, qty=sd.qty)
-            #         log.save()
-            #         purchase_manage = PurchaseManage(
-            #             p_status='USED',
-            #             s_type=pm.s_type,
-            #             create_type=pm.create_type,
-            #             sku=pm.sku,
-            #             p_name=pm.p_name,
-            #             item_id=pm.item_id,
-            #             label_code=pm.label_code,
-            #             image=pm.image,
-            #             unit_cost=pm.unit_cost,
-            #             weight=pm.weight,
-            #             length=pm.length,
-            #             width=pm.width,
-            #             heigth=pm.heigth,
-            #             used_qty=sd.qty,
-            #             used_batch=sd.ship.batch,
-            #             note=pm.note,
-            #             shop=pm.shop,
-            #             shop_color=pm.shop_color,
-            #             packing_size=pm.packing_size,
-            #             packing_name=pm.packing_name,
-            #             used_time=datetime.now()
-            #         )
-            #         purchase_manage.save()
-            #         if pm.pack_qty > sd.qty:
-            #             pm.pack_qty = pm.pack_qty - sd.qty
-            #             pm.save()
-            #         else:
-            #             pm.delete()
 
         ship = Ship.objects.filter(id=ship_id).first()
         if ship_note:
@@ -3069,7 +3027,13 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     @action(methods=['post'], detail=False, url_path='ship_tracking')
     def ship_tracking(self, request):
         track_num = request.data['track_num']
-        message = tasks.ship_tracking(track_num)
+        # 判断运单号类型：S开头 → 新接口，否则 → 旧接口
+        if track_num and track_num.startswith('S'):
+            # S 开头 = 盛德新单号
+            message = tasks.ship_tracking(track_num)
+        else:
+            # 不是 S 开头 = 旧物流单号
+            message = tasks.ship_tracking_old(track_num)
 
         # 创建操作日志
         log = MLOperateLog()
@@ -3106,91 +3070,127 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     # 盛德标签
     @action(methods=['post'], detail=False, url_path='carrier_label')
     def carrier_label(self, request):
-        label_type = request.data['label_type']  # 箱唛：BOX 交运单：RECEIPT
-        s_number = request.data['s_number']
+        # 1. 获取前端参数 label_type: BOX = 箱唛 | RECEIPT = 交仓单
+        try:
+            label_type = request.data['label_type']
+            s_number = request.data['s_number']
+            ship_id = request.data['ship_id']
+        except KeyError:
+            return Response(
+                {
+                    'status': 'error',
+                    'msg': '参数缺失：label_type 或 s_number'
+                },
+                status=status.HTTP_202_ACCEPTED)
 
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            data = json.load(f)  # 加载配置数据
-        header = {'Cookie': data['sd_cookies']}
-
-        # 查询运单详情，获取operNo
-        url_1 = 'http://client.sanstar.net.cn/console/customer_order/get_order_list'
-        data_1 = {
-            'thecompany': 'SO',
-            'operNo': s_number,
-            'op': 1,
-        }
-        resp = requests.post(url_1, data=data_1, headers=header)
-
-        if 'success' in resp.json():
-            # 查询运单异常情况
+        if not s_number:
             return Response({
-                'msg': resp.json()['msg'],
-                'status': 'error'
+                'status': 'error',
+                'msg': '运单号不能为空'
             },
                             status=status.HTTP_202_ACCEPTED)
 
-        # 查到运单（已受理）
-        if resp.json()[0]['tb']:
-            ship_order = resp.json()[0]['tb'][0]
-            oper_no = ship_order['operNo']
+        # 2. 读取配置
+        try:
+            c_path = os.path.join(BASE_DIR, "site_config.json")
+            with open(c_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'msg': f'读取配置失败：{str(e)}'
+            },
+                            status=status.HTTP_202_ACCEPTED)
 
-            # 箱唛标签
-            url_2 = ''
-            data_2 = {}
-            if label_type == 'BOX':
-                url_2 = 'http://client.sanstar.net.cn/console/Report/shippingmark'
-                data_2 = {
-                    'param':
-                    '[{"operNo":' + oper_no +
-                    ',"dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","type":1,"proc":"client_add_BigWaybill_warehousereceipt","TheCompany":"10571","country":"墨西哥","repottype":"pdf","EntrustType":"空运","serialno":0,"new_num":0}]'
-                }
+        # 请求头
+        headers = {
+            'Authorization': config.get('sd_cookies', ''),
+            'Content-Type': 'application/json'
+        }
 
-            # 交运单
-            if label_type == 'RECEIPT':
-                url_2 = 'http://client.sanstar.net.cn/console/Report/getwarehousereceipt'
-                data_2 = {
-                    'param':
-                    '[{"type":1,"operNo":"' + oper_no +
-                    '","dsid":"8CF7FA95-1F7B-4F03-BD27-F33E9EA9F6FC","proc":"cliect_交仓单","warehouseid":"0200","regionid":30,"repottype":"pdf"}]'
-                }
+        # 3. 根据类型自动选择接口
+        if label_type == 'BOX':
+            url = "http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/mark_export"
+            payload = {"rpid": "686193367949381", "sono": s_number}
+            label_name = "箱唛"
 
-            # 获取标签链接
-            resp2 = requests.post(url_2, data=data_2, headers=header)
-            if 'success' in resp2.json():
-                if resp2.json()['success']:
-                    # 创建操作日志
-                    log = MLOperateLog()
-                    log.op_module = 'SHIP'
-                    log.op_type = 'EDIT'
-                    log.target_type = 'SHIP'
-                    log.desc = '打印物流标签-{message} 单号{track_num}'.format(
-                        track_num=s_number,
-                        message='箱唛' if label_type == 'BOX' else '交运单')
-                    log.user = request.user
-                    log.save()
-                    return Response(
-                        {
-                            'link': resp2.json()['msg'],
-                            'status': 'success'
-                        },
-                        status=status.HTTP_200_OK)
+        elif label_type == 'RECEIPT':
+            url = "http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/deliver_export"
+            payload = {"sono": s_number}
+            label_name = "交仓单"
 
         else:
             return Response({
-                'msg': '运单待受理，无法生成标签',
-                'status': 'error'
+                'status': 'error',
+                'msg': '不支持的标签类型'
             },
                             status=status.HTTP_202_ACCEPTED)
 
-        return Response({
-            'msg': '生成标签异常',
-            'status': 'error'
-        },
-                        status=status.HTTP_202_ACCEPTED)
+        # 4. 请求接口获取下载地址
+        try:
+            resp = requests.post(url,
+                                 json=payload,
+                                 headers=headers,
+                                 timeout=15)
 
-    # 盛德交运运单
+            if resp.status_code != 200:
+                return Response(
+                    {
+                        'status': 'error',
+                        'msg': f'获取{label_name}失败，接口状态码：{resp.status_code}'
+                    },
+                    status=status.HTTP_202_ACCEPTED)
+
+            result = resp.json()
+            if not result.get('success', False):
+                msg = result.get('message', f'获取{label_name}地址失败')
+                return Response({
+                    'status': 'error',
+                    'msg': msg
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+            # 获取下载地址
+            file_url = result.get('data', '')
+            if not file_url:
+                return Response(
+                    {
+                        'status': 'error',
+                        'msg': f'未获取到{label_name}下载地址'
+                    },
+                    status=status.HTTP_202_ACCEPTED)
+
+            # 记录日志
+            log = MLOperateLog()
+            log.op_module = 'SHIP'
+            log.op_type = 'EDIT'
+            log.target_type = 'SHIP'
+            log.target_id = ship_id
+            log.desc = f'打印物流标签-{label_name} 单号{s_number}'
+            log.user = request.user
+            log.save()
+
+            # 成功返回 → link 字段
+            return Response({
+                'status': 'success',
+                'link': file_url
+            },
+                            status=status.HTTP_200_OK)
+
+        except requests.exceptions.Timeout:
+            return Response({
+                'status': 'error',
+                'msg': f'获取{label_name}接口超时'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'msg': f'系统异常：{str(e)}'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
+    # 盛德交运运单-旧
     @action(methods=['post'], detail=False, url_path='carrier_place_order')
     def carrier_place_order(self, request):
         ship_id = request.data['ship_id']
@@ -3218,6 +3218,44 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         }
 
         info = tasks.sd_place_order(ship_id, ship_data)
+        if info['status'] == 'error':
+            return Response({
+                'msg': info['msg'],
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        return Response({
+            'msg': info['msg'],
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 盛德交运运单-新api
+    @action(methods=['post'], detail=False, url_path='carrier_place_order_new')
+    def carrier_place_order_new(self, request):
+        ship_id = request.data['ship_id']
+        d_code = request.data['d_code']
+        fbm = FBMWarehouse.objects.filter(w_code=d_code).first()
+        if not fbm:
+            return Response({
+                'msg': 'fbm仓库不存在!',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        ship_data = {
+            'd_code': d_code,  # fbm仓库编号
+            'sh_addr': fbm.address,  # fbm仓库地址
+            'sh_zip_code': fbm.zip if fbm.zip else ' ',  # fbm仓库邮编
+            'delivery_time': request.data['apptdate'] + ' 18:00',  # 预约日期
+            'transport_type': request.data['EntrustType'],  # 货运方式
+            'ck_name': request.data['warehouseid'],  # 送货仓库名称
+            'refid': request.data['sellerid'],  #店铺账号id
+            'fbx_no': request.data['envio'],  # 运单编号
+            'product': request.data['product'],  # 品名
+            'ProductNature': request.data['ProductNature'],  # 产品性质
+        }
+
+        info = tasks.sd_place_order_api(ship_id, ship_data)
         if info['status'] == 'error':
             return Response({
                 'msg': info['msg'],
@@ -4265,7 +4303,7 @@ class CarrierViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     search_fields = ('name', )  # 配置搜索字段
     ordering_fields = ('od_num', 'id')  # 配置排序字段
 
-    # 获取盛德预约入仓时间
+    # 获取盛德预约入仓时间-作废
     @action(methods=['post'], detail=False, url_path='get_sd_reserve')
     def get_sd_reserve(self, request):
         apptdate = request.data['apptdate']  # 预约日期
@@ -4302,31 +4340,65 @@ class CarrierViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     # 获取盛德fbm仓库信息
     @action(methods=['get'], detail=False, url_path='get_fbm_warehouse')
     def get_fbm_warehouse(self, request):
-        payload = {
-            'country': '墨西哥',
-            'nid': '03E85014-136E-4E5B-B2F9-751E21FF5D88',
-            'somrequest': '',
-        }
-        url = 'http://client.sanstar.net.cn/console/customer_order/fbawarehousecodedata'
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            data = json.load(f)  # 加载配置数据
-        header = {'Cookie': data['sd_cookies']}
-        resp = requests.post(url, data=payload, headers=header)
-        if 'success' in resp.json():
-            if resp.json()['success']:
+        try:
+            payload = {'fbx_code': 'FBL', 'country_code': 'MX'}
+
+            c_path = os.path.join(BASE_DIR, "site_config.json")
+            with open(c_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            headers = {
+                'Authorization': config.get('sd_cookies', ''),
+                'Content-Type': 'application/json'
+            }
+
+            url = 'http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/fbx_addrinfo'
+            resp = requests.post(url,
+                                 json=payload,
+                                 headers=headers,
+                                 timeout=15)
+
+            if resp.status_code != 200:
                 return Response(
                     {
-                        'status': 'success',
-                        'data': resp.json()['data']
+                        'status': 'error',
+                        'msg': f'接口状态码异常：{resp.status_code}'
                     },
-                    status=status.HTTP_200_OK)
+                    status=200)
 
-        return Response({
-            'msg': '查询异常',
-            'status': 'error'
-        },
-                        status=status.HTTP_202_ACCEPTED)
+            # 解析一次
+            result = resp.json()
+            if not result.get('success', False):
+                return Response(
+                    {
+                        'status': 'error',
+                        'msg': result.get('message', '获取仓库失败')
+                    },
+                    status=200)
+
+            # ===================== 核心：提取 d_code 列表 =====================
+            data = result.get('data', {})
+            warehouse_list = data.get('list', [])
+
+            # 只提取所有 d_code 组成数组
+            d_code_list = [
+                item.get('d_code') for item in warehouse_list
+                if item.get('d_code')
+            ]
+
+            return Response(
+                {
+                    'status': 'success',
+                    'd_codes': d_code_list  # 直接返回数组
+                },
+                status=200)
+
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'msg': f'异常：{str(e)}'
+            },
+                            status=200)
 
 
 class TransStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,

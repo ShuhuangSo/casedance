@@ -549,9 +549,11 @@ def ship_tracking(num):
             # 去重：同一个运单 + 同一个内容不重复保存
             is_exist = CarrierTrack.objects.filter(carrier_name=carrier,
                                                    carrier_number=num,
-                                                   context=context).exists()
+                                                   context=context).first()
 
             if is_exist:
+                is_exist.create_time = datetime.now()
+                is_exist.save()
                 continue
 
             # 保存新轨迹
@@ -595,12 +597,121 @@ def bulk_ship_tracking():
     return 'SUCCESS'
 
 
+# 同步物流收货的尺寸重量
+def update_sd_ship_size():
+    # 1. 读取认证配置
+    try:
+        c_path = os.path.join(BASE_DIR, "site_config.json")
+        with open(c_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        sd_cookies = config.get('sd_cookies', '')
+    except Exception as e:
+        return f"读取配置失败: {str(e)}"
+
+    # 2. 接口地址
+    url = "http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/ordersize"
+
+    headers = {'Authorization': sd_cookies, 'Content-Type': 'application/json'}
+
+    # 3. 查询需要更新尺寸重量的运单
+    shipset = Ship.objects.filter(carrier='盛德物流',
+                                  carrier_order_status='ACCEPTED',
+                                  carrier_rec_check='UNCHECK').filter(
+                                      Q(s_status='PREPARING')
+                                      | Q(s_status='SHIPPED')
+                                      | Q(s_status='BOOKED'))
+
+    if not shipset.exists():
+        return "暂无需要更新重量尺寸的运单"
+
+    # 4. 循环逐个查询（接口不支持批量）
+    for ship in shipset:
+        sono = ship.s_number
+        if not sono:
+            continue
+
+        # 接口只支持单个 sono
+        payload = {"ids": [sono]}
+
+        try:
+            resp = requests.post(url,
+                                 json=payload,
+                                 headers=headers,
+                                 timeout=15)
+            if resp.status_code != 200:
+                continue
+
+            result = resp.json()
+            if not result.get('success', False):
+                continue
+
+            # 获取返回列表
+            data = result.get('data', {})
+            size_list = data.get('list', [])
+            if not size_list:
+                continue
+
+            # 取第一条
+            item = size_list[0]
+            total_qty = item.get('total_qty')
+            total_kg = item.get('total_kg')
+            total_cbm = item.get('total_cbm')
+            cost_kg = item.get('cost_kg')
+
+            # 只有有数据才保存
+            if all([total_qty, total_kg, total_cbm, cost_kg]):
+                with transaction.atomic():
+                    ship.carrier_GoodsNum = total_qty  # 总数量
+                    ship.carrier_ckweight = total_kg  # 重量
+                    ship.carrier_ckcbm = total_cbm  # 体积
+                    ship.carrier_ckvolume = cost_kg  # 计费重
+                    # ============= ✅ 开始比对逻辑 =============
+                    # 本地数量
+                    local_qty = ship.total_box or 0
+                    # 物流返回数量
+                    carrier_qty = ship.carrier_GoodsNum or 0
+
+                    # 本地重量
+                    local_weight = round(float(ship.weight or 0), 2)  # 保留2位
+
+                    # 物流返回计费重
+                    carrier_weight = round(float(ship.carrier_ckvolume or 0),
+                                           2)  # 保留2位
+
+                    # 数量必须完全相等 | 重量差异 ≤ 1
+                    qty_ok = (local_qty == carrier_qty)
+                    weight_ok = (abs(local_weight - carrier_weight)
+                                 <= 1.0)  # 安全判断
+
+                    # 标记状态
+                    if qty_ok and weight_ok:
+                        ship.carrier_rec_check = 'CHECKED'
+                    else:
+                        ship.carrier_rec_check = 'ERROR'
+                    ship.save()
+
+                    # 记录日志
+                    log = MLOperateLog()
+                    log.op_module = 'SHIP'
+                    log.op_type = 'EDIT'
+                    log.target_type = 'SHIP'
+                    log.target_id = ship.id
+                    log.desc = f'同步收货尺寸/重量 | 状态：{ship.carrier_rec_check}'
+                    log.save()
+
+        except Exception as e:
+            continue
+
+    return "SUCCESS"
+
+
 # sd物流自动同步/跟踪
 @shared_task
 def sd_auto_sync():
     # 1.自动检查备货中已打包运单
-    shipset = Ship.objects.filter(carrier='盛德物流').filter(
-        s_status='PREPARING').filter(carrier_order_status='')
+    shipset = Ship.objects.filter(carrier='盛德物流', s_status='PREPARING').filter(
+        Q(carrier_order_status='')
+        | Q(carrier_order_status=None))
     for ship in shipset:
         sd_set = ShipDetail.objects.filter(ship=ship)
         is_packed = True  # 产品打包状态
@@ -620,8 +731,8 @@ def sd_auto_sync():
             log.save()
 
     # 2.检查资料是否齐全
-    shipset = Ship.objects.filter(carrier_order_status='PACKED').filter(
-        s_status='PREPARING')
+    shipset = Ship.objects.filter(carrier='盛德物流').filter(
+        carrier_order_status='PACKED').filter(s_status='PREPARING')
     for ship in shipset:
         sd_set = ShipDetail.objects.filter(ship=ship)
         is_declare = True  # 产品申报状态
@@ -684,11 +795,15 @@ def sd_auto_sync():
 
     # 4. 查询受理情况
     query_sd_order_status()
+    # 5. 同步收货重量/尺寸
+    update_sd_ship_size()
+    # 批量更新跟踪
+    bulk_ship_tracking()
 
     # 记录执行日志
     task_log = TaskLog()
     task_log.task_type = 4
-    task_log.note = '自动检查sd物流交运'
+    task_log.note = '自动检查sd物流交运/信息同步'
     task_log.save()
 
     return 'SUCCESS'

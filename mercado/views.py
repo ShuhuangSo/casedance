@@ -3053,6 +3053,27 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                             status=status.HTTP_202_ACCEPTED)
         return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
 
+    # 确认核查重量
+    @action(methods=['post'], detail=False, url_path='confirm_weight')
+    def confirm_weight(self, request):
+        ship_id = request.data['ship_id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        if ship:
+            ship.carrier_rec_check = 'CHECKED'
+            ship.save()
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'EDIT'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '手动确认核查重量'
+        log.user = request.user
+        log.save()
+
+        return Response({'msg': '操作成功'}, status=status.HTTP_200_OK)
+
     # 批量更新物流跟踪信息
     @action(methods=['get'], detail=False, url_path='bulk_update_tracking')
     def bulk_update_tracking(self, request):
@@ -3309,6 +3330,16 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         tasks.query_sd_order_status()
         return Response({
             'msg': '刷新成功！',
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
+    # 批量交运/同步盛德运单状态
+    @action(methods=['get'], detail=False, url_path='sd_manual_sync')
+    def sd_manual_sync(self, request):
+        tasks.sd_auto_sync.delay()
+        return Response({
+            'msg': '已提交同步任务',
             'status': 'success'
         },
                         status=status.HTTP_200_OK)

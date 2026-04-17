@@ -458,7 +458,8 @@ class ShipSerializer(serializers.ModelSerializer):
                   'products_cost', 'products_weight', 'user_id', 'manager',
                   'logi_fee_clear', 'is_attach', 'is_remove_items',
                   'ship_shipDetail', 'latest_track', 'carrier_order_status',
-                  'carrier_rec_check')
+                  'carrier_rec_check', 'carrier_ckweight', 'carrier_ckcbm',
+                  'carrier_ckvolume', 'carrier_GoodsNum')
 
 
 class ShipBoxSerializer(serializers.ModelSerializer):

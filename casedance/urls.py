@@ -28,7 +28,7 @@ from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
     MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
     UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet, CarrierTrackViewSet, MLStockLogViewSet, \
-    FileUploadNotifyViewSet, PlatformCategoryRateViewSet
+    FileUploadNotifyViewSet, PlatformCategoryRateViewSet, ScreenshotRecognizeViewSet, InvoiceCreateViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -257,6 +257,15 @@ router.register('ml_file_upload_notify',
 router.register('platform_category',
                 PlatformCategoryRateViewSet,
                 basename='platform_category')
+# 订单截图识别
+router.register('screenshot_recognize',
+                ScreenshotRecognizeViewSet,
+                basename='screenshot_recognize')
+
+# 生成发票PDF
+router.register('create_invoice',
+                InvoiceCreateViewSet,
+                basename='create_invoice')
 # ---------------------------产品开发app-------------------------------------------------
 # 产品开发列表
 router.register('dev_products', DevProductViewSet, basename='dev_products')

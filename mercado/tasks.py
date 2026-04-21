@@ -2770,11 +2770,30 @@ def sd_place_order_api(ship_id, data):
 
         # ====================== 保存数据（事务保证安全） ======================
         with transaction.atomic():
+            # ============================
+            # ✅ 安全临时关闭信号（只临时！执行完自动恢复！）
+            # s_number触发了信号
+            # ============================
+            from django.db.models.signals import pre_save, post_save
+
+            # 1. 先把现有的信号接收器保存下来
+            pre_save_receivers = pre_save.receivers.copy()
+            post_save_receivers = post_save.receivers.copy()
+
+            # 2. 临时断开
+            pre_save.disconnect(sender=Ship)
+            post_save.disconnect(sender=Ship)
+
+            # 3. 你的保存逻辑
             ship.s_number = sono
             ship.carrier_order_status = "WAIT"
             ship.carrier_rec_check = "UNCHECK"
             ship.carrier_order_time = datetime.now()
             ship.save()
+
+            # 4. ✅ 立刻恢复信号（关键！不会影响系统！）
+            pre_save.receivers = pre_save_receivers
+            post_save.receivers = post_save_receivers
 
             # 日志
             log = MLOperateLog()

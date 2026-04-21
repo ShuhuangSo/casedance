@@ -7,11 +7,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import requests
 import openpyxl
-import time, os
+import time, os, re
 import random
 import json
 import urllib
 import hashlib
+from fpdf import FPDF
 from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.db.models import Q
@@ -6471,3 +6472,282 @@ class PlatformCategoryRateViewSet(mixins.ListModelMixin,
             'status': 'success'
         },
                         status=status.HTTP_200_OK)
+
+
+# ==========================
+# 1. 订单截图识别 → ViewSet
+# ==========================
+class ScreenshotRecognizeViewSet(viewsets.ViewSet):
+
+    # 读取配置文件（只加载一次）
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                           'site_config.json'),
+              'r',
+              encoding='utf-8') as f:
+        config = json.load(f)
+
+    # 从配置文件读取敏感信息 ✅
+    DIFY_API_KEY = config.get("dify_invoice_apikey", "")
+    DIFY_HOST = config.get("dify_host", "")
+
+    # 拼接接口地址
+    UPLOAD_URL = f"{DIFY_HOST}/v1/files/upload"
+    RUN_URL = f"{DIFY_HOST}/v1/workflows/run"
+
+    def create(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({
+                'msg': '请上传订单截图',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
+        try:
+            # 上传文件到 Dify
+            headers_upload = {"Authorization": f"Bearer {self.DIFY_API_KEY}"}
+            files = {"file": (file.name, file, file.content_type)}
+            data = {"user": "dev-user", "type": "image"}
+            upload_resp = requests.post(self.UPLOAD_URL,
+                                        headers=headers_upload,
+                                        files=files,
+                                        data=data,
+                                        timeout=15)
+            file_id = upload_resp.json().get("id")
+
+            if not file_id:
+                return Response({
+                    'msg': '文件上传失败',
+                    'status': 'error'
+                },
+                                status=status.HTTP_202_ACCEPTED)
+
+            # 执行工作流
+            headers_run = {
+                "Authorization": f"Bearer {self.DIFY_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "inputs": {
+                    "screenshot": {
+                        "type": "image",
+                        "transfer_method": "local_file",
+                        "upload_file_id": file_id
+                    }
+                },
+                "response_mode": "blocking",
+                "user": "dev-user"
+            }
+
+            resp = requests.post(self.RUN_URL,
+                                 json=payload,
+                                 headers=headers_run,
+                                 timeout=30)
+            result = resp.json()
+
+            # 解析数据
+            text_output = result["data"]["outputs"]["text"]
+            order_data = json.loads(text_output)
+
+            return Response({
+                'status': 'success',
+                'data': order_data
+            },
+                            status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'msg': f'识别失败：{str(e)}',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+
+
+# ==========================
+# 2. 使用 fpdf2 生成发票 PDF
+# ==========================
+class InvoiceCreateViewSet(viewsets.ViewSet):
+
+    def create(self, request):
+        try:
+            data = request.data
+
+            # 基础配置
+            invoice_dir = "media/invoices"
+            os.makedirs(invoice_dir, exist_ok=True)
+            # ==========================
+            # ✅ 每次生成前：清空旧的所有 PDF
+            # ==========================
+            for f in os.listdir(invoice_dir):
+                file_path = os.path.join(invoice_dir, f)
+                try:
+                    if os.path.isfile(file_path) and f.endswith(".pdf"):
+                        os.remove(file_path)
+                except:
+                    pass
+
+            # 继续生成新 PDF
+            order_no = data.get("order_no", "UNKNOWN")
+            filename = f"FACTURA_{order_no}.pdf"
+            relative_path = f"/media/invoices/{filename}"
+            save_path = os.path.join(invoice_dir, filename)
+
+            # 文本清理
+            def clean(t):
+                if not t:
+                    return ""
+                t = str(t)
+                t = t.replace("\u2022", "").replace("•", "")
+                t = t.replace("Ã±", "ñ").replace("Ã¡", "a").replace(
+                    "Ã©", "e").replace("Ã³", "o").replace("Ã¼", "u")
+                return re.sub(r'[^\x00-\x7Fñáéíóúü]', ' ', t)
+
+            # PDF 初始化
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Helvetica", "", 10)
+
+            # ==========================
+            # 标题
+            # ==========================
+            pdf.set_font("Helvetica", "B", 22)
+            pdf.cell(0, 14, txt="FACTURA", ln=1, align="C")
+            pdf.ln(6)
+
+            # ==========================
+            # 发票信息（全部标签加粗）
+            # ==========================
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Facturado a:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('buyer', '')), ln=1)
+
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="R.F.C:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('RFC', '')), ln=1)
+
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Régimen fiscal:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('tax_regime', '')), ln=1)
+
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Código Postal:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('postcode', '')), ln=1)
+
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Dirección:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.multi_cell(0, 8, txt=clean(data.get('address', '')))
+            pdf.ln()  # ✅ 修复光标位置
+
+            # Forma de pago
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Forma de pago:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150,
+                     8,
+                     txt=clean(data.get('forma_pago', 'Tarjeta de crédito')),
+                     ln=1)
+
+            # Email
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Email:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('email', '')), ln=1)
+
+            # Venta
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Venta:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('order_no', '')), ln=1)
+
+            # Fecha de pedido
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Fecha de pedido:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150, 8, txt=clean(data.get('order_time', '')), ln=1)
+
+            # Uso de CFDI
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(40, 8, txt="Uso de CFDI:", ln=0)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(150,
+                     8,
+                     txt=clean(data.get('CFDI', 'Gastos en General')),
+                     ln=1)
+
+            pdf.ln(8)
+
+            # ==========================
+            # 极简表格：自适应高度 + 只有横线 + 永不压线
+            # ==========================
+            line_h = 9
+
+            # 标题行
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(110, line_h, txt="Producto", ln=0)
+            pdf.cell(30, line_h, txt="Qty", ln=0, align="C")
+            pdf.cell(50, line_h, txt="Precio", ln=1, align="R")
+
+            # 顶部横线
+            pdf.cell(190, 0, txt="", border="T", ln=1)
+
+            # 产品列表
+            pdf.set_font("Helvetica", "", 10)
+            items = data.get("items", [])
+            for item in items:
+                title = clean(item.get("title", "Sin producto"))
+                qty = str(item.get("qty", 1))
+                precio = f"$ {item.get('item_price', 0):.2f}"
+
+                # 1. 记录当前行开始位置
+                y_start = pdf.get_y()
+
+                # 2. 绘制产品名称（自动换行）
+                pdf.multi_cell(110, line_h, txt=title, ln=0)
+
+                # 3. 计算实际行高（自动适应多行文本）
+                y_end = pdf.get_y()
+                row_height = y_end - y_start
+
+                # 4. 在同一行绘制 Qty / Precio
+                pdf.set_xy(110, y_start)
+                pdf.cell(30, row_height, txt=qty, ln=0, align="C")
+                pdf.cell(50, row_height, txt=precio, ln=1, align="R")
+
+                # 5. 绘制底线（永远在文字下方）
+                pdf.cell(190, 0, txt="", border="T", ln=1)
+
+            pdf.ln(4)
+
+            # ==========================
+            # 总计
+            # ==========================
+            total = round(float(data.get("product_price", 0)), 2)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(190, 8, txt=f"Subtotal: $ {total:.2f}", ln=1, align="R")
+            pdf.cell(190, 8, txt=f"Franqueo: $ 0.00", ln=1, align="R")
+            pdf.cell(190, 8, txt=f"Total: $ {total:.2f}", ln=1, align="R")
+
+            # 保存
+            pdf.output(save_path)
+            full_url = f"{BASE_URL}{relative_path}".strip()
+
+            return Response({
+                "status": "success",
+                "invoice_url": full_url
+            },
+                            status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print("=" * 60)
+            print("PDF 生成错误：", str(e))
+            print("=" * 60)
+            return Response({
+                "status": "error",
+                "msg": str(e)
+            },
+                            status=status.HTTP_202_ACCEPTED)

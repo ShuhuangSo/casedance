@@ -176,6 +176,7 @@ class MLProductSerializer(serializers.ModelSerializer):
     mercado产品库
     """
     is_incomplete = serializers.SerializerMethodField()  # 是否不完整
+    is_label_complete = serializers.SerializerMethodField()  # 产品标签信息是否完整
 
     def get_is_incomplete(self, obj):
         status = False
@@ -192,6 +193,14 @@ class MLProductSerializer(serializers.ModelSerializer):
             status = True
         return status
 
+    def get_is_label_complete(self, obj):
+        label_status = True
+        if obj.platform == 'MERCADO':
+            # 只要这两个字段任意一个为空 → 信息不全
+            if not obj.label_code or not obj.label_title:
+                label_status = False
+        return label_status
+
     class Meta:
         model = MLProduct
         fields = ('id', 'sku', 'p_name', 'label_code', 'upc', 'item_id',
@@ -202,7 +211,7 @@ class MLProductSerializer(serializers.ModelSerializer):
                   'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option',
                   'packing_id', 'buy_url2', 'buy_url3', 'buy_url4', 'buy_url5',
-                  'user_id', 'is_incomplete', 'platform')
+                  'user_id', 'is_incomplete', 'platform', 'is_label_complete')
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -320,6 +329,7 @@ class ShipDetailSerializer(serializers.ModelSerializer):
     total_onway_qty = serializers.SerializerMethodField()
     total_rec_qty = serializers.SerializerMethodField()
     user_id = serializers.SerializerMethodField()
+    is_label_complete = serializers.SerializerMethodField()
 
     def get_total_onway_qty(self, obj):
         qty = 0
@@ -348,6 +358,15 @@ class ShipDetailSerializer(serializers.ModelSerializer):
                 user_id = shop.user.id
         return user_id
 
+    def get_is_label_complete(self, obj):
+        product = MLProduct.objects.filter(sku=obj.sku).first()
+        label_status = True
+        if obj.ship.platform == 'MERCADO':
+            # 只要这两个字段任意一个为空 → 信息不全
+            if not product.label_code or not product.label_title:
+                label_status = False
+        return label_status
+
     class Meta:
         model = ShipDetail
         fields = ('id', 'target_FBM', 'box_number', 's_type', 'sku', 'p_name',
@@ -357,7 +376,7 @@ class ShipDetailSerializer(serializers.ModelSerializer):
                   'avg_ship_fee', 'qty', 'length', 'width', 'heigth', 'weight',
                   'note', 'create_time', 'packing_name', 'packing_size',
                   'plan_qty', 'ship', 'total_onway_qty', 'total_rec_qty',
-                  'user_id')
+                  'user_id', 'is_label_complete')
 
 
 class ShipSerializer(serializers.ModelSerializer):

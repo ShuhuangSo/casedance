@@ -731,8 +731,61 @@ class MLProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         from fpdf import FPDF
         import barcode
         data = request.data['products']
+        platform = request.data['platform']
 
-        # 检查是否有upc
+        # 检查平台
+        if platform == 'OZON':
+            return Response({
+                'msg': '暂不支持该平台产品标签打印',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        if platform == 'MERCADO':
+            incomplete_skus = []
+
+            for item in data:
+                # 检查所有产品标签信息是否完整
+                sku = item['sku']
+                product = MLProduct.objects.filter(sku=sku).first()
+                if not product:
+                    incomplete_skus.append(sku)
+                    continue
+                # 只要这两个字段任意一个为空 → 信息不全
+                if not product.label_code or not product.label_title:
+                    incomplete_skus.append(sku)
+            # 如果存在不完整的SKU → 返回异常
+            if incomplete_skus:
+                return Response(
+                    {
+                        'msg': '产品标签信息不全，无法打印，请完善后重试',
+                        'status': 'error'
+                    },
+                    status=status.HTTP_202_ACCEPTED)
+            # 2. 组装标签数据
+            label_data_list = []
+            for item in data:
+                sku = item['sku']
+                qty = item['qty']
+                product = MLProduct.objects.filter(sku=sku).first()
+                label_data_list.append({
+                    "code": product.label_code or "",
+                    "desc": product.label_title or "",
+                    "color": product.label_option or "",
+                    "sku": sku,
+                    "qty": qty
+                })
+            # 3. 直接传数组进去生成PDF
+            path = 'media/label/'
+            pdf_file_path = tasks.generate_ml_label_pdf(
+                label_list=label_data_list, output_path=f"{path}{sku}.pdf")
+            url = BASE_URL + '/' + pdf_file_path
+            return Response({
+                'url': url,
+                'status': 'success'
+            },
+                            status=status.HTTP_200_OK)
+
+        # emag平台 检查是否有upc
         for item in data:
             sku = item['sku']
             product = MLProduct.objects.filter(sku=sku).first()
@@ -1633,7 +1686,7 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         message = 'runing'
-        tasks.sd_auto_sync()
+        # tasks.sd_auto_sync()
 
         return Response({'message': message}, status=status.HTTP_200_OK)
 
@@ -2952,6 +3005,89 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
         return Response({'url': url}, status=status.HTTP_200_OK)
 
+    # 导出ml产品标签
+    @action(methods=['post'], detail=False, url_path='export_product_labels')
+    def export_product_labels(self, request):
+        # 1. 获取运单
+        ship_id = request.data['id']
+        ship = Ship.objects.filter(id=ship_id).first()
+        ship_detail_list = ShipDetail.objects.filter(ship=ship)
+        # 检查前提条件
+        if ship.platform != 'MERCADO':
+            return Response({
+                'msg': '不支持该平台打印产品标签',
+                'status': 'error'
+            },
+                            status=status.HTTP_202_ACCEPTED)
+        # ======================
+        # 新增：检查所有产品标签信息是否完整
+        # 只要有一个 sku 的 label_code 或 label_title 为空 → 直接报错
+        # ======================
+        incomplete_skus = []
+
+        for detail in ship_detail_list:
+            sku = detail.sku
+            product = MLProduct.objects.filter(sku=sku).first()
+            if not product:
+                incomplete_skus.append(sku)
+                continue
+
+            # 只要这两个字段任意一个为空 → 信息不全
+            if not product.label_code or not product.label_title:
+                incomplete_skus.append(sku)
+
+        # 如果存在不完整的SKU → 返回异常
+        if incomplete_skus:
+            return Response(
+                {
+                    'msg':
+                    f'部分产品标签信息不全，无法打印，请完善后重试：{", ".join(incomplete_skus)}',
+                    'status': 'error'
+                },
+                status=status.HTTP_202_ACCEPTED)
+
+        # 2. 组装标签数据（关键：外部处理数据，不耦合在生成函数里）
+        label_data_list = []
+        for sd in ship_detail_list:
+            product = MLProduct.objects.filter(sku=sd.sku).first()
+            if not product:
+                continue
+            label_data_list.append({
+                "code": product.label_code or "",
+                "desc": product.label_title or "",
+                "color": product.label_option or "",
+                "sku": sd.sku,
+                "qty": sd.qty or 1
+            })
+
+        # 3. 直接传数组进去生成PDF
+        path = 'media/ml_ships/'
+        head_path = '{path}{batch}_{id}'.format(path=path,
+                                                batch=ship.batch,
+                                                id=ship.id)
+        # 判断是否存在文件夹,如果没有就创建文件路径
+        if not os.path.exists(head_path):
+            os.makedirs(head_path)
+        pdf_file_path = tasks.generate_ml_label_pdf(
+            label_list=label_data_list,
+            output_path=f"{head_path}/{ship.batch}_{ship.shop}.pdf")
+        url = BASE_URL + '/' + pdf_file_path
+
+        # 创建操作日志
+        log = MLOperateLog()
+        log.op_module = 'SHIP'
+        log.op_type = 'GET'
+        log.target_type = 'SHIP'
+        log.target_id = ship.id
+        log.desc = '导出产品标签'
+        log.user = request.user
+        log.save()
+        return Response({
+            'url': url,
+            'status': 'success'
+        },
+                        status=status.HTTP_200_OK)
+
     # 修改运费结算状态
     @action(methods=['post'], detail=False, url_path='change_logi_fee_status')
     def change_logi_fee_status(self, request):
@@ -4119,6 +4255,25 @@ class ShipAttachmentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         log.desc = '上传附件：' + file_name
         log.user = request.user
         log.save()
+
+        # ===================== 新增：处理SKU标签文件 =====================
+        if ship.platform == 'MERCADO' and a_type == 'SKU_LABEL':
+            # ✅ 关键：只处理 .txt 文件，其他文件跳过
+            file_ext = os.path.splitext(file_name)[-1].lower()
+            if file_ext == ".txt":
+                res = tasks.process_sku_label_file(head_path)
+                update_count = res.get("updated_count", 0)
+                # 有更新则写入日志
+                if update_count > 0:
+                    label_log = MLOperateLog()
+                    label_log.op_module = 'SHIP'
+                    label_log.op_type = 'EDIT'
+                    label_log.target_type = 'SHIP'
+                    label_log.target_id = ship_id
+                    label_log.desc = f'更新了{update_count}条产品标签信息'
+                    label_log.user = request.user
+                    label_log.save()
+        # ================================================================
 
         return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
 

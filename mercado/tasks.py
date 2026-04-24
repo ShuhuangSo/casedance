@@ -6,12 +6,16 @@ import time
 import json
 import urllib
 import hashlib
-import os
+import os, re
 from datetime import datetime, timedelta
 from django.utils import dateparse
 from bs4 import BeautifulSoup
 from django.db.models import Sum, Avg, Q
 from django.db import transaction
+from fpdf import FPDF
+from io import BytesIO
+from barcode import Code128
+from barcode.writer import ImageWriter
 
 from casedance.settings import MEDIA_ROOT, BASE_DIR, BASE_URL, MEDIA_URL
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
@@ -2900,3 +2904,243 @@ def query_sd_order_status():
         return '请求超时'
     except Exception as e:
         return f'系统异常：{str(e)}'
+
+
+# ==============================
+# 生成 Code128 条码
+# ==============================
+# ==========================
+# 修复 ZPL 十六进制编码（如 _C3_A9 → é）
+# ==========================
+def fix_zpl_chars(text):
+    if not text:
+        return ""
+    import re
+    pattern = re.compile(r'_C3_([0-9A-F]{2})')
+
+    def replace_match(match):
+        hex_byte = match.group(1)
+        return bytes([0xC3, int(hex_byte, 16)]).decode('utf-8')
+
+    return pattern.sub(replace_match, text).strip()
+
+
+# ==========================
+# 生成清晰条码
+# ==========================
+def generate_barcode(code):
+    try:
+        rv = BytesIO()
+        Code128(code, writer=ImageWriter()).write(rv,
+                                                  options={
+                                                      "module_width": 0.25,
+                                                      "module_height": 8,
+                                                      "quiet_zone": 1,
+                                                      "text_distance": 0,
+                                                      "font_size": 0,
+                                                  })
+        rv.seek(0)
+        return rv
+    except:
+        return None
+
+
+# ==========================
+# 完整解析 ZPL（含颜色/型号）
+# ==========================
+def parse_zpl(zpl_text):
+    labels = []
+    blocks = zpl_text.strip().split("^XA")
+    for b in blocks:
+        if not b.strip():
+            continue
+
+        # 1. 追踪码
+        code = re.search(r"\^FD([A-Z0-9]{9})\^FS", b)
+        code = code.group(1) if code else ""
+
+        # 2. 产品名称
+        desc = re.search(r"\^FO40,185.*?\^FD(.*?)\^FS", b, re.DOTALL)
+        desc = desc.group(1) if desc else ""
+        desc = fix_zpl_chars(desc)
+
+        # 3. 颜色 / 型号（第二行描述）
+        color = ""
+        color1 = re.search(r"\^FO40,240.*?\^FD(.*?)\^FS", b, re.DOTALL)
+        color2 = re.search(r"\^FO39,240.*?\^FD(.*?)\^FS", b, re.DOTALL)
+        if color1:
+            color = color1.group(1)
+        if color2 and not color:
+            color = color2.group(1)
+        color = fix_zpl_chars(color)
+
+        # 4. SKU
+        sku = re.search(r"SKU:\s*(MD\d+)\^FS", b)
+        sku = sku.group(1) if sku else ""
+
+        # 5. 数量
+        qty = re.search(r"\^PQ(\d+),", b)
+        qty = int(qty.group(1)) if qty else 1
+
+        if code:
+            labels.append({
+                "code": code,
+                "desc": desc,
+                "color": color,
+                "sku": sku,
+                "qty": qty
+            })
+    return labels
+
+
+# ==========================
+# 【纯渲染·可复用】生成ml平台标签PDF
+# 入参：
+#   label_list: 数组，固定结构
+#   output_path: 输出路径
+# 结构示例：
+# [
+#     {"code":"追踪码", "desc":"产品标题", "color":"型号/颜色", "sku":"MDxxxx", "qty":2},
+# ]
+# ==========================
+def generate_ml_label_pdf(label_list, output_path=""):
+    pdf = FPDF(unit="mm", format=[60, 40])
+    pdf.set_auto_page_break(False)
+
+    for lab in label_list:
+        # 根据数量循环生成多页标签
+        for _ in range(lab.get("qty", 1)):
+            pdf.add_page()
+
+            # 条码居中 45mm
+            bc = generate_barcode(lab.get("code", ""))
+            if bc:
+                pdf.image(bc, x=7.5, y=2, w=45)
+
+            # 顶部追踪码
+            pdf.set_font("Arial", "B", 12)
+            pdf.set_xy(0, 15)
+            pdf.cell(60, 5, lab.get("code", ""), align="C")
+
+            # 产品描述
+            pdf.set_font("Arial", "", 8)
+            pdf.set_xy(4, 21)
+            pdf.multi_cell(52, 3, lab.get("desc", ""), align='L')
+
+            # 颜色/型号选项
+            if lab.get("color"):
+                pdf.set_font("Arial", "B", 8)
+                pdf.set_xy(4, pdf.get_y())
+                pdf.multi_cell(52, 3, lab["color"], align='L')
+
+            # 底部SKU
+            pdf.set_font("Arial", "B", 9)
+            pdf.set_xy(4, 34)
+            pdf.cell(50, 4, f"SKU: {lab.get('sku', '')}")
+
+    pdf.output(output_path)
+    return output_path
+
+
+def process_sku_label_file(file_path):
+    """
+    处理ml平台上传的SKU_LABEL标签TXT文件
+    解析ZPL -> 提取SKU、追踪码、标题、选项 -> 自动填充MLProduct
+    """
+    try:
+        # 1. 读取文件内容
+        with open(file_path, 'r', encoding='utf-8') as f:
+            zpl_content = f.read()
+
+        # 2. 分割每个标签 ^XA ... ^XZ
+        label_blocks = re.split(r'\^XA', zpl_content)
+        product_list = []
+
+        for block in label_blocks:
+            if not block.strip():
+                continue
+
+            # ====================== 解析字段 ======================
+            # 追踪码（如 PMCM72911）
+            code_match = re.search(r'\^FD([A-Z0-9]{9})\^FS', block)
+            label_code = code_match.group(1) if code_match else ""
+
+            # 产品描述 label_title
+            desc_match = re.search(r'\^FO40,185.*?\^FD(.*?)\^FS', block,
+                                   re.DOTALL)
+            label_title = desc_match.group(1).strip() if desc_match else ""
+
+            # 颜色/型号 label_option
+            option_match1 = re.search(r'\^FO40,240.*?\^FD(.*?)\^FS', block,
+                                      re.DOTALL)
+            option_match2 = re.search(r'\^FO39,240.*?\^FD(.*?)\^FS', block,
+                                      re.DOTALL)
+            label_option = ""
+            if option_match1:
+                label_option = option_match1.group(1).strip()
+            if option_match2 and not label_option:
+                label_option = option_match2.group(1).strip()
+
+            # SKU
+            sku_match = re.search(r'SKU:\s*(MD\d+)\^FS', block)
+            sku = sku_match.group(1) if sku_match else ""
+
+            # 西语字符解码
+            def fix_zpl_text(s):
+                if not s:
+                    return ""
+                pattern = re.compile(r'_C3_([0-9A-F]{2})')
+
+                def rep(m):
+                    return bytes([0xC3, int(m.group(1), 16)]).decode('utf-8')
+
+                return pattern.sub(rep, s).strip()
+
+            label_title = fix_zpl_text(label_title)
+            label_option = fix_zpl_text(label_option)
+            # ======================================================
+
+            if sku:
+                product_list.append({
+                    "sku": sku,
+                    "label_code": label_code,
+                    "label_title": label_title,
+                    "label_option": label_option
+                })
+
+        # 3. 批量更新产品（为空才更新）
+        update_count = 0
+
+        for item in product_list:
+            sku = item["sku"]
+            product = MLProduct.objects.filter(sku=sku).first()
+            if not product:
+                continue
+
+            need_save = False
+
+            # 为空才赋值
+            if not product.label_code:
+                product.label_code = item["label_code"]
+                need_save = True
+
+            if not product.label_title:
+                product.label_title = item["label_title"]
+                need_save = True
+            # 颜色/型号 label_option
+            product.label_option = item["label_option"]
+
+            if need_save:
+                product.save(update_fields=[
+                    'label_code', 'label_title', 'label_option'
+                ])
+                update_count += 1
+
+        return {
+            "status": "ok",
+            "parsed_count": len(product_list),
+            "updated_count": update_count
+        }
+
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}

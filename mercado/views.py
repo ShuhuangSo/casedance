@@ -1362,12 +1362,150 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         'is_active': ['exact'],
         'is_collect': ['exact'],
     }
-    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id')  # 配置搜索字段
+    search_fields = ('sku', 'p_name', 'label_code', 'upc', 'item_id',
+                     'group_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'item_id', 'qty', 'day15_sold',
                        'day30_sold', 'total_sold', 'total_profit',
                        'total_weight', 'total_cbm', 'stock_value', 'onway_qty',
                        'refund_rate', 'avg_profit', 'avg_profit_rate'
                        )  # 配置排序字段
+
+    # ================== 核心：按 group_id 分组 ==================
+    def list(self, request, *args, **kwargs):
+        import copy
+        from collections import defaultdict
+        from django.db.models import Q
+
+        # ========== 1. 当前要展示的数据（带搜索、筛选） ==========
+        base_queryset = self.filter_queryset(self.get_queryset()).order_by(
+            'group_id', 'p_status')
+        show_data = self.get_serializer(base_queryset, many=True).data
+
+        # ========== 2. 真实统计用的数据（去掉搜索，保留 p_status 筛选） ==========
+        real_queryset = self.get_queryset()
+        p_status_param = request.GET.get('p_status')
+        p_status_in_param = request.GET.get('p_status__in')
+
+        if p_status_param:
+            real_queryset = real_queryset.filter(p_status=p_status_param)
+        if p_status_in_param:
+            real_queryset = real_queryset.filter(
+                p_status__in=p_status_in_param.split(','))
+
+        # ========== 3. 只按 group_id 分组（不管 p_status，真正同组合合并） ==========
+        groups = defaultdict(
+            lambda: {
+                "group_id": None,
+                "p_status": None,
+                "images_list": [],
+                "total_qty": 0,
+                "total_onway_qty": 0,
+                "total_trans_qty": 0,
+                "total_day7_sold": 0,
+                "total_day15_sold": 0,
+                "total_day30_sold": 0,
+                "total_sold": 0,
+                "total_profit": 0,
+                "total_skus": 0,
+                "total_avg_profit": 0,
+                "total_avg_profit_rate": 0,
+                "total_fbm_onway_qty": 0,
+                "total_trans_onway_qty": 0,
+                "total_trans_qty_new": 0,
+                "total_preparing_qty": 0,
+                "total_p_onway_qty": 0,
+                "total_p_rec_qty": 0,
+                "total_stock_value": 0,
+                "is_group": True,
+                "other_skus": 0,
+                "children": []
+            })
+
+        for item in show_data:
+            group_id = item.get("group_id")
+            if not group_id:
+                continue
+
+            # ========================= ✅ 核心修复 =========================
+            # 只按 group_id 分组，不按 p_status 拆分！
+            g = groups[group_id]
+            g["group_id"] = group_id
+
+            # 图片去重添加
+            img = item.get("image")
+            if img and img not in g["images_list"]:
+                g["images_list"].append(img)
+
+            # 数字字段安全累加
+            g["total_qty"] += item.get("qty") or 0
+            g["total_onway_qty"] += item.get("onway_qty") or 0
+            g["total_trans_qty"] += item.get("trans_qty") or 0
+            g["total_day7_sold"] += item.get("day7_sold") or 0
+            g["total_day15_sold"] += item.get("day15_sold") or 0
+            g["total_day30_sold"] += item.get("day30_sold") or 0
+            g["total_sold"] += item.get("total_sold") or 0
+            g["total_profit"] += item.get("total_profit") or 0
+
+            g["total_fbm_onway_qty"] += item.get("fbm_onway_qty") or 0
+            g["total_trans_onway_qty"] += item.get("trans_onway_qty") or 0
+            g["total_trans_qty_new"] += item.get("trans_qty_new") or 0
+            g["total_preparing_qty"] += item.get("preparing_qty") or 0
+            g["total_p_onway_qty"] += item.get("p_onway_qty") or 0
+            g["total_p_rec_qty"] += item.get("p_rec_qty") or 0
+
+            # 库存价值累加
+            unit_cost = float(item.get("unit_cost") or 0)
+            first_ship_cost = float(item.get("first_ship_cost") or 0)
+            qty = int(item.get("qty") or 0)
+            g["total_stock_value"] += (unit_cost + first_ship_cost) * qty
+
+            # 子项加入
+            g["children"].append(item)
+
+        # ========== 4. 计算平均值 & 同筛选条件下的真实数量 ==========
+        group_list = []
+        for g in groups.values():
+            sku_count = len(g["children"])
+            g["total_skus"] = sku_count
+
+            # 平均值
+            if sku_count > 0:
+                total_avg_profit_sum = sum(
+                    [float(i.get("avg_profit") or 0) for i in g["children"]])
+                g["total_avg_profit"] = round(total_avg_profit_sum / sku_count,
+                                              2)
+
+                total_avg_profit_rate_sum = sum([
+                    float(i.get("avg_profit_rate") or 0) for i in g["children"]
+                ])
+                g["total_avg_profit_rate"] = round(
+                    total_avg_profit_rate_sum / sku_count, 2)
+            else:
+                g["total_avg_profit"] = 0
+                g["total_avg_profit_rate"] = 0
+
+            # 真实总数：同 group_id + 同前端筛选的 p_status 条件
+            real_total = real_queryset.filter(
+                group_id=g["group_id"]).values("sku").distinct().count()
+
+            g["is_group"] = (sku_count == real_total)
+            g["other_skus"] = real_total - sku_count
+            group_list.append(g)
+
+        # ========== 5. 组合分页（不拆组） ==========
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        total = len(group_list)
+        start = (page - 1) * page_size
+        end = page * page_size
+        paginated_groups = group_list[start:end]
+
+        return Response({
+            "count": total,
+            "next": None,
+            "previous": None,
+            "results": paginated_groups
+        })
 
     # FBM库存上传
     @action(methods=['post'], detail=False, url_path='fbm_upload')
@@ -1687,8 +1825,23 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     def test(self, request):
         message = 'runing'
         # tasks.sd_auto_sync()
+        p_list = MLProduct.objects.all()
+        n = 0
+        m = 0
+        for i in p_list:
+            if not i.group_id:
+                i.group_id = i.item_id
+                i.save()
+                n += 1
+            ss = ShopStock.objects.filter(sku=i.sku).first()
+            if ss:
+                if not ss.group_id:
+                    ss.group_id = i.item_id
+                    ss.save()
+                    m += 1
 
-        return Response({'message': message}, status=status.HTTP_200_OK)
+        return Response({'message': f'产品库更新了{n}条数据，店铺库存更新了{m}条数据'},
+                        status=status.HTTP_200_OK)
 
 
 class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
@@ -2392,6 +2545,7 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 else:
                     shop_stock = ShopStock()
                     shop = Shop.objects.filter(name=ship.shop).first()
+                    product = MLProduct.objects.filter(sku=i.sku).first()
                     url = ''
                     if shop.platform == 'MERCADO':
                         url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + i.item_id
@@ -2410,6 +2564,7 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                     shop_stock.label_code = i.label_code
                     shop_stock.upc = i.upc
                     shop_stock.item_id = i.item_id
+                    shop_stock.group_id = product.group_id
                     shop_stock.image = i.image
                     shop_stock.qty = i.qty
                     shop_stock.weight = i.weight

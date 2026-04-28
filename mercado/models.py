@@ -664,6 +664,11 @@ class MLProduct(models.Model):
                                   blank=True,
                                   verbose_name='创建人id',
                                   help_text='创建人id')
+    group_id = models.CharField(max_length=40,
+                                null=True,
+                                blank=True,
+                                verbose_name='组合id',
+                                help_text='组合id')
 
     class Meta:
         verbose_name = 'ML产品库'
@@ -952,6 +957,11 @@ class ShopStock(models.Model):
     is_collect = models.BooleanField(default=True,
                                      verbose_name='是否收藏',
                                      help_text='是否收藏')
+    group_id = models.CharField(max_length=40,
+                                null=True,
+                                blank=True,
+                                verbose_name='组合id',
+                                help_text='组合id')
 
     class Meta:
         verbose_name = '店铺库存'

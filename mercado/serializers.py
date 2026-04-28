@@ -211,7 +211,8 @@ class MLProductSerializer(serializers.ModelSerializer):
                   'weight', 'buy_url', 'sale_url', 'refer_url', 'note',
                   'create_time', 'is_checked', 'label_title', 'label_option',
                   'packing_id', 'buy_url2', 'buy_url3', 'buy_url4', 'buy_url5',
-                  'user_id', 'is_incomplete', 'platform', 'is_label_complete')
+                  'user_id', 'is_incomplete', 'platform', 'is_label_complete',
+                  'group_id')
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -302,7 +303,7 @@ class ShopStockSerializer(serializers.ModelSerializer):
                   'total_profit', 'total_weight', 'total_cbm', 'stock_value',
                   'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
                   'note', 'create_time', 'is_active', 'is_collect',
-                  'preparing_qty', 'p_onway_qty', 'p_rec_qty')
+                  'preparing_qty', 'p_onway_qty', 'p_rec_qty', 'group_id')
 
 
 class StockLogSerializer(serializers.ModelSerializer):

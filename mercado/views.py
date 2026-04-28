@@ -1376,12 +1376,15 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         from collections import defaultdict
         from django.db.models import Q
 
-        # ========== 1. 当前要展示的数据（带搜索、筛选） ==========
-        base_queryset = self.filter_queryset(self.get_queryset()).order_by(
-            'group_id', 'p_status')
+        # ========== 1. 获取排序参数 ==========
+        ordering = request.GET.get('ordering', 'group_id')
+        sort_fields = [f.strip() for f in ordering.split(',') if f.strip()]
+
+        # ========== 2. 当前要展示的数据（带搜索、筛选） ==========
+        base_queryset = self.filter_queryset(self.get_queryset())
         show_data = self.get_serializer(base_queryset, many=True).data
 
-        # ========== 2. 真实统计用的数据（去掉搜索，保留 p_status 筛选） ==========
+        # ========== 3. 真实统计用的数据（去掉搜索，保留 p_status 筛选） ==========
         real_queryset = self.get_queryset()
         p_status_param = request.GET.get('p_status')
         p_status_in_param = request.GET.get('p_status__in')
@@ -1392,7 +1395,7 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             real_queryset = real_queryset.filter(
                 p_status__in=p_status_in_param.split(','))
 
-        # ========== 3. 只按 group_id 分组（不管 p_status，真正同组合合并） ==========
+        # ========== 4. 只按 group_id 分组（不管 p_status，真正同组合合并） ==========
         groups = defaultdict(
             lambda: {
                 "group_id": None,
@@ -1426,17 +1429,13 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             if not group_id:
                 continue
 
-            # ========================= ✅ 核心修复 =========================
-            # 只按 group_id 分组，不按 p_status 拆分！
             g = groups[group_id]
             g["group_id"] = group_id
 
-            # 图片去重添加
             img = item.get("image")
             if img and img not in g["images_list"]:
                 g["images_list"].append(img)
 
-            # 数字字段安全累加
             g["total_qty"] += item.get("qty") or 0
             g["total_onway_qty"] += item.get("onway_qty") or 0
             g["total_trans_qty"] += item.get("trans_qty") or 0
@@ -1453,22 +1452,19 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             g["total_p_onway_qty"] += item.get("p_onway_qty") or 0
             g["total_p_rec_qty"] += item.get("p_rec_qty") or 0
 
-            # 库存价值累加
             unit_cost = float(item.get("unit_cost") or 0)
             first_ship_cost = float(item.get("first_ship_cost") or 0)
             qty = int(item.get("qty") or 0)
             g["total_stock_value"] += (unit_cost + first_ship_cost) * qty
 
-            # 子项加入
             g["children"].append(item)
 
-        # ========== 4. 计算平均值 & 同筛选条件下的真实数量 ==========
+        # ========== 5. 计算平均值 & 真实数量 ==========
         group_list = []
         for g in groups.values():
             sku_count = len(g["children"])
             g["total_skus"] = sku_count
 
-            # 平均值
             if sku_count > 0:
                 total_avg_profit_sum = sum(
                     [float(i.get("avg_profit") or 0) for i in g["children"]])
@@ -1484,15 +1480,25 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 g["total_avg_profit"] = 0
                 g["total_avg_profit_rate"] = 0
 
-            # 真实总数：同 group_id + 同前端筛选的 p_status 条件
             real_total = real_queryset.filter(
                 group_id=g["group_id"]).values("sku").distinct().count()
-
             g["is_group"] = (sku_count == real_total)
             g["other_skus"] = real_total - sku_count
             group_list.append(g)
 
-        # ========== 5. 组合分页（不拆组） ==========
+        # ========== ✅ 核心修复：对组合列表进行排序 ==========
+        for field in reversed(sort_fields):
+            if not field:
+                continue
+            reverse = field.startswith('-')
+            key = field.lstrip('-')
+
+            def sort_func(obj, k=key):
+                return obj.get(k, 0)
+
+            group_list.sort(key=sort_func, reverse=reverse)
+
+        # ========== 分页 ==========
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 20))
         total = len(group_list)
@@ -1825,23 +1831,8 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     def test(self, request):
         message = 'runing'
         # tasks.sd_auto_sync()
-        p_list = MLProduct.objects.all()
-        n = 0
-        m = 0
-        for i in p_list:
-            if not i.group_id:
-                i.group_id = i.item_id
-                i.save()
-                n += 1
-            ss = ShopStock.objects.filter(sku=i.sku).first()
-            if ss:
-                if not ss.group_id:
-                    ss.group_id = i.item_id
-                    ss.save()
-                    m += 1
 
-        return Response({'message': f'产品库更新了{n}条数据，店铺库存更新了{m}条数据'},
-                        status=status.HTTP_200_OK)
+        return Response({'message': message}, status=status.HTTP_200_OK)
 
 
 class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,

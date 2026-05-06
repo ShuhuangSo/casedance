@@ -404,7 +404,8 @@ def create_ship_log(pid, value, user):
     log.target_type = 'SHIP'
     log.target_id = pid
     log.desc = '修改运单 {name}'.format(name=value)
-    log.user = user
+    if user:
+        log.user = user
     log.save()
 
 
@@ -418,60 +419,61 @@ def ship_edit_signal(sender, instance, created, **kwargs):
             break
     else:
         request = None
+    user = request.user if request else None
 
     if not created:
         # 记录修改操作日志
         if instance.__original_s_number != instance.s_number:
             value = '物流商单号: %s ===>> %s' % (instance.__original_s_number,
                                             instance.s_number)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_batch != instance.batch:
             value = '批次号: %s ===>> %s' % (instance.__original_batch,
                                           instance.batch)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_shop != instance.shop:
             value = '目标店铺: %s ===>> %s' % (instance.__original_shop,
                                            instance.shop)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_target != instance.target:
             value = '类型: %s ===>> %s' % (instance.__original_target,
                                          instance.target)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_fbm_warehouse != instance.fbm_warehouse:
             value = 'fbm仓库: %s ===>> %s' % (instance.__original_fbm_warehouse,
                                             instance.fbm_warehouse)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_envio_number != instance.envio_number:
             value = 'Envio号: %s ===>> %s' % (instance.__original_envio_number,
                                              instance.envio_number)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_ship_type != instance.ship_type:
             value = '发货方式: %s ===>> %s' % (instance.__original_ship_type,
                                            instance.ship_type)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_carrier != instance.carrier:
             value = '承运商: %s ===>> %s' % (instance.__original_carrier,
                                           instance.carrier)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_end_date != str(instance.end_date):
             value = '截单日期: %s ===>> %s' % (instance.__original_end_date,
                                            instance.end_date)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_ship_date != str(instance.ship_date):
             value = '航班日期: %s ===>> %s' % (instance.__original_ship_date,
                                            instance.ship_date)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_book_date != str(instance.book_date):
             value = 'FBM预约日期: %s ===>> %s' % (instance.__original_book_date,
                                               instance.book_date)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_note != instance.note:
             value = '修改备注'
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
         if instance.__original_tag_name != instance.tag_name:
             value = '编辑标签: %s ===>> %s' % (instance.__original_tag_name,
                                            instance.tag_name)
-            create_ship_log(instance.id, value, request.user)
+            create_ship_log(instance.id, value, user)
 
 
 # 运单数据保存前的初始化，将原数据保存起来

@@ -3101,12 +3101,9 @@ def process_sku_label_file(file_path):
 
             need_save = False
 
-            # 为空才赋值
-            if not product.label_code:
+            # 只要其中一个为空，就赋值
+            if not product.label_code or not product.label_title:
                 product.label_code = item["label_code"]
-                need_save = True
-
-            if not product.label_title:
                 product.label_title = item["label_title"]
                 need_save = True
             # 颜色/型号 label_option

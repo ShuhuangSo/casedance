@@ -3064,8 +3064,8 @@ def process_sku_label_file(file_path):
                 label_option = option_match2.group(1).strip()
 
             # SKU
-            sku_match = re.search(r'SKU:\s*(MD\d+)\^FS', block)
-            sku = sku_match.group(1) if sku_match else ""
+            sku_match = re.search(r'SKU:\s*([^\^]+)\^FS', block)
+            sku = sku_match.group(1).strip() if sku_match else ""
 
             # 西语字符解码
             def fix_zpl_text(s):

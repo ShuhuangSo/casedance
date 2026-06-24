@@ -12,10 +12,13 @@ def jwt_response_payload_handler(token, user=None, request=None):
     log = MLOperateLog()
     log.op_module = 'SYSTEM'
     log.op_type = 'CREATE'
-    log.desc = '登录系统, 登录设备IP: {ip},软件版本: {app_ver}'.format(ip=ip, app_ver=app_ver if app_ver else '无')
+    log.desc = '登录系统, 登录设备IP: {ip},软件版本: {app_ver}'.format(
+        ip=ip, app_ver=app_ver if app_ver else '无')
     log.user = user
     log.save()
-    return {'code': 100,
-            'token': token,
-            'user': user.username,
-            }
+    return {
+        'code': 100,
+        'token': token,
+        'user': user.username,
+        'username': user.first_name,
+    }

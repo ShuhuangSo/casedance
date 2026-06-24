@@ -17,7 +17,7 @@ from io import BytesIO
 from barcode import Code128
 from barcode.writer import ImageWriter
 
-from casedance.settings import MEDIA_ROOT, BASE_DIR, BASE_URL, MEDIA_URL
+from casedance.settings import MEDIA_ROOT, BASE_DIR, BASE_URL, MEDIA_URL, SD_COOKIES
 from mercado.models import ApiSetting, Listing, Seller, ListingTrack, Categories, TransApiSetting, SellerTrack, Shop, \
     MLOrder, ShopStock, ShopReport, TransStock, Ship, ShipDetail, MLProduct, CarrierTrack, ExRate, StockLog, \
     FileUploadNotify, ShipAttachment, ShipBox, MLOperateLog, GeneralSettings, FBMWarehouse
@@ -500,13 +500,9 @@ def ship_tracking_old(num):
 # 跟踪运单物流运输
 @shared_task
 def ship_tracking(num):
-    # ================= 1. 读取配置文件获取 token/cookies =================
-    try:
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        sd_cookies = config.get('sd_cookies', '')
-    except:
+    # ================= 1. 读取配置获取 token/cookies =================
+    sd_cookies = SD_COOKIES
+    if not sd_cookies:
         return '读取配置失败'
 
     # ================= 2. 新接口地址 =================
@@ -604,13 +600,9 @@ def bulk_ship_tracking():
 # 同步物流收货的尺寸重量
 def update_sd_ship_size():
     # 1. 读取认证配置
-    try:
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        sd_cookies = config.get('sd_cookies', '')
-    except Exception as e:
-        return f"读取配置失败: {str(e)}"
+    sd_cookies = SD_COOKIES
+    if not sd_cookies:
+        return "读取配置失败：SD_COOKIES 未配置"
 
     # 2. 接口地址
     url = "http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/ordersize"
@@ -2503,10 +2495,7 @@ def sd_place_order(ship_id, data):
         box_num += 1
     payload['tb_GoodsInfo2'] = json.dumps(p_list, ensure_ascii=False)  # 产品列表
 
-    c_path = os.path.join(BASE_DIR, "site_config.json")
-    with open(c_path, "r", encoding="utf-8") as f:
-        data = json.load(f)  # 加载配置数据
-    header = {'Cookie': data['sd_cookies']}
+    header = {'Cookie': SD_COOKIES}
     url = 'http://client.sanstar.net.cn/console/customer_order/newadd?somrequest='
 
     resp = requests.post(url, files=files, data=payload, headers=header)
@@ -2682,11 +2671,8 @@ def sd_place_order_api(ship_id, data):
         box_num += 1
     payload['boxgauge_list'] = boxgauge_list  # 箱列表
 
-    c_path = os.path.join(BASE_DIR, "site_config.json")
-    with open(c_path, "r", encoding="utf-8") as f:
-        config = json.load(f)  # 加载配置数据
     header = {
-        'Authorization': config['sd_cookies'],
+        'Authorization': SD_COOKIES,
         'Content-Type': 'application/json'
     }
     url = 'http://api.more56.com/api/v1/edi/open_bigwaybill_order_client/create'
@@ -2755,7 +2741,7 @@ def sd_place_order_api(ship_id, data):
                 return True
 
             # 上传请求头（不要 Content-Type，requests 自动生成 form-data）
-            upload_headers = {'Authorization': config['sd_cookies']}
+            upload_headers = {'Authorization': SD_COOKIES}
 
             try:
                 res = requests.post(upload_url,
@@ -2806,12 +2792,8 @@ def sd_place_order_api(ship_id, data):
 @shared_task()
 def query_sd_order_status():
     # ===================== 1. 读取配置获取认证 =====================
-    try:
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        sd_cookies = config.get('sd_cookies', '')
-    except:
+    sd_cookies = SD_COOKIES
+    if not sd_cookies:
         return '读取配置失败'
 
     # ===================== 2. 新接口地址 =====================

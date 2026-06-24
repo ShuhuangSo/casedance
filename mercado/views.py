@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.db.models import Q
 
-from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR
+from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR, SD_COOKIES, DIFY_INVOICE_APIKEY, DIFY_HOST
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
@@ -3394,20 +3394,17 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                             status=status.HTTP_202_ACCEPTED)
 
         # 2. 读取配置
-        try:
-            c_path = os.path.join(BASE_DIR, "site_config.json")
-            with open(c_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-        except Exception as e:
+        sd_cookies = SD_COOKIES
+        if not sd_cookies:
             return Response({
                 'status': 'error',
-                'msg': f'读取配置失败：{str(e)}'
+                'msg': '读取配置失败：SD_COOKIES 未配置'
             },
                             status=status.HTTP_202_ACCEPTED)
 
         # 请求头
         headers = {
-            'Authorization': config.get('sd_cookies', ''),
+            'Authorization': sd_cookies,
             'Content-Type': 'application/json'
         }
 
@@ -3739,23 +3736,21 @@ class ShipViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             detail=False,
             url_path='sd_cookies_setting')
     def sd_cookies_setting(self, request):
-        from pathlib import Path
-        config_path = Path(__file__).parent.parent / "site_config.json"
-        # 读取现有配置
-        with open(config_path, 'r') as f:
-            config = json.load(f)
+        from django.conf import settings as django_settings
+        config_path = BASE_DIR / "sd_config.json"
         if request.method == 'GET':
             return Response({
-                'sd_cookies': config['sd_cookies'],
+                'sd_cookies': SD_COOKIES,
             },
                             status=status.HTTP_200_OK)
 
         elif request.method == 'POST':
             cookies = request.data['sd_cookies']
-            config['sd_cookies'] = cookies
             # 写回文件
             with open(config_path, 'w') as f:
-                json.dump(config, f, indent=4)
+                json.dump({'sd_cookies': cookies}, f, indent=4)
+            # 立即更新当前进程的 settings
+            django_settings.SD_COOKIES = cookies
             return Response({
                 'msg': '操作成功！',
                 'status': 'success'
@@ -4649,10 +4644,7 @@ class CarrierViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             'somrequest': '',
         }
         url = 'http://client.sanstar.net.cn/ashx/reservationdeliverysys/handler/idata_context.ashx?action=get_reserveinto'
-        c_path = os.path.join(BASE_DIR, "site_config.json")
-        with open(c_path, "r", encoding="utf-8") as f:
-            data = json.load(f)  # 加载配置数据
-        header = {'Cookie': data['sd_cookies']}
+        header = {'Cookie': SD_COOKIES}
         resp = requests.post(url, data=payload, headers=header)
         if 'success' in resp.json():
             if resp.json()['success']:
@@ -4675,12 +4667,8 @@ class CarrierViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         try:
             payload = {'fbx_code': 'FBL', 'country_code': 'MX'}
 
-            c_path = os.path.join(BASE_DIR, "site_config.json")
-            with open(c_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-
             headers = {
-                'Authorization': config.get('sd_cookies', ''),
+                'Authorization': SD_COOKIES,
                 'Content-Type': 'application/json'
             }
 
@@ -6779,20 +6767,13 @@ class PlatformCategoryRateViewSet(mixins.ListModelMixin,
 # ==========================
 class ScreenshotRecognizeViewSet(viewsets.ViewSet):
 
-    # 读取配置文件（只加载一次）
-    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                           'site_config.json'),
-              'r',
-              encoding='utf-8') as f:
-        config = json.load(f)
-
-    # 从配置文件读取敏感信息 ✅
-    DIFY_API_KEY = config.get("dify_invoice_apikey", "")
-    DIFY_HOST = config.get("dify_host", "")
+    # 从 settings 读取 Dify 配置
+    DIFY_API_KEY = DIFY_INVOICE_APIKEY
+    DIFY_HOST_SETTING = DIFY_HOST
 
     # 拼接接口地址
-    UPLOAD_URL = f"{DIFY_HOST}/v1/files/upload"
-    RUN_URL = f"{DIFY_HOST}/v1/workflows/run"
+    UPLOAD_URL = f"{DIFY_HOST_SETTING}/v1/files/upload" if DIFY_HOST_SETTING else ""
+    RUN_URL = f"{DIFY_HOST_SETTING}/v1/workflows/run" if DIFY_HOST_SETTING else ""
 
     def create(self, request):
         file = request.FILES.get('file')

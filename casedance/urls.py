@@ -37,6 +37,12 @@ from sale.views import CustomerDiscountViewSet, CustomerViewSet, CustomerTagView
     OrderTagViewSet
 from setting.views import TagViewSet, OperateLogViewSet, MenuViewSet, UserViewSet, AllMenuViewSet, UserMenuViewSet, \
     SysRefillViewSet, AllMLUserPermissionViewSet, MLUserPermissionViewSet, MLPermissionViewSet
+from productbase.views import (BaseProductGroupViewSet, ProductGroupViewSet,
+                                FetchTaskViewSet, SupplierViewSet,
+                                ProductSeriesViewSet, ProductLogViewSet,
+                                ShopConfigViewSet, ListingConfigViewSet,
+                                FetchConfigViewSet, PricingRuleViewSet,
+                                StatsViewSet)
 
 from rest_framework.routers import DefaultRouter
 
@@ -287,6 +293,27 @@ router.register('dev_listing_account',
                 basename='dev_listing_account')
 # 开发产品订单列表
 router.register('dev_order', DevOrderViewSet, basename='dev_order')
+# ---------------------------上架产品库app-------------------------------------------------
+# 上架产品库列表
+router.register('base_product_group',
+                BaseProductGroupViewSet,
+                basename='base_product_group')
+router.register('product_group',
+                ProductGroupViewSet,
+                basename='product_group')
+# 抓取任务列表
+router.register('fetch_tasks', FetchTaskViewSet, basename='fetch_tasks')
+router.register('base_suppliers', SupplierViewSet, basename='base_suppliers')
+router.register('product_series',
+                ProductSeriesViewSet,
+                basename='product_series')
+router.register('product_logs', ProductLogViewSet, basename='product_logs')
+# 用户自定义配置
+router.register('shop_configs', ShopConfigViewSet, basename='shop_configs')
+router.register('listing_configs', ListingConfigViewSet, basename='listing_configs')
+router.register('fetch_configs', FetchConfigViewSet, basename='fetch_configs')
+router.register('pricing_rules', PricingRuleViewSet, basename='pricing_rules')
+router.register('stats', StatsViewSet, basename='stats')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

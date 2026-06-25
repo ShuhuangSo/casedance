@@ -183,14 +183,24 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         ws.title = 'SKU导出'
         headers = [
             '*库存sku编号', '*库存sku中文名称', '商品重量', '统一成本价(RMB)', '仓库',
-            '供应商', '供应商商品网址'
+            '供应商', '供应商商品网址', '库存图片地址'
         ]
         ws.append(headers)
+        # 预加载封面图片，避免 N+1
+        core_ids_list = [c.id for c in cores]
+        cover_map = {}
+        if core_ids_list:
+            covers = ProductImage.objects.filter(
+                product_core_id__in=core_ids_list, is_cover=True
+            ).values('product_core_id', 'image_url')
+            for item in covers:
+                cover_map[item['product_core_id']] = item['image_url']
         for core in cores:
             ws.append([
                 core.sku, core.p_name, 70,
                 float(core.cost), '华强仓', core.base.supplier or '',
-                core.purchase_url or ''
+                core.purchase_url or '',
+                cover_map.get(core.id, '')
             ])
         for col in ['A', 'B', 'G']:
             ws.column_dimensions[col].width = 30

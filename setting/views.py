@@ -1152,20 +1152,21 @@ class UserViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     # 修改用户资料
     @action(methods=['put'], detail=False, url_path='edit_user')
     def edit_user(self, request):
-        u_id = request.data['id']
-        first_name = request.data['first_name']
-        password = request.data['password']
-        last_name = request.data['last_name']
-        email = request.data['email']
-        is_superuser = request.data['is_superuser']
-        is_active = request.data['is_active']
-
+        u_id = request.data.get('id')
+        if not u_id:
+            return Response({'msg': '缺少用户ID'}, status=status.HTTP_400_BAD_REQUEST)
         user = User.objects.get(id=u_id)
-        user.first_name = first_name
-        user.last_name = last_name
-        user.email = email
-        user.is_superuser = is_superuser
-        user.is_active = is_active
+        if 'first_name' in request.data:
+            user.first_name = request.data['first_name']
+        if 'last_name' in request.data:
+            user.last_name = request.data['last_name']
+        if 'email' in request.data:
+            user.email = request.data['email']
+        if 'is_superuser' in request.data:
+            user.is_superuser = request.data['is_superuser']
+        if 'is_active' in request.data:
+            user.is_active = request.data['is_active']
+        password = request.data.get('password')
         if password:
             user.set_password(password)
         user.save()

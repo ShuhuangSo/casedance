@@ -141,7 +141,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = False
+USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
@@ -180,7 +180,7 @@ JWT_AUTH = {
 # celery相关配置
 # 配置celery时区，默认时UTC。
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_ENABLE_UTC = False  # 与 USE_TZ=False 保持一致，避免 MySQL aware datetime 警告
+CELERY_ENABLE_UTC = True
 
 # 任务队列的链接地址 celery配置redis作为broker。redis有16个数据库，编号0~15，这里使用第1个。
 CELERY_BROKER_URL = f'redis://{os.environ.get("REDIS_HOST", "127.0.0.1")}:{os.environ.get("REDIS_PORT", "6379")}/1'

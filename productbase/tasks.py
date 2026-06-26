@@ -813,10 +813,11 @@ def fetch_and_save_ebay_product_with_task(task,
 
 
 
-@app.task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3, time_limit=1800, soft_time_limit=1500)
 def migrate_images_to_cdn(self, base_id):
     """
     Celery 异步任务：将 BaseProductGroup 下所有 eBay 图片迁移到聚合图床。
+    time_limit=30min，防止大量的图片上传时被默认 5min 超时杀死。
     - 按 image_url 去重，同一 URL 只上传一次
     - 逐张上传，间隔 0.5s 避免限速
     - 单张失败重试 3 次（指数退避）

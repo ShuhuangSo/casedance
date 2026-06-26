@@ -615,31 +615,7 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         ws.title = '上架信息'
         total_cols = 32 + len(all_custom_keys)  # A-AF(32) + dynamic, B列新增"可售库存"
 
-        # ====== row 1: primary category headers (once) ======
-        row1 = [None] * total_cols
-        row1[0] = '基础数据'      # A-E
-        row1[5] = '快速刊登'      # F
-        row1[6] = '站点类目'      # G-H
-        row1[8] = '多属性'        # I-J
-        row1[10] = '基本信息'     # K-Z
-        row1[26] = '付款方式'     # AA
-        row1[27] = '货运方式'     # AB
-        row1[28] = '不运送地区'   # AC
-        row1[29] = '买家要求'     # AD
-        row1[30] = '退货政策'     # AE
-        row1[31] = '物品所在地'   # AF
-        if all_custom_keys:
-            row1[32] = '产品属性'  # AG+
-        ws.append(row1)
-
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)    # A-E
-        ws.merge_cells(start_row=1, start_column=7, end_row=1, end_column=8)    # G-H
-        ws.merge_cells(start_row=1, start_column=9, end_row=1, end_column=10)   # I-J
-        ws.merge_cells(start_row=1, start_column=11, end_row=1, end_column=26)  # K-Z
-        if all_custom_keys:
-            ws.merge_cells(start_row=1, start_column=33, end_row=1, end_column=total_cols)
-
-        # ====== row 2: sub-category headers (once) ======
+        # ====== row 1: column headers ======
         row2 = [
             '库存SKU *', '可售库存', '标签', '刊登模板名称 *', '站点 *',
             '通用刊登模板',
@@ -653,9 +629,9 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             '付款方式模板名称 *',
             '货运方式模板名称 *',
             '不运送地区模板名称 *',
-            '买家要求',
-            '退货政策',
-            '物品所在地',
+            '买家要求模板名称 *',
+            '退货政策模板名称 *',
+            '物品所在地模板名称 *',
         ]
         for ck in all_custom_keys:
             row2.append(f'{{{ck}}}')

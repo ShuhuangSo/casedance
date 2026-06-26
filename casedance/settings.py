@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'rest_framework',
-    'django_celery_beat',
     'product',  # 产品管理
     'setting',  # 系统设置
     'store',  # 仓库/商店模块

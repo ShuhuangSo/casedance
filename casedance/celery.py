@@ -6,12 +6,6 @@ from celery.schedules import crontab
 from datetime import timedelta
 from django.conf import settings
 
-# django_celery_beat 内部使用 aware datetime，与 USE_TZ=False 冲突，
-# MySQL 后端会发出 WARNING 但不影响功能。此处静默该警告。
-warnings.filterwarnings(
-    'ignore',
-    message='MySQL backend does not support timezone-aware datetimes')
-
 # 指定Django默认配置文件模块
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'casedance.settings')
 

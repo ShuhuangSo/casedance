@@ -825,7 +825,7 @@ def migrate_images_to_cdn(self, base_id):
     """
     from productbase.models import ProductImage, ProductGroup, ProductCore
     # Celery fork 子进程继承的数据库连接可能已失效，先关闭重建
-    connection.close()
+    close_old_connections()
 
     # 1. 查所有图片
     group_ids = ProductGroup.objects.filter(base_id=base_id).values_list(

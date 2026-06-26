@@ -290,3 +290,19 @@ v1.7.0
 v1.7.1
 精简productbase列表字段
 修复导出店铺上架信息excel模板标题问题
+
+v1.7.2
+增加.env环境配置文件，敏感信息统一管理
+增加部署脚本deploy.sh
+移除django_celery_beat，改用文件持久化调度器，解决USE_TZ兼容问题
+优化productbase列表接口性能，分离列表与详情序列化器
+修复图片迁移Celery异步更新不持久化问题
+修复SKU增删改后店铺同步状态未重置问题
+productbase列表creator改为用户姓名显示
+导出SKU表格增加库存图片地址列
+设置模块增加配置项用户筛选字段
+抓取统计仪表盘管理员只显示STAFF激活用户
+修复图片迁移任务超时被杀死的问题
+sd_cookies/dify配置从site_config.json迁移到.env
+.gitignore完善，移除media/等不必要的追踪
+修复celery beat USE_TZ报错问题

@@ -311,6 +311,7 @@ def _copy_images_by_primary_variant(base, new_core, variant_keys, var_values):
 class BaseProductGroupListSerializer(serializers.ModelSerializer):
     """列表专用轻量序列化器，不嵌套 product_groups / core_skus"""
     images = serializers.SerializerMethodField()
+    creator = serializers.SerializerMethodField()
     first_product_group_title = serializers.SerializerMethodField()
     image_migration_status = serializers.SerializerMethodField()
     image_migration_summary = serializers.SerializerMethodField()
@@ -327,6 +328,20 @@ class BaseProductGroupListSerializer(serializers.ModelSerializer):
             if cover:
                 return cover.image_url
         return ''
+
+    def get_creator(self, obj):
+        # 用缓存避免同一页面重复查同一个用户
+        cache = getattr(self, '_creator_cache', None)
+        if cache is None:
+            cache = {}
+            self._creator_cache = cache
+        uname = obj.creator
+        if uname not in cache:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.filter(username=uname).first()
+            cache[uname] = user.first_name if user else uname
+        return cache[uname]
 
     def get_first_product_group_title(self, obj):
         first = obj.product_groups.first()
@@ -564,6 +579,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
 
         # 2. 处理核心 SKU 增删改
         if core_skus_data is not None:
+            shop_sync_reset = False  # 标记是否需重置店铺同步状态
             product_groups = list(instance.product_groups.all())
             main_group = self._get_main_group(instance)
             variant_keys = main_group.get_variant_names() if main_group else []
@@ -597,6 +613,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                         shop = ProductShop.objects.select_related(
                             'core_sku').get(id=sku_id, group__base=instance)
                         shop.core_sku.delete()
+                        shop_sync_reset = True
                     except ProductShop.DoesNotExist:
                         continue
                     continue
@@ -652,6 +669,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                     if shop_fields:
                         ProductShop.objects.filter(
                             core_sku=core).update(**shop_fields)
+                        shop_sync_reset = True
                 else:
                     # --- 新增 ---
                     var_values = [
@@ -699,6 +717,8 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                             var3=shop_fields.get('var3', ''),
                             var4=shop_fields.get('var4', ''))
 
+                    shop_sync_reset = True
+
                     # 新增 SKU 图片：前端传入优先，否则按主属性自动复制
                     if images_data:
                         for img_data in images_data:
@@ -731,6 +751,11 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                     dim_parts.append(f'删除{",".join(sorted(removed))}')
                 if dim_parts:
                     log_parts.append(f'{dim}: {"; ".join(dim_parts)}')
+
+            # SKU 增删改会影响到店铺上架信息，统一重置所有店铺同步状态
+            if shop_sync_reset:
+                ProductGroup.objects.filter(base=instance).update(
+                    shop_synced_at=None)
 
             if log_parts:
                 log_product_action(instance, 'VARIANT',

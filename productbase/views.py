@@ -7,7 +7,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import CharFilter, FilterSet
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import Count, F, Q
 from django.utils import timezone
 from django.http import HttpResponse
 import openpyxl
@@ -15,11 +15,12 @@ from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
                      ProductImage, FetchTask, Supplier, ProductSeries,
                      ProductLog, log_product_action,
                      ShopConfig, ListingConfig, FetchConfig, PricingRule)
-from .serializers import (BaseProductGroupSerializer, ProductGroupSerializer,
-                           FetchTaskSerializer, SupplierSerializer,
-                           ProductSeriesSerializer, ProductLogSerializer,
-                           ShopConfigSerializer, ListingConfigSerializer,
-                           FetchConfigSerializer, PricingRuleSerializer)
+from .serializers import (BaseProductGroupSerializer, BaseProductGroupListSerializer,
+                           ProductGroupSerializer, FetchTaskSerializer,
+                           SupplierSerializer, ProductSeriesSerializer,
+                           ProductLogSerializer, ShopConfigSerializer,
+                           ListingConfigSerializer, FetchConfigSerializer,
+                           PricingRuleSerializer)
 from .permissions import IsOwnerOrAdmin
 from productbase import tasks
 
@@ -59,10 +60,23 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                      'product_groups__title', 'core_skus__sku')
     ordering_fields = ('create_time', )
 
-    # ======================== 【修改 1】预加载改为新结构 ========================
-    queryset = BaseProductGroup.objects.prefetch_related(
-        "product_groups__shop_skus", "product_groups__images", "images",
-        "core_skus__images").order_by("-create_time")
+    queryset = BaseProductGroup.objects.all().order_by("-create_time")
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return BaseProductGroupListSerializer
+        return BaseProductGroupSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == 'list':
+            qs = qs.annotate(
+                sku_count=Count('core_skus'),
+                group_count=Count('product_groups', distinct=True),
+                _synced_sku_count=Count('core_skus', filter=Q(core_skus__sku_synced_at__isnull=False)),
+                _synced_shop_count=Count('product_groups', filter=Q(product_groups__shop_synced_at__isnull=False), distinct=True),
+            ).prefetch_related('product_groups__images')
+        return qs
 
     @action(methods=['post'],
             detail=False,
@@ -1010,9 +1024,9 @@ class StatsViewSet(viewsets.ViewSet):
         except (ValueError, TypeError):
             return Response({'error': '日期格式需为 YYYY-MM-DD'}, status=400)
 
-        # 确定查询用户范围
+        # 确定查询用户范围（管理员只看 STAFF 且激活的用户）
         if request.user.is_superuser:
-            users = User.objects.all()
+            users = User.objects.filter(last_name='STAFF', is_active=True)
         else:
             users = User.objects.filter(username=request.user.username)
 

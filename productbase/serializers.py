@@ -308,6 +308,90 @@ def _copy_images_by_primary_variant(base, new_core, variant_keys, var_values):
         return  # 只复制第一个有图片的 core
 
 
+class BaseProductGroupListSerializer(serializers.ModelSerializer):
+    """列表专用轻量序列化器，不嵌套 product_groups / core_skus"""
+    images = serializers.SerializerMethodField()
+    first_product_group_title = serializers.SerializerMethodField()
+    image_migration_status = serializers.SerializerMethodField()
+    image_migration_summary = serializers.SerializerMethodField()
+    # 以下计数字段由 queryset annotate() 预计算，直接声明即可
+    sku_count = serializers.IntegerField(read_only=True, default=0)
+    group_count = serializers.IntegerField(read_only=True, default=0)
+    synced_sku_count = serializers.SerializerMethodField()
+    synced_shop_count = serializers.SerializerMethodField()
+
+    def get_images(self, obj):
+        main = self._get_main_group(obj)
+        if main:
+            cover = main.images.filter(is_cover=True).first()
+            if cover:
+                return cover.image_url
+        return ''
+
+    def get_first_product_group_title(self, obj):
+        first = obj.product_groups.first()
+        return first.title if first else ''
+
+    def get_synced_sku_count(self, obj):
+        total = getattr(obj, 'sku_count', 0)
+        synced = getattr(obj, '_synced_sku_count', 0)
+        return f'{synced}/{total}'
+
+    def get_synced_shop_count(self, obj):
+        total = getattr(obj, 'group_count', 0)
+        synced = getattr(obj, '_synced_shop_count', 0)
+        return f'{synced}/{total}'
+
+    def get_image_migration_status(self, obj):
+        if obj.image_migrated:
+            return 'done'
+        total, ebay = self._get_image_urls(obj)
+        if ebay == 0:
+            return 'done'
+        tried = ProductLog.objects.filter(
+            base_group=obj, action='IMAGE_MIGRATE').exists()
+        if tried:
+            return 'failed' if total == ebay else 'partial'
+        return 'pending'
+
+    def get_image_migration_summary(self, obj):
+        total, ebay = self._get_image_urls(obj)
+        if total == 0:
+            return '0/0'
+        return f'{total - ebay}/{total}'
+
+    def _get_image_urls(self, obj):
+        from productbase.image_hosting import EBAY_IMAGE_DOMAINS
+        group_ids = list(ProductGroup.objects.filter(base_id=obj.id).values_list('id', flat=True))
+        core_ids = list(ProductCore.objects.filter(base_id=obj.id).values_list('id', flat=True))
+        all_urls = ProductImage.objects.filter(
+            Q(base_group_id=obj.id) | Q(group_id__in=group_ids)
+            | Q(product_core_id__in=core_ids)
+        ).values_list('image_url', flat=True)
+        urls = list(all_urls)
+        total_unique = len(set(urls))
+        ebay_unique = len({u for u in urls if any(d in u for d in EBAY_IMAGE_DOMAINS)})
+        return total_unique, ebay_unique
+
+    def _get_main_group(self, obj):
+        main = obj.product_groups.filter(is_main=True).first()
+        if not main:
+            main = obj.product_groups.first()
+        return main
+
+    class Meta:
+        model = BaseProductGroup
+        fields = [
+            'id', 'p_status', 'category', 'supplier', 'series', 'tag',
+            'creator', 'create_time', 'images', 'from_site_id',
+            'first_product_group_title',
+            'sku_count', 'group_count',
+            'synced_sku_count', 'synced_shop_count',
+            'image_migration_status', 'image_migration_summary',
+            'image_migrated', 'variant_mapped',
+        ]
+
+
 class BaseProductGroupSerializer(serializers.ModelSerializer):
     product_groups = ProductGroupSerializer(many=True, read_only=True)
     core_skus = ProductCoreWriteSerializer(many=True,

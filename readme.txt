@@ -306,3 +306,10 @@ productbase列表creator改为用户姓名显示
 sd_cookies/dify配置从site_config.json迁移到.env
 .gitignore完善，移除media/等不必要的追踪
 修复celery beat USE_TZ报错问题
+
+v1.7.3
+增加Dify AI eBay标题/描述优化接口
+新增DifyUsageLog模型记录token消耗
+统计仪表盘增加Dify消耗统计(token/费用)
+新增部署脚本deploy.sh
+productbase操作日志operator改为用户姓名

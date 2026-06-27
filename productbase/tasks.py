@@ -420,9 +420,6 @@ def save_product_to_db(data,
         from_platform=platform,
         primary_variant=primary_variant)
 
-    log_product_action(base, 'CREATE',
-                       f'从 {platform} 抓取商品 {item_id}', operator=creator)
-
     desc = data.get("group_description") or data.get("single_description", "")
 
     # 处理自定义属性
@@ -629,6 +626,12 @@ def save_product_to_db(data,
             if child_log:
                 pricing_logs.add(
                     f'{child_pg.shop_account}: "{child_pricing_rule.name}"')
+
+    # 记录创建日志（含所有店铺账号）
+    shop_accounts = [pg.shop_account for pg in base.product_groups.all()]
+    log_product_action(base, 'CREATE',
+                       f'从 {platform} 抓取商品 {item_id}，创建店铺: {", ".join(shop_accounts)}',
+                       operator=creator)
 
     # 记录定价日志
     if pricing_logs:

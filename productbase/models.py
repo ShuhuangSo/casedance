@@ -102,6 +102,10 @@ class ProductGroup(models.Model):
     shop_synced_at = models.DateTimeField(null=True,
                                           blank=True,
                                           verbose_name="上次同步时间")
+    title_optimized = models.BooleanField(default=False,
+                                           verbose_name="标题已优化")
+    desc_optimized = models.BooleanField(default=False,
+                                          verbose_name="描述已优化")
 
     class Meta:
         verbose_name = "店铺产品组"
@@ -350,6 +354,8 @@ class ProductLog(models.Model):
         ('DELETE_SKU', '删除SKU'),
         ('STATUS_CHANGE', '状态变更'),
         ('IMAGE_MIGRATE', '图片迁移完成'),
+        ('OPTIMIZE_TITLE', '优化标题'),
+        ('OPTIMIZE_DESC', '优化描述'),
     )
 
     base_group = models.ForeignKey(BaseProductGroup,
@@ -543,3 +549,38 @@ class FetchConfig(models.Model):
 
     def __str__(self):
         return f"{self.name} {'✓' if self.is_active else ''}"
+
+
+class DifyUsageLog(models.Model):
+    """Dify AI 调用消耗记录"""
+    user = models.ForeignKey(User,
+                              on_delete=models.CASCADE,
+                              related_name="dify_usage_logs",
+                              verbose_name="调用用户")
+    product_group = models.ForeignKey(ProductGroup,
+                                       on_delete=models.SET_NULL,
+                                       null=True,
+                                       blank=True,
+                                       related_name="dify_usage_logs",
+                                       verbose_name="关联店铺")
+    optimize_type = models.CharField(max_length=20, verbose_name="优化类型")
+    prompt_tokens = models.IntegerField(default=0, verbose_name="提示词 Token")
+    completion_tokens = models.IntegerField(default=0, verbose_name="生成 Token")
+    total_tokens = models.IntegerField(default=0, verbose_name="总 Token")
+    total_price = models.DecimalField(max_digits=10,
+                                       decimal_places=6,
+                                       default=0,
+                                       verbose_name="费用(RMB)")
+    currency = models.CharField(max_length=10,
+                                 default="RMB",
+                                 verbose_name="币种")
+    latency = models.FloatField(default=0, verbose_name="延迟(秒)")
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+
+    class Meta:
+        verbose_name = "Dify 调用记录"
+        verbose_name_plural = "Dify 调用记录"
+        ordering = ["-create_time"]
+
+    def __str__(self):
+        return f"[{self.optimize_type}] {self.total_tokens} tokens ¥{self.total_price}"

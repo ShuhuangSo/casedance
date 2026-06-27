@@ -187,6 +187,7 @@ class ProductGroupSerializer(serializers.ModelSerializer):
             "images", "variants",
             "listing_config_id", "listing_config_detail",
             "is_synced",
+            "title_optimized", "desc_optimized",
         ]
         read_only_fields = ["shop_account", "platform", "site"]
 
@@ -830,6 +831,20 @@ class ProductLogSerializer(serializers.ModelSerializer):
     action_display = serializers.CharField(source='get_action_display',
                                            read_only=True)
     base_product_cover = serializers.SerializerMethodField()
+    operator = serializers.SerializerMethodField()
+
+    def get_operator(self, obj):
+        cache = getattr(self, '_operator_cache', None)
+        if cache is None:
+            cache = {}
+            self._operator_cache = cache
+        uname = obj.operator
+        if uname not in cache:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.filter(username=uname).first()
+            cache[uname] = user.first_name if user else uname
+        return cache[uname]
 
     def get_base_product_cover(self, obj):
         """主店铺封面图 URL"""

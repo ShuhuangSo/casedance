@@ -237,4 +237,5 @@ if not SD_COOKIES:
 # Dify AI 配置（仅从环境变量读取）
 # ======================
 DIFY_INVOICE_APIKEY = os.environ.get('DIFY_INVOICE_APIKEY', '')
+DIFY_EBAY_APIKEY = os.environ.get('DIFY_EBAY_APIKEY', '')
 DIFY_HOST = os.environ.get('DIFY_HOST', '')

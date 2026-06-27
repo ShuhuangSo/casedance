@@ -7,14 +7,15 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import CharFilter, FilterSet
 from django.db import transaction
-from django.db.models import Count, F, Q
+from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 from django.http import HttpResponse
 import openpyxl
 from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
                      ProductImage, FetchTask, Supplier, ProductSeries,
                      ProductLog, log_product_action,
-                     ShopConfig, ListingConfig, FetchConfig, PricingRule)
+                     ShopConfig, ListingConfig, FetchConfig, PricingRule,
+                     DifyUsageLog)
 from .serializers import (BaseProductGroupSerializer, BaseProductGroupListSerializer,
                            ProductGroupSerializer, FetchTaskSerializer,
                            SupplierSerializer, ProductSeriesSerializer,
@@ -745,6 +746,64 @@ class ProductGroupViewSet(mixins.RetrieveModelMixin,
         from productbase.tasks import regenerate_p_names
         regenerate_p_names(instance.base)
 
+    @action(methods=['post'],
+            detail=False,
+            url_path='optimize')
+    def optimize(self, request):
+        """调用 Dify AI 优化店铺标题或描述"""
+        pg_id = request.data.get('id')
+        optimize_type = request.data.get('type')
+
+        if not pg_id or optimize_type not in ('EBAY_TITLE', 'EBAY_DESC'):
+            return Response(
+                {'error': '请提供 id 和 type（EBAY_TITLE / EBAY_DESC）'},
+                status=400)
+
+        from productbase.dify import optimize_product_text, record_dify_usage
+        from productbase.models import ProductGroup
+
+        try:
+            pg = ProductGroup.objects.select_related('base').get(id=pg_id)
+        except ProductGroup.DoesNotExist:
+            return Response({'error': f'店铺不存在: id={pg_id}'}, status=404)
+
+        result, usage, error = optimize_product_text(pg_id, optimize_type,
+                                                     user=request.user)
+        if error:
+            return Response({'error': error}, status=500)
+
+        # 记录消耗
+        record_dify_usage(request.user, pg, optimize_type, usage)
+
+        # 标记优化状态
+        if optimize_type == 'EBAY_TITLE':
+            pg.title_optimized = True
+            pg.save(update_fields=['title_optimized'])
+            log_action = 'OPTIMIZE_TITLE'
+            log_detail = (f'优化店铺 {pg.shop_account} 标题：'
+                          f'{usage.get("total_tokens", 0)} tokens, '
+                          f'¥{usage.get("total_price", "0")}')
+        else:
+            pg.desc_optimized = True
+            pg.save(update_fields=['desc_optimized'])
+            log_action = 'OPTIMIZE_DESC'
+            log_detail = (f'优化店铺 {pg.shop_account} 描述：'
+                          f'{usage.get("total_tokens", 0)} tokens, '
+                          f'¥{usage.get("total_price", "0")}')
+
+        log_product_action(pg.base, log_action, log_detail,
+                           operator=request.user.username)
+
+        return Response({
+            'id': result['id'],
+            optimize_type.lower().replace('ebay_', ''): result.get(
+                'title', result.get('desc', '')),
+            'usage': {
+                'total_tokens': usage.get('total_tokens', 0),
+                'total_price': str(usage.get('total_price', '0')),
+            },
+        })
+
 
 class SupplierViewSet(viewsets.ModelViewSet):
     """供应商 CRUD"""
@@ -1040,6 +1099,16 @@ class StatsViewSet(viewsets.ViewSet):
             shops_exported = shop_qs.count()
             skus_exported = sku_qs.count()
 
+            # Dify AI 消耗统计
+            dify_qs = DifyUsageLog.objects.filter(user=user)
+            if start_dt:
+                dify_qs = dify_qs.filter(create_time__gte=start_dt)
+            if end_dt:
+                dify_qs = dify_qs.filter(create_time__lte=end_dt)
+            dify_agg = dify_qs.aggregate(
+                total_tokens=Sum('total_tokens'),
+                total_cost=Sum('total_price'))
+
             result.append({
                 'username': uname,
                 'display_name': user.first_name or uname,
@@ -1049,6 +1118,8 @@ class StatsViewSet(viewsets.ViewSet):
                     'skus_created': skus,
                     'shops_exported': shops_exported,
                     'skus_exported': skus_exported,
+                    'dify_tokens': dify_agg['total_tokens'] or 0,
+                    'dify_cost': str(dify_agg['total_cost'] or 0),
                 }
             })
 

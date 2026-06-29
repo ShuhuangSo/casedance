@@ -56,6 +56,10 @@ app.conf.beat_schedule = {
         'task': 'mercado.tasks.sd_auto_sync',  # 每30分钟处理物流问题
         'schedule': timedelta(minutes=30),  # 每30分钟一次
     },
+    'recover-stuck-tasks': {
+        'task': 'productbase.tasks.recover_stuck_fetch_tasks',  # 恢复卡住的抓取任务
+        'schedule': timedelta(minutes=1),  # 每1分钟一次
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

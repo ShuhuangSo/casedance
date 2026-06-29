@@ -1025,3 +1025,44 @@ def check_and_update_base_status(base_ids):
 
         except Exception:
             continue
+
+
+# ======================
+# 定时任务：恢复丢失的 PENDING / PROCESSING 抓取任务
+# ======================
+@app.task
+def recover_stuck_fetch_tasks():
+    """
+    每分钟执行一次，恢复卡住的任务：
+    - PROCESSING 超过 30 分钟 → 重置为 PENDING 并重新投递
+    - PENDING 超过 5 分钟 → 重新投递到 Celery（应对 worker 重启丢失队列）
+    """
+    from productbase.models import FetchTask
+    from django.utils import timezone as dj_timezone
+
+    now = dj_timezone.now()
+
+    # 1. PROCESSING 超过 30 分钟
+    stuck_cutoff = now - datetime.timedelta(minutes=30)
+    stuck = FetchTask.objects.filter(
+        status='PROCESSING', update_time__lt=stuck_cutoff)
+    recovered = 0
+    for t in stuck:
+        t.status = 'PENDING'
+        t.log = '任务超时，自动重置为等待抓取'
+        t.save()
+        recovered += 1
+
+    # 2. PENDING 超过 5 分钟没有投递的，重新投递
+    pending_cutoff = now - datetime.timedelta(minutes=5)
+    pending = FetchTask.objects.filter(
+        status='PENDING', create_time__lt=pending_cutoff)
+    requeued = 0
+    for t in pending:
+        fetch_ebay_product_async.delay(task_id=t.id)
+        requeued += 1
+
+    if recovered or requeued:
+        print(f'[RECOVER] Reset {recovered} PROCESSING → PENDING, '
+              f're-queued {requeued} PENDING tasks')
+    return {'recovered': recovered, 'requeued': requeued}

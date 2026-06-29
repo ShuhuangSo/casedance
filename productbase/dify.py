@@ -38,15 +38,12 @@ def build_dify_payload(pg, optimize_type):
     user_value = {
         "id": pg.id,
         "category": category,
+        "title": title,
+        "variant_list": variant_list,
     }
 
-    if optimize_type == 'EBAY_TITLE':
-        user_value["title"] = title
-    elif optimize_type == 'EBAY_DESC':
-        user_value["title"] = title
-        user_value["variant_list"] = variant_list
-        desc = pg.desc or ""
-        user_value["desc"] = desc
+    if optimize_type == 'EBAY_DESC':
+        user_value["desc"] = pg.desc or ""
 
     return {
         "inputs": {

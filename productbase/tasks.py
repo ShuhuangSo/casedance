@@ -1,6 +1,7 @@
 import requests
 import re
 import time
+import datetime
 from django.db import connection, transaction, close_old_connections
 from django.db.models import Max, Q
 from django.conf import settings
@@ -737,6 +738,15 @@ def fetch_ebay_product_async(self,
     后台异步完成抓取并更新 FetchTask 状态。
     """
     from productbase.models import FetchTask
+    from django.utils import timezone as dj_timezone
+
+    # 恢复卡住的 PROCESSING 任务：超过 30 分钟仍在处理中的重置为 PENDING
+    stuck_deadline = dj_timezone.now() - datetime.timedelta(minutes=30)
+    recovered = FetchTask.objects.filter(
+        status='PROCESSING', update_time__lt=stuck_deadline
+    ).update(status='PENDING', log='任务超时，自动重置为等待抓取')
+    if recovered:
+        print(f'[FETCH] Recovered {recovered} stuck PROCESSING tasks → PENDING')
 
     try:
         task = FetchTask.objects.get(id=task_id)

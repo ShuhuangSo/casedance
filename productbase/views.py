@@ -394,6 +394,20 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         # 创建 FetchTask(PENDING) 并分发 Celery 异步任务
         result = []
         for item_id in item_ids:
+            # 检查同一 item_id 是否已有未完成的任务
+            existing = FetchTask.objects.filter(
+                item_id=item_id,
+                status__in=['PENDING', 'PROCESSING']
+            ).first()
+            if existing:
+                result.append({
+                    'task_id': existing.id,
+                    'item_id': item_id,
+                    'status': existing.status,
+                    'msg': '已存在进行中的任务，跳过重复提交'
+                })
+                continue
+
             task = FetchTask.objects.create(
                 item_id=item_id,
                 marketplace_id=marketplace_id,

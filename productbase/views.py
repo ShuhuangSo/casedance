@@ -38,7 +38,7 @@ class FetchTaskViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = DefaultPagination
     filter_backends = (DjangoFilterBackend, filters.SearchFilter,
                        filters.OrderingFilter)
-    filter_fields = ('platform', 'creator')
+    filter_fields = ('platform', 'creator', 'status')
     search_fields = ('item_id', )
 
     def get_queryset(self):

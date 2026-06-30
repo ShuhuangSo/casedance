@@ -42,7 +42,8 @@ from productbase.views import (BaseProductGroupViewSet, ProductGroupViewSet,
                                 ProductSeriesViewSet, ProductLogViewSet,
                                 ShopConfigViewSet, ListingConfigViewSet,
                                 FetchConfigViewSet, PricingRuleViewSet,
-                                StatsViewSet)
+                                StatsViewSet, VariantMappingAttributeViewSet,
+                                WarehouseConfigViewSet)
 
 from rest_framework.routers import DefaultRouter
 
@@ -313,6 +314,12 @@ router.register('shop_configs', ShopConfigViewSet, basename='shop_configs')
 router.register('listing_configs', ListingConfigViewSet, basename='listing_configs')
 router.register('fetch_configs', FetchConfigViewSet, basename='fetch_configs')
 router.register('pricing_rules', PricingRuleViewSet, basename='pricing_rules')
+router.register('variant_mapping',
+                VariantMappingAttributeViewSet,
+                basename='variant_mapping')
+router.register('warehouse_configs',
+                WarehouseConfigViewSet,
+                basename='warehouse_configs')
 router.register('stats', StatsViewSet, basename='stats')
 
 urlpatterns = [

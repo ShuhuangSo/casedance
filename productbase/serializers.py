@@ -4,7 +4,9 @@ from rest_framework import serializers
 from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
                      ProductImage, FetchTask, Supplier, ProductSeries,
                      ProductLog, log_product_action,
-                     ShopConfig, ListingConfig, FetchConfig, PricingRule)
+                     ShopConfig, ListingConfig, FetchConfig, PricingRule,
+                     VariantMappingAttribute, VariantMappingValue,
+                     WarehouseConfig)
 
 
 # 产品图片序列化
@@ -41,6 +43,7 @@ class ProductShopSerializer(serializers.ModelSerializer):
     UPC = serializers.CharField(source="core_sku.UPC", read_only=True)
     purchase_url = serializers.CharField(source="core_sku.purchase_url",
                                          read_only=True)
+    warehouse = serializers.CharField(source="core_sku.warehouse", read_only=True)
     is_synced = serializers.SerializerMethodField()
 
     def get_is_synced(self, obj):
@@ -62,6 +65,7 @@ class ProductShopSerializer(serializers.ModelSerializer):
             "cost",
             "UPC",
             "purchase_url",  # 来自核心SKU
+            "warehouse",
             "price",
             "currency",
             "var1",
@@ -247,6 +251,7 @@ class ProductCoreWriteSerializer(serializers.Serializer):
                                     decimal_places=2,
                                     required=False)
     purchase_url = serializers.CharField(required=False, allow_blank=True)
+    warehouse = serializers.CharField(required=False, allow_blank=True)
 
     # ProductShop 同步字段（修改后同步到所有店铺）
     var1 = serializers.CharField(required=False, allow_blank=True)
@@ -622,7 +627,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                 images_data = sku_data.pop('images', None)
 
                 # 分离 core 字段和 shop 同步字段
-                core_field_names = ['sku', 'p_name', 'UPC', 'cost', 'purchase_url']
+                core_field_names = ['sku', 'p_name', 'UPC', 'cost', 'purchase_url', 'warehouse']
                 shop_field_names = [
                     'var1', 'var2', 'var3', 'var4', 'price', 'currency'
                 ]
@@ -694,7 +699,8 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                         p_name=p_name,
                         UPC=core_fields.get('UPC', ''),
                         cost=core_fields.get('cost', 0),
-                        purchase_url=core_fields.get('purchase_url', ''))
+                        purchase_url=core_fields.get('purchase_url', ''),
+                        warehouse=core_fields.get('warehouse', ''))
                     # 如果 SKU 是自动生成的临时值，用自增 ID 回写
                     if not core_fields.get('sku') or core_fields.get(
                             'sku') == '待分配':
@@ -955,3 +961,125 @@ class FetchConfigSerializer(serializers.ModelSerializer):
             "creator", "create_time"
         ]
         read_only_fields = ["user", "creator", "create_time"]
+
+
+# ------------------------------------------------------------------------------
+# 变体映射 序列化器
+# ------------------------------------------------------------------------------
+class VariantMappingValueSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = VariantMappingValue
+        fields = ["id", "match_pattern", "replace_value", "priority"]
+
+    def validate_match_pattern(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("匹配模式不能为空")
+        return value.strip()
+
+    def validate_replace_value(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("替换值不能为空")
+        return value.strip()
+
+
+class VariantMappingAttributeSerializer(serializers.ModelSerializer):
+    values = VariantMappingValueSerializer(many=True, required=False)
+
+    class Meta:
+        model = VariantMappingAttribute
+        fields = ["id", "attribute_name", "values", "create_time"]
+        read_only_fields = ["create_time"]
+
+    def validate_attribute_name(self, value):
+        # 拆分、小写、去空白、去重
+        names = []
+        seen = set()
+        for n in value.split(","):
+            n = n.strip().lower()
+            if n and n not in seen:
+                names.append(n)
+                seen.add(n)
+        if not names:
+            raise serializers.ValidationError("变体属性名不能为空")
+        normalized = ",".join(names)
+
+        # 唯一性：每个独立名称不可出现在其他 attribute 中
+        for name in names:
+            qs = VariantMappingAttribute.objects.all()
+            if self.instance:
+                qs = qs.exclude(id=self.instance.id)
+            # 检查该 name 是否已存在于其他 attribute 的 attribute_name 中
+            for existing in qs:
+                existing_names = [
+                    n.strip().lower()
+                    for n in existing.attribute_name.split(",")
+                    if n.strip()
+                ]
+                if name in existing_names:
+                    raise serializers.ValidationError(
+                        f'变体属性名 "{name}" 已存在于 "{existing.attribute_name}" 中')
+        return normalized
+
+    def validate_values(self, value):
+        """同一属性下 match_pattern 不可重复"""
+        if not value:
+            return value
+        patterns = [
+            v.get("match_pattern", "").strip().lower()
+            for v in value
+            if v.get("match_pattern")
+        ]
+        if len(patterns) != len(set(patterns)):
+            raise serializers.ValidationError("同一属性下匹配模式不能重复")
+        return value
+
+    def create(self, validated_data):
+        values_data = validated_data.pop("values", [])
+        attr = VariantMappingAttribute.objects.create(**validated_data)
+        for val_data in values_data:
+            VariantMappingValue.objects.create(attribute=attr, **val_data)
+        return attr
+
+    def update(self, instance, validated_data):
+        values_data = validated_data.pop("values", None)
+        instance = super().update(instance, validated_data)
+        if values_data is not None:
+            # 全量替换：删除旧值，重建新的
+            instance.values.all().delete()
+            for val_data in values_data:
+                VariantMappingValue.objects.create(attribute=instance, **val_data)
+        return instance
+
+
+# ------------------------------------------------------------------------------
+# 仓库匹配配置 序列化器
+# ------------------------------------------------------------------------------
+class WarehouseConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WarehouseConfig
+        fields = [
+            "id", "category_id", "category_name", "warehouse",
+            "priority", "create_time",
+        ]
+        read_only_fields = ["create_time"]
+
+    def validate(self, data):
+        category_id = data.get('category_id', '').strip()
+        category_name = data.get('category_name', '').strip()
+        if not category_id and not category_name:
+            # 空规则 = 兜底规则，检查是否已存在
+            qs = WarehouseConfig.objects.filter(
+                category_id='', category_name='')
+            if self.instance:
+                qs = qs.exclude(id=self.instance.id)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    '兜底规则（类目ID和类目名称均为空）已存在，只能有一条')
+        return data
+
+    def validate_warehouse(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("仓库名称不能为空")
+        return value.strip()

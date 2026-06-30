@@ -15,14 +15,16 @@ from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
                      ProductImage, FetchTask, Supplier, ProductSeries,
                      ProductLog, log_product_action,
                      ShopConfig, ListingConfig, FetchConfig, PricingRule,
-                     DifyUsageLog)
+                     DifyUsageLog, VariantMappingAttribute, WarehouseConfig)
 from .serializers import (BaseProductGroupSerializer, BaseProductGroupListSerializer,
                            ProductGroupSerializer, FetchTaskSerializer,
                            SupplierSerializer, ProductSeriesSerializer,
                            ProductLogSerializer, ShopConfigSerializer,
                            ListingConfigSerializer, FetchConfigSerializer,
-                           PricingRuleSerializer)
+                           PricingRuleSerializer, VariantMappingAttributeSerializer,
+                           WarehouseConfigSerializer)
 from .permissions import IsOwnerOrAdmin
+from setting.models import OperateLog
 from productbase import tasks
 
 
@@ -213,7 +215,7 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         for core in cores:
             ws.append([
                 core.sku, core.p_name, 70,
-                float(core.cost), '华强仓', core.base.supplier or '',
+                float(core.cost), core.warehouse or 'F仓', core.base.supplier or '',
                 core.purchase_url or '',
                 cover_map.get(core.id, '')
             ])
@@ -390,6 +392,7 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
 
         keep_attributes = fetch_config.keep_attributes if fetch_config else None
         fixed_attributes = fetch_config.fixed_attributes if fetch_config else None
+        fetch_config_name = fetch_config.name if fetch_config else None
 
         # 创建 FetchTask(PENDING) 并分发 Celery 异步任务
         result = []
@@ -423,7 +426,8 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 cost=cost,
                 creator=creator_username,
                 keep_attributes=keep_attributes,
-                fixed_attributes=fixed_attributes)
+                fixed_attributes=fixed_attributes,
+                fetch_config_name=fetch_config_name)
 
             result.append({
                 "item_id": task.item_id,
@@ -1222,3 +1226,168 @@ class PricingRuleViewSet(viewsets.ModelViewSet):
             'max_price': max_price,
             'detail': log_detail,
         })
+
+
+class VariantMappingAttributeViewSet(viewsets.ModelViewSet):
+    """变体映射 CRUD — 所有用户共享，无需按用户隔离"""
+    serializer_class = VariantMappingAttributeSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [IsAuthenticated]
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    search_fields = ('attribute_name',)
+    ordering_fields = ('attribute_name', 'create_time')
+
+    def get_queryset(self):
+        return VariantMappingAttribute.objects.prefetch_related('values').all()
+
+    def perform_create(self, serializer):
+        attr = serializer.save()
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'新增变体映射属性: {attr.attribute_name}',
+            target_id=attr.id,
+            user=self.request.user)
+
+    def perform_update(self, serializer):
+        attr = serializer.save()
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'更新变体映射属性: {attr.attribute_name}',
+            target_id=attr.id,
+            user=self.request.user)
+
+    def perform_destroy(self, instance):
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'删除变体映射属性: {instance.attribute_name}',
+            target_id=instance.id,
+            user=self.request.user)
+        instance.delete()
+
+    @action(methods=['post'], detail=False, url_path='preview')
+    def preview(self, request):
+        """预览映射效果：传入 variant_keys 和各维度值列表，返回 var_mappings 增量"""
+        variant_keys = request.data.get('variant_keys', [])
+        var_values_by_dim = request.data.get('var_values_by_dim', None)
+
+        if not isinstance(variant_keys, list):
+            return Response({'error': 'variant_keys 必须是数组'}, status=400)
+
+        variant_keys = [k.strip().lower() for k in variant_keys]
+
+        # 支持两种输入模式：
+        # 1. var_values_by_dim: {"colour": ["Black","Blue"], "model": ["For Samsung A16"]}
+        # 2. var_values 数组（旧模式，兼容）
+        if var_values_by_dim and isinstance(var_values_by_dim, dict):
+            var_values_by_dim = {
+                k.strip().lower(): v
+                for k, v in var_values_by_dim.items()
+                if isinstance(v, list)
+            }
+        else:
+            var_values = request.data.get('var_values', [])
+            if not isinstance(var_values, list):
+                return Response(
+                    {'error': 'var_values_by_dim 或 var_values 需要为数组'},
+                    status=400)
+            var_values_by_dim = {}
+            for i, vk in enumerate(variant_keys):
+                if i < len(var_values) and var_values[i]:
+                    var_values_by_dim[vk] = [var_values[i]]
+
+        from productbase.tasks import build_var_mappings_from_config
+        result = build_var_mappings_from_config(var_values_by_dim)
+
+        # 整理变更明细
+        changes = []
+        for dim, mapping in result.items():
+            for original, mapped in mapping.items():
+                changes.append({
+                    'dimension': dim,
+                    'original': original,
+                    'mapped': mapped,
+                })
+
+        return Response({
+            'var_mappings': result,
+            'changes': changes,
+        })
+
+    @action(methods=['post'], detail=True, url_path='reorder')
+    def reorder(self, request, pk=None):
+        """拖拽排序：传入 value ID 列表，按顺序分配优先级（越靠前优先级越高）"""
+        attr = self.get_object()
+        value_ids = request.data.get('value_ids', [])
+
+        if not isinstance(value_ids, list) or not value_ids:
+            return Response(
+                {'error': 'value_ids 必须是非空数组'}, status=400)
+
+        from productbase.models import VariantMappingValue
+        # 只接受该属性下的 value
+        values = {
+            v.id: v
+            for v in VariantMappingValue.objects.filter(attribute=attr)
+        }
+
+        if len(value_ids) != len(values):
+            return Response(
+                {'error': f'value_ids 数量({len(value_ids)})与属性下实际值数量({len(values)})不一致'},
+                status=400)
+
+        # 按提交顺序分配优先级：列表越靠前 priority 越高
+        max_priority = len(value_ids)
+        for val_id in value_ids:
+            if val_id not in values:
+                return Response(
+                    {'error': f'value {val_id} 不属于该属性'}, status=400)
+            values[val_id].priority = max_priority
+            max_priority -= 1
+            values[val_id].save(update_fields=['priority'])
+
+        return Response({
+            'status': 'success',
+            'msg': f'已更新 {len(value_ids)} 个匹配值的优先级',
+        })
+
+
+class WarehouseConfigViewSet(viewsets.ModelViewSet):
+    """仓库匹配配置 CRUD — 所有用户共享"""
+    serializer_class = WarehouseConfigSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [IsAuthenticated]
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    search_fields = ('category_id', 'category_name', 'warehouse')
+    ordering_fields = ('priority', 'create_time')
+
+    def get_queryset(self):
+        return WarehouseConfig.objects.all()
+
+    def perform_create(self, serializer):
+        config = serializer.save()
+        label = config.category_id or config.category_name or '默认'
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'新增仓库匹配规则: {label} → {config.warehouse}',
+            target_id=config.id,
+            user=self.request.user)
+
+    def perform_update(self, serializer):
+        config = serializer.save()
+        label = config.category_id or config.category_name or '默认'
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'更新仓库匹配规则: {label} → {config.warehouse}',
+            target_id=config.id,
+            user=self.request.user)
+
+    def perform_destroy(self, instance):
+        label = instance.category_id or instance.category_name or '默认'
+        OperateLog.objects.create(
+            op_type='PRODUCT',
+            op_log=f'删除仓库匹配规则: {label} → {instance.warehouse}',
+            target_id=instance.id,
+            user=self.request.user)
+        instance.delete()

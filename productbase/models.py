@@ -155,6 +155,10 @@ class ProductCore(models.Model):
     purchase_url = models.CharField(max_length=500,
                                     blank=True,
                                     verbose_name="采购链接")
+    warehouse = models.CharField(max_length=100,
+                                  blank=True,
+                                  default='',
+                                  verbose_name="仓库")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
     sku_synced_at = models.DateTimeField(null=True,
                                          blank=True,
@@ -356,6 +360,9 @@ class ProductLog(models.Model):
         ('IMAGE_MIGRATE', '图片迁移完成'),
         ('OPTIMIZE_TITLE', '优化标题'),
         ('OPTIMIZE_DESC', '优化描述'),
+        ('VARIANT', '变体映射'),
+        ('PRICE_RULE', '定价规则'),
+        ('WAREHOUSE', '仓库匹配'),
     )
 
     base_group = models.ForeignKey(BaseProductGroup,
@@ -584,3 +591,89 @@ class DifyUsageLog(models.Model):
 
     def __str__(self):
         return f"[{self.optimize_type}] {self.total_tokens} tokens ¥{self.total_price}"
+
+
+# ------------------------------------------------------------------------------
+# 变体映射（多用户共享）
+# ------------------------------------------------------------------------------
+class VariantMappingAttribute(models.Model):
+    """变体属性名 — 匹配产品的变体维度（如 color）"""
+    attribute_name = models.CharField(
+        max_length=200,
+        unique=True,
+        verbose_name="变体属性名",
+        help_text="属性名，多个用逗号分隔为 OR 关系。如: color,colour")
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+
+    class Meta:
+        verbose_name = "变体映射属性"
+        verbose_name_plural = verbose_name
+        ordering = ["attribute_name"]
+
+    def __str__(self):
+        return self.attribute_name
+
+
+class VariantMappingValue(models.Model):
+    """变体值替换规则 — 匹配模式 → 替换值（部分替换）"""
+    attribute = models.ForeignKey(
+        VariantMappingAttribute,
+        on_delete=models.CASCADE,
+        related_name="values",
+        verbose_name="所属属性")
+    match_pattern = models.CharField(
+        max_length=200,
+        verbose_name="匹配模式",
+        help_text="待匹配的前缀文本，如: For Samsung")
+    replace_value = models.CharField(
+        max_length=200,
+        verbose_name="替换值",
+        help_text="匹配后替换为的值，如: 三星")
+    priority = models.IntegerField(
+        default=0,
+        verbose_name="优先级",
+        help_text="数值越大越优先匹配。同属性下长模式应设置更高优先级")
+
+    class Meta:
+        verbose_name = "变体映射值"
+        verbose_name_plural = verbose_name
+        unique_together = ("attribute", "match_pattern")
+        ordering = ["-priority"]
+
+    def __str__(self):
+        return f"{self.match_pattern} → {self.replace_value}"
+
+
+# ------------------------------------------------------------------------------
+# 仓库匹配配置（多用户共享）
+# ------------------------------------------------------------------------------
+class WarehouseConfig(models.Model):
+    """仓库匹配规则 — 根据类目匹配仓库，全用户共享"""
+    category_id = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="类目ID",
+        help_text="精确匹配 eBay categoryIdPath，如: 150|173444")
+    category_name = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="类目名称",
+        help_text="子串匹配 categoryPath（大小写不敏感），如: Cases")
+    warehouse = models.CharField(
+        max_length=100,
+        verbose_name="仓库名称",
+        help_text="匹配到的仓库，如: F仓、华强仓")
+    priority = models.IntegerField(
+        default=0,
+        verbose_name="优先级",
+        help_text="数值越大越优先匹配")
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+
+    class Meta:
+        verbose_name = "仓库匹配配置"
+        verbose_name_plural = verbose_name
+        ordering = ["-priority", "-create_time"]
+
+    def __str__(self):
+        label = self.category_id or self.category_name or "默认"
+        return f"{label} → {self.warehouse}"

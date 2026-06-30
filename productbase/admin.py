@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
-                     ProductImage, FetchTask)
+                     ProductImage, FetchTask, VariantMappingAttribute,
+                     VariantMappingValue, WarehouseConfig)
 
 
 # ------------------------------------------------------------------------------
@@ -116,3 +117,31 @@ class FetchTaskAdmin(admin.ModelAdmin):
                     'create_time')
     list_filter = ('status', 'platform')
     search_fields = ('item_id', 'log')
+
+
+# ------------------------------------------------------------------------------
+# 变体映射
+# ------------------------------------------------------------------------------
+class VariantMappingValueInline(admin.TabularInline):
+    model = VariantMappingValue
+    extra = 1
+    fields = ('match_pattern', 'replace_value')
+
+
+@admin.register(VariantMappingAttribute)
+class VariantMappingAttributeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'attribute_name', 'create_time')
+    search_fields = ('attribute_name',)
+    ordering = ('attribute_name',)
+    inlines = [VariantMappingValueInline]
+
+
+# ------------------------------------------------------------------------------
+# 仓库匹配配置
+# ------------------------------------------------------------------------------
+@admin.register(WarehouseConfig)
+class WarehouseConfigAdmin(admin.ModelAdmin):
+    list_display = ('id', 'category_id', 'category_name', 'warehouse',
+                    'priority', 'create_time')
+    search_fields = ('category_id', 'category_name', 'warehouse')
+    ordering = ('-priority', '-create_time')

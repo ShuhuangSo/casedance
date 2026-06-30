@@ -382,6 +382,135 @@ def regenerate_p_names(base):
     return updated
 
 
+def apply_variant_mapping(variant_keys, var_values):
+    """
+    将变体映射规则应用到原始变体值上。
+    每个变体维度独立匹配：只要 variant_key 匹配某个 VariantMappingAttribute.attribute_name，
+    就应用其 values 替换规则。未设置映射的维度保持原值。
+
+    Args:
+        variant_keys: 已小写的变体维度名列表，如 ['color', 'model']
+        var_values: 原始变体值列表，如 ['Red', 'For Samsung A16']
+
+    Returns:
+        映射后的 var_values 列表（长度与输入相同）
+    """
+    from productbase.models import VariantMappingAttribute
+
+    mapped = list(var_values)
+    if not variant_keys or not var_values:
+        return mapped
+
+    # 加载所有映射属性及其值，支持逗号分隔多个名称
+    attrs = VariantMappingAttribute.objects.prefetch_related('values').all()
+    name_to_attr = {}
+    for a in attrs:
+        names = [n.strip().lower() for n in a.attribute_name.split(",") if n.strip()]
+        for n in names:
+            name_to_attr[n] = a
+
+    for i, vk in enumerate(variant_keys):
+        attr_entry = name_to_attr.get(vk)
+        if attr_entry is None:
+            continue
+
+        raw_val = var_values[i]
+        if not raw_val:
+            continue
+
+        for val_rule in attr_entry.values.all():
+            pattern = val_rule.match_pattern
+            if raw_val.lower().startswith(pattern.lower()):
+                suffix = raw_val[len(pattern):]
+                mapped[i] = val_rule.replace_value + suffix
+                break  # 第一个匹配的值规则胜出
+
+    return mapped
+
+
+def match_warehouse(category_id, category_name):
+    """
+    根据类目匹配仓库。
+
+    匹配优先级：
+    1) category_id 精确匹配
+    2) category_name 子串匹配（大小写不敏感）
+    3) 兜底：category_id 和 category_name 均为空的规则
+    4) 硬编码兜底：'F仓'
+    """
+    from productbase.models import WarehouseConfig
+
+    configs = WarehouseConfig.objects.all().order_by('-priority')
+
+    # 1) 精确匹配 category_id
+    for cfg in configs:
+        if cfg.category_id and cfg.category_id.strip() == (category_id or '').strip():
+            return cfg.warehouse
+
+    # 2) 子串匹配 category_name
+    for cfg in configs:
+        if cfg.category_name and cfg.category_name.strip().lower() in (category_name or '').lower():
+            return cfg.warehouse
+
+    # 3) 兜底规则（category_id 和 category_name 均为空）
+    fallback = configs.filter(category_id='', category_name='').first()
+    if fallback:
+        return fallback.warehouse
+
+    # 4) 硬编码兜底
+    return 'F仓'
+
+
+def build_var_mappings_from_config(dim_values):
+    """
+    根据变体映射配置，为每个维度下的原始值生成中文映射。
+
+    Args:
+        dim_values: {'colour': {'Black','Blue'}, 'model': {'For Samsung Galaxy Z Fold 7'}}
+
+    Returns:
+        dict like {'colour': {'Black': '黑色', 'Blue': '蓝色'},
+                   'model': {'For Samsung Galaxy Z Fold 7': '三星 Galaxy Z Fold 7'}}
+
+    匹配规则：attribute_name 支持逗号分隔多个名称（如 "color,colour"），
+    任一名称匹配到维度名即触发。
+    """
+    from productbase.models import VariantMappingAttribute
+
+    var_mappings = {}
+    attrs = VariantMappingAttribute.objects.prefetch_related('values').all()
+
+    # 构建索引：每个独立名称 → 对应的 attribute 条目
+    name_to_attr = {}
+    for a in attrs:
+        names = [n.strip().lower() for n in a.attribute_name.split(",") if n.strip()]
+        for n in names:
+            name_to_attr[n] = a
+
+    for dim_name, values in dim_values.items():
+        attr_entry = name_to_attr.get(dim_name.lower())
+        if attr_entry is None:
+            continue
+
+        dim_mapping = {}
+        for raw_val in values:
+            if not raw_val:
+                continue
+            for val_rule in attr_entry.values.all():
+                pattern = val_rule.match_pattern
+                if raw_val.lower().startswith(pattern.lower()):
+                    suffix = raw_val[len(pattern):]
+                    mapped = val_rule.replace_value + suffix
+                    if mapped != raw_val:
+                        dim_mapping[raw_val] = mapped
+                    break  # 第一个匹配的值规则胜出
+
+        if dim_mapping:
+            var_mappings[dim_name] = dim_mapping
+
+    return var_mappings
+
+
 # ======================
 # 🔥 核心保存逻辑（已改新结构）
 # ======================
@@ -395,7 +524,8 @@ def save_product_to_db(data,
                        cost=0,
                        creator="system",
                        keep_attributes=None,
-                       fixed_attributes=None):
+                       fixed_attributes=None,
+                       fetch_config_name=None):
 
     if not data or not data["items"]:
         return None
@@ -527,12 +657,15 @@ def save_product_to_db(data,
                                  variant_keys,
                                  [var1, var2, var3, var4],
                                  base.var_mappings)
+        warehouse = match_warehouse(
+            base.category_id, base.category)
         core_sku = ProductCore.objects.create(base=base,
                                               sku=generate_unique_sku(),
                                               p_name=p_name,
                                               UPC="",
                                               cost=cost if cost > 0 else 0,
-                                              purchase_url="")
+                                              purchase_url="",
+                                              warehouse=warehouse)
         assign_sku_after_save(core_sku)
         original_prices[core_sku.id] = original_price
 
@@ -577,6 +710,38 @@ def save_product_to_db(data,
                 ProductImage.objects.create(product_core=core_sku,
                                             image_url=url,
                                             sort=j + 1)
+
+    # 5b. 根据变体映射配置填充 base.var_mappings，再重新生成 p_name
+    if variant_keys:
+        # 收集每个维度下的所有变体值
+        dim_values = {vk: set() for vk in variant_keys}
+        var_field_map = {0: 'var1', 1: 'var2', 2: 'var3', 3: 'var4'}
+        for shop_sku in main_pg.shop_skus.all():
+            for i, vk in enumerate(variant_keys):
+                val = getattr(shop_sku, var_field_map[i], '')
+                if val:
+                    dim_values[vk].add(val)
+
+        var_mappings = build_var_mappings_from_config(dim_values)
+        if var_mappings:
+            # 合并到已有的 var_mappings（保留手动编辑的部分）
+            existing = base.var_mappings or {}
+            for dim, mapping in var_mappings.items():
+                if dim in existing:
+                    existing[dim].update(mapping)
+                else:
+                    existing[dim] = mapping
+            base.var_mappings = existing
+            base.save(update_fields=['var_mappings'])
+            # 重新生成所有 SKU 的中文名称
+            regenerate_p_names(base)
+            # 记录操作日志
+            parts = []
+            for dim, mapping in var_mappings.items():
+                parts.append(f'{dim} {len(mapping)}个')
+            log_product_action(base, 'VARIANT',
+                               f'变体映射: {", ".join(parts)}',
+                               operator=creator)
 
     # 6. 为 auto_create_shop 配置创建子店铺（复制主店铺内容）
     for config in auto_configs:
@@ -628,11 +793,20 @@ def save_product_to_db(data,
                 pricing_logs.add(
                     f'{child_pg.shop_account}: "{child_pricing_rule.name}"')
 
-    # 记录创建日志（含所有店铺账号）
+    # 记录创建日志（含所有店铺账号 + 抓取配置）
     shop_accounts = [pg.shop_account for pg in base.product_groups.all()]
-    log_product_action(base, 'CREATE',
-                       f'从 {platform} 抓取商品 {item_id}，创建店铺: {", ".join(shop_accounts)}',
-                       operator=creator)
+    create_detail = f'从 {platform} 抓取商品 {item_id}，创建店铺: {", ".join(shop_accounts)}'
+    if fetch_config_name:
+        create_detail += f'，抓取配置: {fetch_config_name}'
+    log_product_action(base, 'CREATE', create_detail, operator=creator)
+
+    # 记录仓库匹配
+    if variant_keys:
+        first_core = base.core_skus.first()
+        if first_core and first_core.warehouse:
+            log_product_action(base, 'WAREHOUSE',
+                               f'仓库匹配: {first_core.warehouse}',
+                               operator=creator)
 
     # 记录定价日志
     if pricing_logs:
@@ -732,7 +906,8 @@ def fetch_ebay_product_async(self,
                               cost=0,
                               creator="system",
                               keep_attributes=None,
-                              fixed_attributes=None):
+                              fixed_attributes=None,
+                              fetch_config_name=None):
     """
     Celery 异步抓取 eBay 商品。前端创建 FetchTask(PENDING) 后立即返回，
     后台异步完成抓取并更新 FetchTask 状态。
@@ -766,7 +941,8 @@ def fetch_ebay_product_async(self,
             cost=cost,
             creator=creator,
             keep_attributes=keep_attributes,
-            fixed_attributes=fixed_attributes)
+            fixed_attributes=fixed_attributes,
+            fetch_config_name=fetch_config_name)
 
         task.status = "SUCCESS"
         task.log = "✅ 抓取成功"
@@ -794,7 +970,8 @@ def fetch_and_save_ebay_product_with_task(task,
                                           cost=0,
                                           creator="system",
                                           keep_attributes=None,
-                                          fixed_attributes=None):
+                                          fixed_attributes=None,
+                                          fetch_config_name=None):
     item_id = task.item_id
     marketplace_id = task.marketplace_id
     platform = task.platform
@@ -814,7 +991,8 @@ def fetch_and_save_ebay_product_with_task(task,
                                        cost=cost,
                                        creator=creator,
                                        keep_attributes=keep_attributes,
-                                       fixed_attributes=fixed_attributes)
+                                       fixed_attributes=fixed_attributes,
+                                       fetch_config_name=fetch_config_name)
 
     check_and_update_base_status([base_group.id])
     return base_group

@@ -2725,17 +2725,13 @@ def sd_place_order_api(ship_id, data):
                 if not os.path.exists(file_path):
                     continue
 
+                form_data[f"ifs[{idx}].file_no"] = sono
+                form_data[f"ifs[{idx}].file_classify"] = "箱唛"
+                form_data[f"ifs[{idx}].fileposition"] = "customerfiles"
+                form_data[f"ifs[{idx}].fields"] = "file"
                 with open(file_path, 'rb') as f_obj:
-                    form_data[f"ifs[{idx}].file_no"] = sono
-                    form_data[f"ifs[{idx}].file_classify"] = "箱唛"
-                    form_data[f"ifs[{idx}].fileposition"] = "customerfiles"
-                    form_data[f"ifs[{idx}].fields"] = "file"
                     files[f"ifs[{idx}].files"] = (att.name, f_obj.read(),
                                                   'application/pdf')
-
-                # 文件
-                files[f"ifs[{idx}].files"] = (att.name, open(file_path, 'rb'),
-                                              'application/pdf')
 
             if not files:
                 return True

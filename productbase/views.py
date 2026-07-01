@@ -101,16 +101,16 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             ctx['variant_page'] = 1
         try:
             ctx['variant_page_size'] = int(
-                self.request.query_params.get('variant_page_size', 200))
+                self.request.query_params.get('variant_page_size', 20))
         except (ValueError, TypeError):
-            ctx['variant_page_size'] = 200
+            ctx['variant_page_size'] = 20
         return ctx
 
     def get_queryset(self):
         qs = super().get_queryset()
         if self.action == 'list':
             qs = qs.annotate(
-                sku_count=Count('core_skus'),
+                sku_count=Count('core_skus', distinct=True),
                 group_count=Count('product_groups', distinct=True),
                 _synced_sku_count=Count('core_skus', filter=Q(core_skus__sku_synced_at__isnull=False)),
                 _synced_shop_count=Count('product_groups', filter=Q(product_groups__shop_synced_at__isnull=False), distinct=True),

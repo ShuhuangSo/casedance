@@ -171,7 +171,7 @@ class ProductGroupSerializer(serializers.ModelSerializer):
     def _get_variant_pagination(self):
         """从 context 读取变体分页参数"""
         ctx = self.context or {}
-        page_size = ctx.get('variant_page_size', 200)
+        page_size = ctx.get('variant_page_size', 20)
         if page_size == 0:  # 0 表示加载全部
             return None, None
         page = max(ctx.get('variant_page', 1), 1)
@@ -495,10 +495,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
         return first_group.title if first_group else ""
 
     def get_sku_count(self, obj):
-        first_group = obj.product_groups.first()
-        if not first_group:
-            return 0
-        return first_group.shop_skus.count()
+        return obj.core_skus.count()
 
     def get_group_count(self, obj):
         return obj.product_groups.count()

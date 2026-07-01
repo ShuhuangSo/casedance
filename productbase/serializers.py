@@ -463,7 +463,10 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
         return obj.product_groups.count()
 
     def _get_image_urls(self, obj):
-        """获取产品下所有唯一图片 URL，返回 (total_unique, ebay_unique)"""
+        """获取产品下所有唯一图片 URL，返回 (total_unique, ebay_unique)。结果缓存在 obj 上避免重复查询。"""
+        cache_key = '_cached_image_urls'
+        if hasattr(obj, cache_key):
+            return getattr(obj, cache_key)
         from productbase.models import ProductImage, ProductGroup, ProductCore
         from productbase.image_hosting import EBAY_IMAGE_DOMAINS
         group_ids = list(ProductGroup.objects.filter(base_id=obj.id).values_list('id', flat=True))
@@ -475,7 +478,9 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
         urls = list(all_urls)
         total_unique = len(set(urls))
         ebay_unique = len({u for u in urls if any(d in u for d in EBAY_IMAGE_DOMAINS)})
-        return total_unique, ebay_unique
+        result = (total_unique, ebay_unique)
+        setattr(obj, cache_key, result)
+        return result
 
     def get_image_migration_status(self, obj):
         """图片迁移状态：done / partial / failed / pending"""

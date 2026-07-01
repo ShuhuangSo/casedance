@@ -101,6 +101,15 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 _synced_sku_count=Count('core_skus', filter=Q(core_skus__sku_synced_at__isnull=False)),
                 _synced_shop_count=Count('product_groups', filter=Q(product_groups__shop_synced_at__isnull=False), distinct=True),
             ).prefetch_related('product_groups__images')
+        if self.action == 'retrieve':
+            qs = qs.prefetch_related(
+                'product_groups__shop_skus__core_sku__images',
+                'product_groups__images',
+                'product_groups__listing_config',
+                'core_skus__images',
+                'core_skus__shop_records',
+                'logs',
+            )
         return qs
 
     @action(methods=['post'],

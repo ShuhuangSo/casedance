@@ -4436,8 +4436,8 @@ class ShipAttachmentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         path = 'media/ml_ships/{batch}_{id}/{name}'.format(batch=sa.ship.batch,
                                                            id=sa.ship.id,
                                                            name=sa.name)
-        # path = 'media/ml_ships/' + sa.ship.envio_number + '/' + sa.name
-        os.remove(path)
+        if os.path.exists(path):
+            os.remove(path)
         sa.delete()
 
         return Response({'msg': '成功删除'}, status=status.HTTP_200_OK)

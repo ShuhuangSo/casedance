@@ -101,9 +101,9 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             ctx['variant_page'] = 1
         try:
             ctx['variant_page_size'] = int(
-                self.request.query_params.get('variant_page_size', 20))
+                self.request.query_params.get('variant_page_size', 200))
         except (ValueError, TypeError):
-            ctx['variant_page_size'] = 20
+            ctx['variant_page_size'] = 200
         return ctx
 
     def get_queryset(self):

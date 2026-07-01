@@ -2704,7 +2704,7 @@ def sd_place_order_api(ship_id, data):
             return {"status": "error", "msg": "接口返回成功，但未获取到 sono"}
 
         # ====================== 开始上传箱唛文件 ======================
-        def upload_box_label_files(ship, sono, config):
+        def upload_box_label_files(ship, sono):
             """上传箱唛附件到盛德"""
             sa_set = ShipAttachment.objects.filter(ship=ship,
                                                    a_type='BOX_LABEL')
@@ -2756,7 +2756,7 @@ def sd_place_order_api(ship_id, data):
                 return False
 
         # 执行上传
-        upload_ok = upload_box_label_files(ship, sono, config)
+        upload_ok = upload_box_label_files(ship, sono)
 
         # ====================== 保存数据（事务保证安全） ======================
         with transaction.atomic():

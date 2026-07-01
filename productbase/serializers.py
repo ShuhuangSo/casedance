@@ -180,16 +180,7 @@ class ProductGroupSerializer(serializers.ModelSerializer):
 
     def get_variant_total(self, obj):
         """该店铺的 SKU 总数"""
-        cache_key = '_variant_total'
-        if hasattr(obj, cache_key):
-            return getattr(obj, cache_key)
-        # 优先从 prefetch 缓存取长度
-        if hasattr(obj, '_prefetched_objects_cache') and 'shop_skus' in obj._prefetched_objects_cache:
-            total = len(obj._prefetched_objects_cache['shop_skus'])
-        else:
-            total = obj.shop_skus.count()
-        setattr(obj, cache_key, total)
-        return total
+        return obj.shop_skus.count()
 
     def get_variant_has_more(self, obj):
         offset, page_size = self._get_variant_pagination()

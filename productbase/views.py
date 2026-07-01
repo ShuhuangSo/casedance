@@ -92,6 +92,20 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             return BaseProductGroupListSerializer
         return BaseProductGroupSerializer
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        try:
+            ctx['variant_page'] = int(
+                self.request.query_params.get('variant_page', 1))
+        except (ValueError, TypeError):
+            ctx['variant_page'] = 1
+        try:
+            ctx['variant_page_size'] = int(
+                self.request.query_params.get('variant_page_size', 200))
+        except (ValueError, TypeError):
+            ctx['variant_page_size'] = 200
+        return ctx
+
     def get_queryset(self):
         qs = super().get_queryset()
         if self.action == 'list':

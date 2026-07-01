@@ -161,9 +161,49 @@ class ProductGroupSerializer(serializers.ModelSerializer):
         write_only=True)
     listing_config_detail = serializers.SerializerMethodField()
     is_synced = serializers.SerializerMethodField()
+    # 变体分页元信息
+    variant_total = serializers.SerializerMethodField()
+    variant_has_more = serializers.SerializerMethodField()
 
     def get_is_synced(self, obj):
         return obj.shop_synced_at is not None
+
+    def _get_variant_pagination(self):
+        """从 context 读取变体分页参数"""
+        ctx = self.context or {}
+        page_size = ctx.get('variant_page_size', 200)
+        if page_size == 0:  # 0 表示加载全部
+            return None, None
+        page = max(ctx.get('variant_page', 1), 1)
+        offset = (page - 1) * page_size
+        return offset, page_size
+
+    def get_variant_total(self, obj):
+        """该店铺的 SKU 总数"""
+        cache_key = '_variant_total'
+        if hasattr(obj, cache_key):
+            return getattr(obj, cache_key)
+        # 优先从 prefetch 缓存取长度
+        if hasattr(obj, '_prefetched_objects_cache') and 'shop_skus' in obj._prefetched_objects_cache:
+            total = len(obj._prefetched_objects_cache['shop_skus'])
+        else:
+            total = obj.shop_skus.count()
+        setattr(obj, cache_key, total)
+        return total
+
+    def get_variant_has_more(self, obj):
+        offset, page_size = self._get_variant_pagination()
+        if page_size is None:
+            return False
+        total = self.get_variant_total(obj)
+        return total > (offset + page_size)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        offset, page_size = self._get_variant_pagination()
+        if page_size is not None and ret.get('variants'):
+            ret['variants'] = ret['variants'][offset:offset + page_size]
+        return ret
 
     def get_listing_config_detail(self, obj):
         if not obj.listing_config:
@@ -192,6 +232,7 @@ class ProductGroupSerializer(serializers.ModelSerializer):
             "listing_config_id", "listing_config_detail",
             "is_synced",
             "title_optimized", "desc_optimized",
+            "variant_total", "variant_has_more",
         ]
         read_only_fields = ["shop_account", "platform", "site"]
 

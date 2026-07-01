@@ -7,7 +7,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import CharFilter, FilterSet
 from django.db import transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Q, Sum, Subquery
 from django.utils import timezone
 from django.http import HttpResponse
 import openpyxl
@@ -48,6 +48,30 @@ class FetchTaskViewSet(viewsets.ReadOnlyModelViewSet):
             "-create_time")
 
 
+class BaseProductGroupFilter(FilterSet):
+    """自定义过滤器：SKU/标题搜索用子查询替代 JOIN LIKE，避免全表扫描超时"""
+    sku = CharFilter(method='filter_sku', label='SKU 搜索')
+    title = CharFilter(method='filter_title', label='标题搜索')
+
+    def filter_sku(self, queryset, name, value):
+        # SKU 格式如 Z04667，用 startswith 可利用索引
+        matching_ids = ProductCore.objects.filter(
+            sku__startswith=value
+        ).values_list('base_id', flat=True)[:1000]
+        return queryset.filter(id__in=list(matching_ids))
+
+    def filter_title(self, queryset, name, value):
+        matching_ids = ProductGroup.objects.filter(
+            title__icontains=value
+        ).values_list('base_id', flat=True)[:1000]
+        return queryset.filter(id__in=list(matching_ids))
+
+    class Meta:
+        model = BaseProductGroup
+        fields = ['p_status', 'category', 'from_platform', 'creator',
+                  'image_migrated', 'variant_mapped', 'sku', 'title']
+
+
 class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                               mixins.UpdateModelMixin,
                               mixins.DestroyModelMixin,
@@ -57,10 +81,8 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     pagination_class = DefaultPagination
     filter_backends = (DjangoFilterBackend, filters.SearchFilter,
                        filters.OrderingFilter)
-    filter_fields = ('p_status', 'category', 'from_platform', 'creator',
-                     'image_migrated', 'variant_mapped')
-    search_fields = ('category', 'from_item_id', 'tag', 'supplier', 'series',
-                     'product_groups__title', 'core_skus__sku')
+    filterset_class = BaseProductGroupFilter
+    search_fields = ('category', 'from_item_id', 'tag', 'supplier', 'series')
     ordering_fields = ('create_time', )
 
     queryset = BaseProductGroup.objects.all().order_by("-create_time")

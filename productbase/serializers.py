@@ -463,20 +463,25 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
         return obj.product_groups.count()
 
     def _get_image_urls(self, obj):
-        """获取产品下所有唯一图片 URL，返回 (total_unique, ebay_unique)。结果缓存在 obj 上避免重复查询。"""
+        """获取产品下所有唯一图片 URL，返回 (total_unique, ebay_unique)。
+        优先使用 prefetch 缓存，避免裸查 DB。"""
         cache_key = '_cached_image_urls'
         if hasattr(obj, cache_key):
             return getattr(obj, cache_key)
-        from productbase.models import ProductImage, ProductGroup, ProductCore
+
         from productbase.image_hosting import EBAY_IMAGE_DOMAINS
-        group_ids = list(ProductGroup.objects.filter(base_id=obj.id).values_list('id', flat=True))
-        core_ids = list(ProductCore.objects.filter(base_id=obj.id).values_list('id', flat=True))
-        all_urls = ProductImage.objects.filter(
-            Q(base_group_id=obj.id) | Q(group_id__in=group_ids)
-            | Q(product_core_id__in=core_ids)
-        ).values_list('image_url', flat=True)
-        urls = list(all_urls)
-        total_unique = len(set(urls))
+        urls = set()
+
+        # 从已 prefetch 的数据中收集 URL，避免额外查询
+        for pg in obj.product_groups.all():
+            for img in pg.images.all():
+                urls.add(img.image_url)
+            for shop in pg.shop_skus.all():
+                core = shop.core_sku
+                for img in core.images.all():
+                    urls.add(img.image_url)
+
+        total_unique = len(urls)
         ebay_unique = len({u for u in urls if any(d in u for d in EBAY_IMAGE_DOMAINS)})
         result = (total_unique, ebay_unique)
         setattr(obj, cache_key, result)

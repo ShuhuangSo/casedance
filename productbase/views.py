@@ -102,12 +102,20 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 _synced_shop_count=Count('product_groups', filter=Q(product_groups__shop_synced_at__isnull=False), distinct=True),
             ).prefetch_related('product_groups__images')
         if self.action == 'retrieve':
+            from django.db.models import Prefetch
+            # shop_skus: select_related core_sku(FK) + prefetch core_sku images
+            shop_skus_qs = ProductShop.objects.select_related(
+                'core_sku'
+            ).prefetch_related('core_sku__images')
+            # product_groups: select_related listing_config(FK) + prefetch shop_skus/images
+            pgs_qs = ProductGroup.objects.select_related(
+                'listing_config'
+            ).prefetch_related(
+                Prefetch('shop_skus', queryset=shop_skus_qs),
+                'images',
+            )
             qs = qs.prefetch_related(
-                'product_groups__shop_skus__core_sku__images',
-                'product_groups__images',
-                'product_groups__listing_config',
-                'core_skus__images',
-                'core_skus__shop_records',
+                Prefetch('product_groups', queryset=pgs_qs),
                 'logs',
             )
         return qs

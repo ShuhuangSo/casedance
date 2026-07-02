@@ -517,75 +517,41 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         result = {item_id: item_id in existing for item_id in item_ids}
         return Response(result)
 
-    @action(methods=['get'], detail=False, url_path='image_stats')
+    @action(methods=['get', 'post'], detail=False, url_path='image_stats')
     def image_stats(self, request):
-        """查询 CDN 与 DB 图片统计：CDN 总数、DB 总数、已迁移、未迁移、孤儿数"""
-        from productbase.image_hosting import get_all_cdn_images, is_ebay_image
+        """
+        GET:  返回缓存的图片统计 + updated_at
+        POST: 触发 Celery 异步重新计算统计
+        """
+        from productbase.models import ImageStatsCache
+        from productbase.tasks import compute_image_stats
 
-        cdn_map = get_all_cdn_images()  # {url: created_at}
-        cdn_urls = set(cdn_map.keys())
-        db_urls = set(
-            ProductImage.objects.values_list('image_url', flat=True))
+        if request.method == 'POST':
+            task = compute_image_stats.delay()
+            return Response({
+                'msg': '已提交统计任务',
+                'task_id': task.id,
+            })
 
-        unmigrated = sum(1 for u in db_urls if is_ebay_image(u))
-        migrated = len(db_urls) - unmigrated
-
+        cache, _ = ImageStatsCache.objects.get_or_create(id=1)
         return Response({
-            'cdn_total': len(cdn_urls),
-            'db_total': len(db_urls),
-            'migrated': migrated,
-            'unmigrated': unmigrated,
-            'orphan': len(cdn_urls - db_urls),
+            'cdn_total': cache.cdn_total,
+            'db_total': cache.db_total,
+            'migrated': cache.migrated,
+            'unmigrated': cache.unmigrated,
+            'orphan': cache.orphan,
+            'computing': cache.computing,
+            'updated_at': cache.updated_at,
         })
 
     @action(methods=['post'], detail=False, url_path='cleanup_images')
     def cleanup_images(self, request):
-        """全量对比 CDN 与 DB，清理孤儿图片（排除最近5分钟内的，防止误删迁移中的图片）"""
-        from datetime import datetime, timedelta
-        from productbase.image_hosting import get_all_cdn_images, delete_cdn_images
-
-        cdn_map = get_all_cdn_images()  # {url: created_at}
-        db_urls = set(
-            ProductImage.objects.values_list('image_url', flat=True))
-
-        # 排除最近 5 分钟内创建的图片（可能在迁移中）
-        cutoff = datetime.now() - timedelta(minutes=5)
-        safe_urls = set()
-        for url, created_at in cdn_map.items():
-            if not created_at:
-                safe_urls.add(url)
-                continue
-            try:
-                t = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
-                if t < cutoff:
-                    safe_urls.add(url)
-            except ValueError:
-                safe_urls.add(url)
-
-        orphans = list(safe_urls - db_urls)
-
-        if not orphans:
-            return Response({'msg': '没有需要清理的图片', 'orphan': 0})
-
-        deleted = 0
-        failed = 0
-        batch_size = 1000
-        batches = (len(orphans) + batch_size - 1) // batch_size
-
-        for i in range(0, len(orphans), batch_size):
-            batch = orphans[i:i + batch_size]
-            success, msg = delete_cdn_images(batch)
-            if success:
-                deleted += len(batch)
-            else:
-                failed += len(batch)
-                print(f'[cleanup_images] batch failed: {msg}')
-
+        """异步清理 CDN 孤儿图片，返回 task_id"""
+        from productbase.tasks import cleanup_orphan_images
+        task = cleanup_orphan_images.delay()
         return Response({
-            'orphan': len(orphans),
-            'deleted': deleted,
-            'failed': failed,
-            'batches': batches,
+            'msg': '已提交清理任务，后台处理中',
+            'task_id': task.id,
         })
 
     @action(methods=['post'], detail=True, url_path='retry_migration')

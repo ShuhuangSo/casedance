@@ -1245,3 +1245,81 @@ def recover_stuck_fetch_tasks():
         print(f'[RECOVER] Reset {recovered} PROCESSING → PENDING, '
               f're-queued {requeued} PENDING tasks')
     return {'recovered': recovered, 'requeued': requeued}
+
+
+# ======================
+# 图片统计 & 清理（异步）
+# ======================
+@app.task(bind=True, time_limit=600, soft_time_limit=540)
+def compute_image_stats(self):
+    """异步计算 CDN/DB 图片统计，结果写入 ImageStatsCache"""
+    from productbase.models import ImageStatsCache, ProductImage
+    from productbase.image_hosting import get_all_cdn_images, is_ebay_image
+
+    cache, _ = ImageStatsCache.objects.get_or_create(id=1)
+    cache.computing = True
+    cache.save(update_fields=['computing'])
+
+    try:
+        cdn_map = get_all_cdn_images()
+        cdn_urls = set(cdn_map.keys())
+        db_urls = set(ProductImage.objects.values_list('image_url', flat=True))
+
+        unmigrated = sum(1 for u in db_urls if is_ebay_image(u))
+
+        cache.cdn_total = len(cdn_urls)
+        cache.db_total = len(db_urls)
+        cache.migrated = len(db_urls) - unmigrated
+        cache.unmigrated = unmigrated
+        cache.orphan = len(cdn_urls - db_urls)
+        cache.computing = False
+        cache.save()
+    except Exception as e:
+        cache.computing = False
+        cache.save(update_fields=['computing'])
+        raise e
+
+    return {
+        'cdn_total': cache.cdn_total,
+        'db_total': cache.db_total,
+        'orphan': cache.orphan,
+    }
+
+
+@app.task(bind=True, time_limit=1200, soft_time_limit=1080)
+def cleanup_orphan_images(self):
+    """异步清理 CDN 孤儿图片"""
+    from datetime import datetime, timedelta
+    from productbase.models import ProductImage
+    from productbase.image_hosting import get_all_cdn_images, delete_cdn_images
+
+    cdn_map = get_all_cdn_images()
+    db_urls = set(ProductImage.objects.values_list('image_url', flat=True))
+
+    cutoff = datetime.now() - timedelta(minutes=5)
+    safe_urls = set()
+    for url, created_at in cdn_map.items():
+        if not created_at:
+            continue
+        try:
+            t = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+            if t < cutoff:
+                safe_urls.add(url)
+        except ValueError:
+            continue
+
+    orphans = list(safe_urls - db_urls)
+    if not orphans:
+        return {'orphan': 0, 'deleted': 0}
+
+    deleted = 0
+    failed = 0
+    for i in range(0, len(orphans), 1000):
+        batch = orphans[i:i + 1000]
+        success, msg = delete_cdn_images(batch)
+        if success:
+            deleted += len(batch)
+        else:
+            failed += len(batch)
+
+    return {'orphan': len(orphans), 'deleted': deleted, 'failed': failed}

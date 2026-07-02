@@ -677,3 +677,18 @@ class WarehouseConfig(models.Model):
     def __str__(self):
         label = self.category_id or self.category_name or "默认"
         return f"{label} → {self.warehouse}"
+
+
+class ImageStatsCache(models.Model):
+    """图片统计缓存 — 由 Celery 异步更新，接口只读缓存"""
+    cdn_total = models.IntegerField(default=0, verbose_name="CDN 总数")
+    db_total = models.IntegerField(default=0, verbose_name="DB 总数")
+    migrated = models.IntegerField(default=0, verbose_name="已迁移")
+    unmigrated = models.IntegerField(default=0, verbose_name="未迁移")
+    orphan = models.IntegerField(default=0, verbose_name="孤儿数")
+    computing = models.BooleanField(default=False, verbose_name="计算中")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "图片统计缓存"
+        verbose_name_plural = verbose_name

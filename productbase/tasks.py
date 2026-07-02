@@ -1237,7 +1237,8 @@ def recover_stuck_fetch_tasks():
         status='PENDING', create_time__lt=pending_cutoff)
     requeued = 0
     for t in pending:
-        fetch_ebay_product_async.delay(task_id=t.id)
+        fetch_ebay_product_async.delay(
+            task_id=t.id, creator=t.creator or 'system')
         requeued += 1
 
     if recovered or requeued:

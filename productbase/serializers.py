@@ -450,11 +450,6 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
     core_skus = ProductCoreWriteSerializer(many=True,
                                            required=False,
                                            write_only=True)
-    _delete_variants = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
-        write_only=True,
-        help_text="按变体值批量删除: [{\"dim\":\"colour\",\"val\":\"Red\"}]")
     images = serializers.SerializerMethodField()
     creator = serializers.SerializerMethodField()
 
@@ -616,48 +611,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                                         assign_sku_after_save)
 
         core_skus_data = validated_data.pop('core_skus', None)
-        _delete_variants_data = validated_data.pop('_delete_variants', None)
         variant_name = validated_data.pop('variant_name', None)
-
-        # 0. 处理按变体值批量删除
-        if _delete_variants_data:
-            main_group = self._get_main_group(instance)
-            if main_group and main_group.variant_name:
-                variant_keys = main_group.get_variant_names()
-                var_map = {0: 'var1', 1: 'var2', 2: 'var3', 3: 'var4'}
-                dim_to_field = {}
-                for i, dim in enumerate(variant_keys):
-                    if i <= 3:
-                        dim_to_field[dim] = var_map[i]
-
-                core_ids_to_delete = set()
-                log_parts = []
-                for item in _delete_variants_data:
-                    dim = (item.get('dim') or '').strip().lower()
-                    val = item.get('val', '')
-                    if not dim or not val:
-                        continue
-                    field = dim_to_field.get(dim)
-                    if not field:
-                        continue
-                    # 主店铺下匹配该变体值的 ProductShop
-                    filter_kw = {f'{field}': val}
-                    matched = ProductShop.objects.filter(
-                        group=main_group, **filter_kw
-                    ).values_list('core_sku_id', flat=True)
-                    ids = list(matched)
-                    if ids:
-                        core_ids_to_delete.update(ids)
-                        log_parts.append(f'{dim}:{val}({len(ids)}个SKU)')
-
-                if core_ids_to_delete:
-                    ProductCore.objects.filter(
-                        id__in=list(core_ids_to_delete)
-                    ).delete()
-                    ProductGroup.objects.filter(base=instance).update(
-                        shop_synced_at=None)
-                    log_product_action(instance, 'VARIANT',
-                                       '删除变体: ' + ', '.join(log_parts))
 
         # 1. 更新 BaseProductGroup 自身字段
         instance = super().update(instance, validated_data)
@@ -865,7 +819,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
             "image_migration_status", "image_migration_summary",
             "var_mappings", "image_migrated", "variant_mapped", "primary_variant",
             "variant_name", "main_variant_name", "main_variant_list",
-            "variant_editor", "core_skus", "_delete_variants",
+            "variant_editor", "core_skus",
             "product_groups"
         ]
 

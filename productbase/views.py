@@ -345,33 +345,6 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             },
                             status=status.HTTP_202_ACCEPTED)
 
-    @action(methods=['post'], detail=True, url_path='delete_core_sku')
-    def delete_core_sku(self, request, pk=None):
-        """按 Core SKU ID 删除变体（级联删除所有店铺的对应记录）"""
-        base = self.get_object()
-        core_sku_id = request.data.get('core_sku_id')
-        if not core_sku_id:
-            return Response(
-                {'msg': 'core_sku_id 不能为空', 'status': 'error'},
-                status=status.HTTP_400_BAD_REQUEST)
-
-        core = base.core_skus.filter(id=core_sku_id).first()
-        if not core:
-            return Response(
-                {'msg': f'Core SKU id={core_sku_id} 不存在', 'status': 'error'},
-                status=status.HTTP_404_NOT_FOUND)
-
-        sku_code = core.sku
-        with transaction.atomic():
-            core.delete()  # CASCADE 删除所有 ProductShop
-            log_product_action(base, 'DELETE_SKU',
-                               f'删除SKU: {sku_code}',
-                               operator=request.user.username)
-
-        return Response(
-            {'msg': f'已删除 SKU: {sku_code}', 'status': 'success'},
-            status=status.HTTP_200_OK)
-
     @action(methods=['post'], detail=False, url_path='update_product_supply')
     def update_product_supply(self, request):
         ids = request.data.get("ids", [])

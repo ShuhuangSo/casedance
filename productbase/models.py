@@ -130,6 +130,12 @@ class ProductGroup(models.Model):
             ]
             name_list = [item for item in name_list if item]
             self.variant_name = ",".join(name_list)
+        # 过滤 4-byte emoji（MySQL utf8 不支持）
+        from productbase.tasks import remove_emoji_special
+        if self.desc:
+            self.desc = remove_emoji_special(self.desc)
+        if self.title:
+            self.title = remove_emoji_special(self.title)
         super().save(*args, **kwargs)
 
 
@@ -208,6 +214,14 @@ class ProductShop(models.Model):
     custom_attributes = models.JSONField(blank=True,
                                          null=True,
                                          verbose_name="自定义属性")
+
+    def save(self, *args, **kwargs):
+        from productbase.tasks import remove_emoji_special
+        if self.title:
+            self.title = remove_emoji_special(self.title)
+        if self.desc:
+            self.desc = remove_emoji_special(self.desc)
+        super().save(*args, **kwargs)
 
     class Meta:
         # 联合唯一：一个店铺组下，同一个核心SKU 只允许一条记录

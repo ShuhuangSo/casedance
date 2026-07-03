@@ -216,6 +216,7 @@ CONN_MAX_AGE = 60
 # 外部服务 Token（从环境变量读取，不进 Git）
 # ======================
 SUPERBED_TOKEN = os.environ.get('SUPERBED_TOKEN', '')
+CDN_RATE_LIMIT_PER_HOUR = int(os.environ.get('CDN_RATE_LIMIT_PER_HOUR', '1000'))
 EBAY_CLIENT_ID = os.environ.get('EBAY_CLIENT_ID', '')
 EBAY_CLIENT_SECRET = os.environ.get('EBAY_CLIENT_SECRET', '')
 

@@ -1,3 +1,4 @@
+import os
 import requests
 import re
 import time
@@ -442,9 +443,9 @@ def match_warehouse(category_id, category_name):
 
     configs = WarehouseConfig.objects.all().order_by('-priority')
 
-    # 1) 精确匹配 category_id
+    # 1) 前缀匹配 category_id（如设置 "15032" 可匹配 "15032|9394|20349"）
     for cfg in configs:
-        if cfg.category_id and cfg.category_id.strip() == (category_id or '').strip():
+        if cfg.category_id and (category_id or '').strip().startswith(cfg.category_id.strip()):
             return cfg.warehouse
 
     # 2) 子串匹配 category_name
@@ -551,7 +552,7 @@ def save_product_to_db(data,
         from_platform=platform,
         primary_variant=primary_variant)
 
-    desc = data.get("group_description") or data.get("single_description", "")
+    desc = (data.get("group_description") or data.get("single_description") or "")
 
     # 处理自定义属性
     variant_attr_names = [n.strip().lower() for n in variant_name.split(',')]
@@ -1004,18 +1005,56 @@ def fetch_and_save_ebay_product_with_task(task,
 
 
 
-@app.task(bind=True, max_retries=3, time_limit=1800, soft_time_limit=1500)
+def _cdn_rate_limit_wait(redis_conn):
+    max_per_hour = getattr(settings, 'CDN_RATE_LIMIT_PER_HOUR', 1000)
+    """
+    滑动窗口速率限制。
+    用 Redis Sorted Set 记录过去 1h 内的上传时间戳。
+    返回需要等待的秒数（0 表示可立即上传）。
+    """
+    now = time.time()
+    cutoff = now - 3600
+
+    # 清理超过 1 小时的记录
+    redis_conn.zremrangebyscore('cdn_upload_ts', 0, cutoff)
+    count = redis_conn.zcard('cdn_upload_ts')
+
+    if count < max_per_hour:
+        return 0
+
+    # 已达上限，等到最旧的记录过期
+    oldest = redis_conn.zrange('cdn_upload_ts', 0, 0, withscores=True)
+    if oldest:
+        wait = oldest[0][1] + 3600 - now + 0.5
+        return max(0, wait)
+    return 60
+
+
+def _cdn_rate_limit_record(redis_conn):
+    """记录一次上传的时间戳"""
+    redis_conn.zadd('cdn_upload_ts', {str(time.time()): time.time()})
+    redis_conn.expire('cdn_upload_ts', 7200)
+
+
+@app.task(bind=True, max_retries=5, time_limit=7200, soft_time_limit=6900)
 def migrate_images_to_cdn(self, base_id):
     """
     Celery 异步任务：将 BaseProductGroup 下所有 eBay 图片迁移到聚合图床。
-    time_limit=30min，防止大量的图片上传时被默认 5min 超时杀死。
-    - 按 image_url 去重，同一 URL 只上传一次
-    - 逐张上传，间隔 0.5s 避免限速
-    - 单张失败重试 3 次（指数退避）
-    - 成功后批量更新所有引用该 URL 的 ProductImage
+    - 滑动窗口限速: 1000张/小时（用 Redis Sorted Set），空闲时全速上传
+    - 每上传成功一张立即写入 DB，确保重试不丢失进度
+    - 异常时自动 retry（countdown=300s=5min）
     """
     from productbase.models import ProductImage, ProductGroup, ProductCore
-    # Celery fork 子进程继承的数据库连接可能已失效，先关闭重建
+    from celery.exceptions import SoftTimeLimitExceeded
+    import redis as redis_lib
+
+    # Redis 限速连接（用 db=2，不与 Celery broker/result 冲突）
+    redis_conn = redis_lib.Redis(
+        host=os.environ.get('REDIS_HOST', '127.0.0.1'),
+        port=int(os.environ.get('REDIS_PORT', '6379')),
+        db=2,
+        decode_responses=False)
+
     close_old_connections()
 
     # 1. 查所有图片
@@ -1033,6 +1072,7 @@ def migrate_images_to_cdn(self, base_id):
 
     if not ebay_images:
         print(f'[CDN] Base {base_id}: no eBay images to migrate')
+        update_image_migrated_status(base_id)
         return {'total': 0, 'migrated': 0, 'failed': 0}
 
     # 2. 按 URL 去重，构建 url → [image_ids] 映射
@@ -1044,61 +1084,66 @@ def migrate_images_to_cdn(self, base_id):
     print(f'[CDN] Base {base_id}: {len(ebay_images)} images, '
           f'{len(unique_urls)} unique URLs to migrate')
 
-    # 3. 逐个上传（去重后），间隔 0.5s
+    # 3. 逐个上传，每张成功后立即写入 DB
     migrated = 0
     failed = 0
     failed_urls = []
-    url_replacements = {}  # old_url → new_url
+    updated_records = 0
 
-    for i, old_url in enumerate(unique_urls):
-        print(f'[CDN] [{i+1}/{len(unique_urls)}] Uploading: {old_url[:70]}...')
-        new_url = upload_image(old_url)
+    try:
+        for i, old_url in enumerate(unique_urls):
+            # 速率限制检查
+            wait = _cdn_rate_limit_wait(redis_conn)
+            if wait > 0:
+                print(f'[CDN] Rate limited, waiting {wait:.0f}s...')
+                time.sleep(wait)
 
-        if new_url:
-            url_replacements[old_url] = new_url
-            migrated += 1
-            print(f'[CDN] [{i+1}/{len(unique_urls)}] OK')
-        else:
-            failed += 1
-            failed_urls.append(old_url)
-            print(f'[CDN] [{i+1}/{len(unique_urls)}] FAILED')
+            print(f'[CDN] [{i+1}/{len(unique_urls)}] Uploading: {old_url[:70]}...')
+            new_url = upload_image(old_url)
 
-        # 间隔 0.5s，避免限速（最后一张不等待）
-        if i < len(unique_urls) - 1:
-            time.sleep(0.5)
+            if new_url:
+                img_ids = url_map[old_url]
+                with transaction.atomic():
+                    ProductImage.objects.filter(
+                        id__in=img_ids).update(image_url=new_url)
+                updated_records += len(img_ids)
+                migrated += 1
+                _cdn_rate_limit_record(redis_conn)
+                print(f'[CDN] [{i+1}/{len(unique_urls)}] OK ({len(img_ids)} records)')
+            else:
+                failed += 1
+                failed_urls.append(old_url)
+                print(f'[CDN] [{i+1}/{len(unique_urls)}] FAILED')
 
-    # 4. 确保数据库连接干净，在事务中批量更新 image_url
-    close_old_connections()
-    updated_count = 0
-    with transaction.atomic():
-        for old_url, new_url in url_replacements.items():
-            img_ids = url_map[old_url]
-            ProductImage.objects.filter(id__in=img_ids).update(image_url=new_url)
-            updated_count += len(img_ids)
+    except SoftTimeLimitExceeded:
+        print(f'[CDN] Base {base_id} soft time limit, retrying...')
+        raise self.retry(countdown=300)
+    except Exception as e:
+        print(f'[CDN] Base {base_id} error: {e}, retrying...')
+        raise self.retry(exc=e, countdown=300)
 
+    # 4. 刷新迁移状态 + 记录日志
     result = {
         'total': len(ebay_images),
         'unique_urls': len(unique_urls),
         'migrated': migrated,
         'failed': failed,
-        'updated_records': updated_count
+        'updated_records': updated_records,
     }
     if failed_urls:
         result['failed_urls'] = failed_urls
     print(f'[CDN] Base {base_id} done: {result}')
+
     try:
         base = BaseProductGroup.objects.get(id=base_id)
-        if result['migrated'] > 0 or result['failed'] > 0:
-            m = result['migrated']
-            f = result['failed']
-            if f > 0:
+        if migrated > 0 or failed > 0:
+            if failed > 0:
                 log_product_action(base, 'IMAGE_MIGRATE',
-                                   f'图片迁移部分完成：{m}/{len(unique_urls)} 成功，{f} 失败。'
+                                   f'图片迁移部分完成：{migrated}/{len(unique_urls)} 成功，{failed} 失败。'
                                    f'失败 URL：{", ".join(failed_urls[:5])}')
             else:
                 log_product_action(base, 'IMAGE_MIGRATE',
-                                   f'迁移 {m} 张图片（{result["updated_records"]} 条记录更新）')
-        # 无论有无迁移，都刷新状态
+                                   f'迁移 {migrated} 张图片（{updated_records} 条记录更新）')
         update_image_migrated_status(base_id)
     except BaseProductGroup.DoesNotExist:
         pass
@@ -1212,15 +1257,14 @@ def check_and_update_base_status(base_ids):
 def recover_stuck_fetch_tasks():
     """
     每分钟执行一次，恢复卡住的任务：
-    - PROCESSING 超过 30 分钟 → 重置为 PENDING 并重新投递
-    - PENDING 超过 5 分钟 → 重新投递到 Celery（应对 worker 重启丢失队列）
+    - PROCESSING 超过 30 分钟 → 重置为 PENDING
+    （注意：不重复投递 PENDING 任务。Redis 持久化队列，worker 重启不会丢失任务，
+     重复投递反而会导致队列中多个相同任务副本，产生重复产品）
     """
     from productbase.models import FetchTask
     from django.utils import timezone as dj_timezone
 
     now = dj_timezone.now()
-
-    # 1. PROCESSING 超过 30 分钟
     stuck_cutoff = now - datetime.timedelta(minutes=30)
     stuck = FetchTask.objects.filter(
         status='PROCESSING', update_time__lt=stuck_cutoff)
@@ -1231,20 +1275,9 @@ def recover_stuck_fetch_tasks():
         t.save()
         recovered += 1
 
-    # 2. PENDING 超过 5 分钟没有投递的，重新投递
-    pending_cutoff = now - datetime.timedelta(minutes=5)
-    pending = FetchTask.objects.filter(
-        status='PENDING', create_time__lt=pending_cutoff)
-    requeued = 0
-    for t in pending:
-        fetch_ebay_product_async.delay(
-            task_id=t.id, creator=t.creator or 'system')
-        requeued += 1
-
-    if recovered or requeued:
-        print(f'[RECOVER] Reset {recovered} PROCESSING → PENDING, '
-              f're-queued {requeued} PENDING tasks')
-    return {'recovered': recovered, 'requeued': requeued}
+    if recovered:
+        print(f'[RECOVER] Reset {recovered} PROCESSING → PENDING')
+    return {'recovered': recovered}
 
 
 # ======================

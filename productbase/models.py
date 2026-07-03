@@ -19,7 +19,7 @@ class BaseProductGroup(models.Model):
     存储产品公共顶层信息
     """
     p_status = models.CharField(max_length=30, verbose_name="产品状态")
-    category = models.CharField(max_length=100,
+    category = models.CharField(max_length=500,
                                 blank=True,
                                 verbose_name="产品类目")
     category_id = models.CharField(max_length=100,
@@ -653,7 +653,7 @@ class WarehouseConfig(models.Model):
         max_length=200,
         blank=True,
         verbose_name="类目ID",
-        help_text="精确匹配 eBay categoryIdPath，如: 150|173444")
+        help_text="前缀匹配 eBay categoryIdPath，如: 15032 可匹配 15032|9394|20349")
     category_name = models.CharField(
         max_length=200,
         blank=True,

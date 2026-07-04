@@ -165,6 +165,10 @@ class ProductCore(models.Model):
                                   blank=True,
                                   default='',
                                   verbose_name="仓库")
+    mb_product_status = models.CharField(max_length=50,
+                                          blank=True,
+                                          default='',
+                                          verbose_name="MB产品状态")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
     sku_synced_at = models.DateTimeField(null=True,
                                          blank=True,
@@ -677,6 +681,11 @@ class WarehouseConfig(models.Model):
         max_length=100,
         verbose_name="仓库名称",
         help_text="匹配到的仓库，如: F仓、华强仓")
+    mb_product_status = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="MB产品状态",
+        help_text="匹到的仓库关联的MB状态，如: 正常销售、商品清仓")
     priority = models.IntegerField(
         default=0,
         verbose_name="优先级",

@@ -431,13 +431,15 @@ def apply_variant_mapping(variant_keys, var_values):
 
 def match_warehouse(category_id, category_name):
     """
-    根据类目匹配仓库。
+    根据类目匹配仓库及 MB 产品状态。
+
+    返回 (warehouse, mb_product_status) 元组。
 
     匹配优先级：
     1) category_id 精确匹配
     2) category_name 子串匹配（大小写不敏感）
     3) 兜底：category_id 和 category_name 均为空的规则
-    4) 硬编码兜底：'F仓'
+    4) 硬编码兜底：'F仓', ''
     """
     from productbase.models import WarehouseConfig
 
@@ -446,20 +448,20 @@ def match_warehouse(category_id, category_name):
     # 1) 前缀匹配 category_id（如设置 "15032" 可匹配 "15032|9394|20349"）
     for cfg in configs:
         if cfg.category_id and (category_id or '').strip().startswith(cfg.category_id.strip()):
-            return cfg.warehouse
+            return cfg.warehouse, cfg.mb_product_status or ''
 
     # 2) 子串匹配 category_name
     for cfg in configs:
         if cfg.category_name and cfg.category_name.strip().lower() in (category_name or '').lower():
-            return cfg.warehouse
+            return cfg.warehouse, cfg.mb_product_status or ''
 
     # 3) 兜底规则（category_id 和 category_name 均为空）
     fallback = configs.filter(category_id='', category_name='').first()
     if fallback:
-        return fallback.warehouse
+        return fallback.warehouse, fallback.mb_product_status or ''
 
     # 4) 硬编码兜底
-    return 'F仓'
+    return 'F仓', ''
 
 
 def build_var_mappings_from_config(dim_values):
@@ -658,7 +660,7 @@ def save_product_to_db(data,
                                  variant_keys,
                                  [var1, var2, var3, var4],
                                  base.var_mappings)
-        warehouse = match_warehouse(
+        warehouse, mb_status = match_warehouse(
             base.category_id, base.category)
         core_sku = ProductCore.objects.create(base=base,
                                               sku=generate_unique_sku(),
@@ -666,7 +668,8 @@ def save_product_to_db(data,
                                               UPC="",
                                               cost=cost if cost > 0 else 0,
                                               purchase_url="",
-                                              warehouse=warehouse)
+                                              warehouse=warehouse,
+                                              mb_product_status=mb_status)
         assign_sku_after_save(core_sku)
         original_prices[core_sku.id] = original_price
 

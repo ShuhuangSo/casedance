@@ -44,6 +44,7 @@ class ProductShopSerializer(serializers.ModelSerializer):
     purchase_url = serializers.CharField(source="core_sku.purchase_url",
                                          read_only=True)
     warehouse = serializers.CharField(source="core_sku.warehouse", read_only=True)
+    mb_product_status = serializers.CharField(source="core_sku.mb_product_status", read_only=True)
     is_synced = serializers.SerializerMethodField()
 
     def get_is_synced(self, obj):
@@ -66,6 +67,7 @@ class ProductShopSerializer(serializers.ModelSerializer):
             "UPC",
             "purchase_url",  # 来自核心SKU
             "warehouse",
+            "mb_product_status",
             "price",
             "currency",
             "var1",
@@ -284,6 +286,7 @@ class ProductCoreWriteSerializer(serializers.Serializer):
                                     required=False)
     purchase_url = serializers.CharField(required=False, allow_blank=True)
     warehouse = serializers.CharField(required=False, allow_blank=True)
+    mb_product_status = serializers.CharField(required=False, allow_blank=True)
 
     # ProductShop 同步字段（修改后同步到所有店铺）
     var1 = serializers.CharField(required=False, allow_blank=True)
@@ -666,7 +669,7 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                 images_data = sku_data.pop('images', None)
 
                 # 分离 core 字段和 shop 同步字段
-                core_field_names = ['sku', 'p_name', 'UPC', 'cost', 'purchase_url', 'warehouse']
+                core_field_names = ['sku', 'p_name', 'UPC', 'cost', 'purchase_url', 'warehouse', 'mb_product_status']
                 shop_field_names = [
                     'var1', 'var2', 'var3', 'var4', 'price', 'currency'
                 ]
@@ -739,7 +742,8 @@ class BaseProductGroupSerializer(serializers.ModelSerializer):
                         UPC=core_fields.get('UPC', ''),
                         cost=core_fields.get('cost', 0),
                         purchase_url=core_fields.get('purchase_url', ''),
-                        warehouse=core_fields.get('warehouse', ''))
+                        warehouse=core_fields.get('warehouse', ''),
+                        mb_product_status=core_fields.get('mb_product_status', ''))
                     # 如果 SKU 是自动生成的临时值，用自增 ID 回写
                     if not core_fields.get('sku') or core_fields.get(
                             'sku') == '待分配':
@@ -1100,7 +1104,7 @@ class WarehouseConfigSerializer(serializers.ModelSerializer):
         model = WarehouseConfig
         fields = [
             "id", "category_id", "category_name", "warehouse",
-            "priority", "create_time",
+            "mb_product_status", "priority", "create_time",
         ]
         read_only_fields = ["create_time"]
 

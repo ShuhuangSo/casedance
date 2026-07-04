@@ -253,6 +253,7 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         ws.title = 'SKU导出'
         headers = [
             '*库存sku编号', '*库存sku中文名称', '商品重量', '统一成本价(RMB)', '仓库',
+            'sku状态(自动创建、等待开发、正常销售、商品清仓、停止销售)',
             '供应商', '供应商商品网址', '库存图片地址'
         ]
         ws.append(headers)
@@ -268,7 +269,8 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         for core in cores:
             ws.append([
                 core.sku, core.p_name, 70,
-                float(core.cost), core.warehouse or 'F仓', core.base.supplier or '',
+                float(core.cost), core.warehouse or 'F仓', core.mb_product_status or '',
+                core.base.supplier or '',
                 core.purchase_url or '',
                 cover_map.get(core.id, '')
             ])

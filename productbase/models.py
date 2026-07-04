@@ -102,9 +102,11 @@ class ProductGroup(models.Model):
     shop_synced_at = models.DateTimeField(null=True,
                                           blank=True,
                                           verbose_name="上次同步时间")
-    title_optimized = models.BooleanField(default=False,
+    title_optimized = models.BooleanField(default=None,
+                                           null=True,
                                            verbose_name="标题已优化")
-    desc_optimized = models.BooleanField(default=False,
+    desc_optimized = models.BooleanField(default=None,
+                                          null=True,
                                           verbose_name="描述已优化")
 
     class Meta:
@@ -457,6 +459,10 @@ class ShopConfig(models.Model):
     is_main = models.BooleanField(default=False, verbose_name="是否主店铺")
     auto_create_shop = models.BooleanField(default=True,
                                            verbose_name="创建产品时自动创建店铺")
+    auto_optimize_title = models.BooleanField(default=False,
+                                              verbose_name="自动AI优化标题")
+    auto_optimize_desc = models.BooleanField(default=False,
+                                             verbose_name="自动AI优化描述")
 
     listing_config = models.ForeignKey("ListingConfig",
                                        null=True,

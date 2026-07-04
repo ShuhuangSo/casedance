@@ -1244,10 +1244,11 @@ def check_and_update_base_status(base_ids):
                 update_image_migrated_status(base_id)
                 update_variant_mapped_status(base_id)
 
-                # INIT→PREPARING 时异步触发图片迁移
+                # INIT→PREPARING 时异步触发图片迁移 & AI 自动优化
                 if was_init:
                     print(f'[CDN] Dispatching migration for base {base_id}')
                     migrate_images_to_cdn.delay(base_id)
+                    auto_optimize_product.delay(base_id)
 
         except Exception:
             continue
@@ -1359,3 +1360,107 @@ def cleanup_orphan_images(self):
             failed += len(batch)
 
     return {'orphan': len(orphans), 'deleted': deleted, 'failed': failed}
+
+
+# ======================
+# 自动 AI 优化（主店铺）
+# ======================
+@app.task(bind=True, max_retries=2)
+def auto_optimize_product(self, base_id):
+    """
+    INIT→PREPARING 时自动触发主店铺标题/描述 AI 优化。
+    仅优化主店铺，子店铺直接复制结果。
+    """
+    from productbase.dify import optimize_product_text, record_dify_usage
+    from productbase.models import BaseProductGroup, ShopConfig
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
+    try:
+        base = BaseProductGroup.objects.get(id=base_id)
+    except BaseProductGroup.DoesNotExist:
+        return {'status': 'error', 'msg': '产品不存在'}
+
+    # 仅 PREPARING 状态
+    if base.p_status != 'PREPARING':
+        return {'status': 'skip', 'msg': '非 PREPARING 状态'}
+
+    # 找用户
+    user = User.objects.filter(username=base.creator).first()
+    if not user:
+        return {'status': 'skip', 'msg': '创建人不存在'}
+
+    # 查主店铺配置
+    main_config = ShopConfig.objects.filter(user=user, is_main=True).first()
+    if not main_config:
+        return {'status': 'skip', 'msg': '无主店铺配置'}
+
+    if not main_config.auto_optimize_title and not main_config.auto_optimize_desc:
+        return {'status': 'skip', 'msg': '未开启自动优化'}
+
+    # 找主 ProductGroup
+    main_pg = base.product_groups.filter(is_main=True).first()
+    if not main_pg:
+        main_pg = base.product_groups.first()
+    if not main_pg:
+        return {'status': 'skip', 'msg': '无店铺'}
+
+    # title_optimized: None=从未优化, False=执行中, True=已完成
+    # 只要不等于 None 就说明已处理过，跳过
+    if main_config.auto_optimize_title and main_pg.title_optimized is not None:
+        main_config.auto_optimize_title = False
+    if main_config.auto_optimize_desc and main_pg.desc_optimized is not None:
+        main_config.auto_optimize_desc = False
+
+    if not main_config.auto_optimize_title and not main_config.auto_optimize_desc:
+        return {'status': 'skip', 'msg': '已优化过'}
+
+    optimized = []
+
+    # 优化标题
+    if main_config.auto_optimize_title:
+        # 先标记为执行中
+        main_pg.title_optimized = False
+        main_pg.save(update_fields=['title_optimized'])
+        try:
+            result, usage, error = optimize_product_text(
+                main_pg.id, 'EBAY_TITLE', user=user)
+            if not error and result.get('title'):
+                new_title = result['title']
+                main_pg.title = new_title
+                main_pg.title_optimized = True
+                main_pg.save(update_fields=['title', 'title_optimized'])
+                base.product_groups.filter(is_main=False).update(title=new_title)
+                record_dify_usage(user, main_pg, 'EBAY_TITLE', usage)
+                log_product_action(base, 'OPTIMIZE_TITLE',
+                                   f'自动优化标题: {usage.get("total_tokens", 0)} tokens')
+                optimized.append('标题')
+        except Exception as e:
+            print(f'[AutoOptimize] title error: {e}')
+            raise self.retry(exc=e, countdown=120)
+
+    # 优化描述
+    if main_config.auto_optimize_desc:
+        main_pg.desc_optimized = False
+        main_pg.save(update_fields=['desc_optimized'])
+        try:
+            result, usage, error = optimize_product_text(
+                main_pg.id, 'EBAY_DESC', user=user)
+            if not error and result.get('desc'):
+                new_desc = result['desc']
+                main_pg.desc = new_desc
+                main_pg.desc_optimized = True
+                main_pg.save(update_fields=['desc', 'desc_optimized'])
+                base.product_groups.filter(is_main=False).update(desc=new_desc)
+                record_dify_usage(user, main_pg, 'EBAY_DESC', usage)
+                log_product_action(base, 'OPTIMIZE_DESC',
+                                   f'自动优化描述: {usage.get("total_tokens", 0)} tokens')
+                optimized.append('描述')
+        except Exception as e:
+            print(f'[AutoOptimize] desc error: {e}')
+            raise self.retry(exc=e, countdown=120)
+
+    if optimized:
+        print(f'[AutoOptimize] base {base_id}: {"、".join(optimized)} 优化完成')
+    return {'status': 'success', 'optimized': optimized}

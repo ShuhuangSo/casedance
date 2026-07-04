@@ -982,6 +982,7 @@ class ShopConfigSerializer(serializers.ModelSerializer):
         fields = [
             "id", "user", "platform", "shop_account", "site",
             "is_main", "auto_create_shop",
+            "auto_optimize_title", "auto_optimize_desc",
             "listing_config", "pricing_rule",
             "creator", "create_time"
         ]

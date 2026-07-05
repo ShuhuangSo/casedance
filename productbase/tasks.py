@@ -1433,8 +1433,10 @@ def auto_optimize_product(self, base_id):
                 main_pg.save(update_fields=['title', 'title_optimized'])
                 base.product_groups.filter(is_main=False).update(title=new_title)
                 record_dify_usage(user, main_pg, 'EBAY_TITLE', usage)
+                tokens = usage.get('total_tokens', 0)
+                cost = usage.get('total_price', '0')
                 log_product_action(base, 'OPTIMIZE_TITLE',
-                                   f'自动优化标题: {usage.get("total_tokens", 0)} tokens')
+                                   f'自动优化标题: {tokens} tokens, ¥{cost}')
                 optimized.append('标题')
         except Exception as e:
             print(f'[AutoOptimize] title error: {e}')
@@ -1454,8 +1456,10 @@ def auto_optimize_product(self, base_id):
                 main_pg.save(update_fields=['desc', 'desc_optimized'])
                 base.product_groups.filter(is_main=False).update(desc=new_desc)
                 record_dify_usage(user, main_pg, 'EBAY_DESC', usage)
+                tokens = usage.get('total_tokens', 0)
+                cost = usage.get('total_price', '0')
                 log_product_action(base, 'OPTIMIZE_DESC',
-                                   f'自动优化描述: {usage.get("total_tokens", 0)} tokens')
+                                   f'自动优化描述: {tokens} tokens, ¥{cost}')
                 optimized.append('描述')
         except Exception as e:
             print(f'[AutoOptimize] desc error: {e}')

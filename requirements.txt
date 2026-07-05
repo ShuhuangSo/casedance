@@ -49,3 +49,4 @@ xlrd==2.0.1
 xlwt==1.3.0
 xToolkit==0.0.68
 zipp==3.6.0
+flower==0.9.7

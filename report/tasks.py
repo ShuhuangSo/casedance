@@ -12,7 +12,7 @@ from sale.models import Customer, OrderDetail
 from setting.models import TaskLog
 
 
-@shared_task()
+@shared_task(time_limit=1800, soft_time_limit=1500)
 def calc_customer_report():
     customers = Customer.objects.filter(is_active=True)
     # 计算所有客户60天的销量数据
@@ -56,7 +56,7 @@ def calc_customer_report():
 
 
 # 计算sku产品60天每天销量
-@shared_task()
+@shared_task(time_limit=1800, soft_time_limit=1500)
 def calc_product_sale():
 
     q = Q()
@@ -101,7 +101,7 @@ def calc_product_sale():
 
 
 # 计算产品60天每天累积总销量
-@shared_task()
+@shared_task(time_limit=1800, soft_time_limit=1500)
 def calc_total_sale():
     add_list = []
     for i in range(60):

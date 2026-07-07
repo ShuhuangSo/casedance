@@ -1048,7 +1048,7 @@ def migrate_images_to_cdn(self, base_id):
     - 异常时自动 retry（countdown=300s=5min）
     """
     from productbase.models import ProductImage, ProductGroup, ProductCore
-    from celery.exceptions import SoftTimeLimitExceeded
+    from celery.exceptions import SoftTimeLimitExceeded, Retry
     import redis as redis_lib
 
     # Redis 限速连接（用 db=2，不与 Celery broker/result 冲突）
@@ -1097,8 +1097,10 @@ def migrate_images_to_cdn(self, base_id):
         for i, old_url in enumerate(unique_urls):
             # 速率限制检查
             wait = _cdn_rate_limit_wait(redis_conn)
-            if wait > 0:
-                print(f'[CDN] Rate limited, waiting {wait:.0f}s...')
+            if wait > 30:
+                print(f'[CDN] Rate limited, retry in {wait:.0f}s...')
+                raise self.retry(countdown=int(wait))
+            elif wait > 0:
                 time.sleep(wait)
 
             print(f'[CDN] [{i+1}/{len(unique_urls)}] Uploading: {old_url[:70]}...')
@@ -1118,6 +1120,8 @@ def migrate_images_to_cdn(self, base_id):
                 failed_urls.append(old_url)
                 print(f'[CDN] [{i+1}/{len(unique_urls)}] FAILED')
 
+    except Retry:
+        raise
     except SoftTimeLimitExceeded:
         print(f'[CDN] Base {base_id} soft time limit, retrying...')
         raise self.retry(countdown=300)

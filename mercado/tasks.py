@@ -1301,7 +1301,7 @@ def upload_mercado_kj_order(shop_id, notify_id, mel_row):
         ex_rate = er.value
 
         # 模板格式检查
-        # 记录表头对应的列索引
+        # 记录表头对应的列索引（大小写不敏感，兼容新旧报表格式）
         header_index = {}
         header_row = sheet[mel_row]
         if header_row is None:
@@ -1312,8 +1312,11 @@ def upload_mercado_kj_order(shop_id, notify_id, mel_row):
             return 'ERROR'
         for col_index, cell in enumerate(header_row, start=0):
             header = cell.value
-            if header in required_headers and header not in header_index:
-                header_index[header] = col_index
+            if header and header not in header_index:
+                for rh in required_headers:
+                    if header.lower() == rh.lower():
+                        header_index[rh] = col_index
+                        break
 
         # 检查是否所有必需的表头都存在
         if not all(header in header_index for header in required_headers):

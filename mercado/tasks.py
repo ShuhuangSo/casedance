@@ -806,7 +806,7 @@ def sd_auto_sync():
 
 
 # 计算mercado产品销量
-@shared_task
+@shared_task(time_limit=1800, soft_time_limit=1500)
 def calc_product_sales():
     shops = Shop.objects.filter(warehouse_type='FBM', is_active=True)
     for s in shops:
@@ -908,7 +908,7 @@ def calc_product_sales():
 
 
 # 计算店铺30天每天累积总销量
-@shared_task()
+@shared_task(time_limit=1800, soft_time_limit=1500)
 def calc_shop_sale():
     # 删除订单状态过滤
     # q = Q()

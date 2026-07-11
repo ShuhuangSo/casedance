@@ -151,6 +151,44 @@ class ProductGroupCreateSerializer(serializers.ModelSerializer):
         return pg
 
 
+class ProductGroupListSerializer(serializers.ModelSerializer):
+    """店铺列表轻量序列化器"""
+    cover_image = serializers.SerializerMethodField()
+    is_synced = serializers.SerializerMethodField()
+    listing_config_name = serializers.SerializerMethodField()
+    # 关联 BaseProductGroup 字段
+    base_id = serializers.IntegerField(source="base.id", read_only=True)
+    base_p_status = serializers.CharField(source="base.p_status", read_only=True)
+    base_supplier = serializers.CharField(source="base.supplier", read_only=True)
+    base_series = serializers.CharField(source="base.series", read_only=True)
+    base_creator = serializers.CharField(source="base.creator", read_only=True)
+    base_sku_count = serializers.SerializerMethodField()
+
+    def get_cover_image(self, obj):
+        cover = obj.images.filter(is_cover=True).first()
+        return cover.image_url if cover else ""
+
+    def get_is_synced(self, obj):
+        return obj.shop_synced_at is not None
+
+    def get_listing_config_name(self, obj):
+        return obj.listing_config.name if obj.listing_config else ""
+
+    def get_base_sku_count(self, obj):
+        return obj.base.core_skus.count()
+
+    class Meta:
+        model = ProductGroup
+        fields = [
+            "id", "shop_account", "platform", "title", "site",
+            "cover_image", "is_synced",
+            "listing_config_name",
+            "title_optimized", "desc_optimized",
+            "base_id", "base_p_status", "base_supplier", "base_series",
+            "base_creator", "base_sku_count",
+        ]
+
+
 class ProductGroupSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)  # 显式声明，允许嵌套更新时匹配
     variants = ProductShopSerializer(many=True, source="shop_skus", required=False)

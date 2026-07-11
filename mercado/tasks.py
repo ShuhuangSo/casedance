@@ -1206,6 +1206,7 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
                         buyer_country=buyer_country,
                         sp_fee=sp_fee,
                         sp_fee_rate=sp_fee_rate,
+                        group_id=shop_stock.group_id,
                     ))
                 shop_stock.qty -= qty
                 shop_stock.save()
@@ -1458,6 +1459,7 @@ def upload_mercado_kj_order(shop_id, notify_id, mel_row):
                         buyer_state=buyer_state,
                         buyer_postcode=buyer_postcode,
                         buyer_country=buyer_country,
+                        group_id=shop_stock.group_id,
                     ))
                 shop_stock.qty -= qty
                 shop_stock.save()
@@ -1662,6 +1664,7 @@ def upload_emag_order(shop_id, notify_id, mel_row):
                         profit_rate=profit_rate,
                         buyer_name=buyer_name,
                         buyer_address=buyer_address,
+                        group_id=shop_stock.group_id,
                     ))
                 shop_stock.qty -= qty
                 shop_stock.save()
@@ -1834,6 +1837,7 @@ def upload_noon_order(shop_id, notify_id):
                         buyer_id=buyer_id,
                         buyer_city=buyer_city,
                         buyer_country=buyer_country,
+                        group_id=shop_stock.group_id,
                     ))
                 shop_stock.qty -= 1
                 shop_stock.save()
@@ -2111,6 +2115,7 @@ def upload_ozon_order(shop_id, notify_id):
                         image=shop_stock.image,
                         unit_cost=shop_stock.unit_cost * qty,
                         first_ship_cost=first_ship_cost * qty,
+                        group_id=shop_stock.group_id,
                     ))
                 # 取消订单不扣库存
                 if order_status != 'CANCEL':

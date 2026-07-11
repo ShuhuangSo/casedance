@@ -1298,17 +1298,26 @@ def compute_image_stats(self):
     cache.save(update_fields=['computing'])
 
     try:
+        # CDN API 可能耗时较长，先关闭 DB 连接避免超时断连
+        from django.db import connection
+        connection.close()
         cdn_map = get_all_cdn_images()
-        cdn_urls = set(cdn_map.keys())
+        cdn_total = len(cdn_map)
+
         db_urls = set(ProductImage.objects.values_list('image_url', flat=True))
-
+        db_total = len(db_urls)
         unmigrated = sum(1 for u in db_urls if is_ebay_image(u))
+        migrated = db_total - unmigrated
 
-        cache.cdn_total = len(cdn_urls)
-        cache.db_total = len(db_urls)
-        cache.migrated = len(db_urls) - unmigrated
+        # CDN API 返回的 URL 格式与 DB 中存储的格式不同（/i/ vs /item/），
+        # 无法直接 URL 匹配，改用公式估算: orphan = cdn_total - migrated
+        orphan = max(0, cdn_total - migrated)
+
+        cache.cdn_total = cdn_total
+        cache.db_total = db_total
+        cache.migrated = migrated
         cache.unmigrated = unmigrated
-        cache.orphan = len(cdn_urls - db_urls)
+        cache.orphan = orphan
         cache.computing = False
         cache.save()
     except Exception as e:
@@ -1325,41 +1334,41 @@ def compute_image_stats(self):
 
 @app.task(bind=True, time_limit=1200, soft_time_limit=1080)
 def cleanup_orphan_images(self):
-    """异步清理 CDN 孤儿图片"""
-    from datetime import datetime, timedelta
-    from productbase.models import ProductImage
-    from productbase.image_hosting import get_all_cdn_images, delete_cdn_images
+    """异步清理 CDN 孤儿图片。
+    注意：CDN API 返回的 URL 格式（/i/xxx）与 DB 存储的旧格式（/item/xxx）不一致，
+    无法通过 URL 精确匹配孤儿图片，仅作估算统计，不执行实际删除。
+    后续统一 URL 格式后可恢复删除功能。
+    """
+    from productbase.models import ProductImage, ImageStatsCache
+    from productbase.image_hosting import get_all_cdn_images, is_ebay_image
+    from django.db import connection
 
+    # CDN API 可能耗时较长，先关闭 DB 连接避免超时断连
+    connection.close()
     cdn_map = get_all_cdn_images()
+    cdn_total = len(cdn_map)
+
     db_urls = set(ProductImage.objects.values_list('image_url', flat=True))
+    db_total = len(db_urls)
+    unmigrated = sum(1 for u in db_urls if is_ebay_image(u))
+    migrated = db_total - unmigrated
+    orphan = max(0, cdn_total - migrated)
 
-    cutoff = datetime.now() - timedelta(minutes=5)
-    safe_urls = set()
-    for url, created_at in cdn_map.items():
-        if not created_at:
-            continue
-        try:
-            t = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
-            if t < cutoff:
-                safe_urls.add(url)
-        except ValueError:
-            continue
+    # 更新统计缓存
+    cache, _ = ImageStatsCache.objects.get_or_create(id=1)
+    cache.cdn_total = cdn_total
+    cache.db_total = db_total
+    cache.migrated = migrated
+    cache.unmigrated = unmigrated
+    cache.orphan = orphan
+    cache.computing = False
+    cache.save()
 
-    orphans = list(safe_urls - db_urls)
-    if not orphans:
-        return {'orphan': 0, 'deleted': 0}
-
-    deleted = 0
-    failed = 0
-    for i in range(0, len(orphans), 1000):
-        batch = orphans[i:i + 1000]
-        success, msg = delete_cdn_images(batch)
-        if success:
-            deleted += len(batch)
-        else:
-            failed += len(batch)
-
-    return {'orphan': len(orphans), 'deleted': deleted, 'failed': failed}
+    return {
+        'orphan': orphan,
+        'deleted': 0,
+        'note': 'URL 格式不一致（/i/ vs /item/），无法精确删除孤儿图片，仅更新统计',
+    }
 
 
 # ======================

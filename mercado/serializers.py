@@ -636,7 +636,8 @@ class MLOrderSerializer(serializers.ModelSerializer):
                   'platform', 'buyer_id', 'shipped_date', 'delivered_date',
                   'VAT', 'invoice_price', 'promo_coupon', 'fee_rate',
                   'fbo_fee', 'last_mile_fee', 'payment_fee', 'finance_check1',
-                  'finance_check2', 'sp_fee', 'sp_fee_rate', 'dispatch_number')
+                  'finance_check2', 'sp_fee', 'sp_fee_rate', 'dispatch_number',
+                  'group_id')
 
 
 class FinanceSerializer(serializers.ModelSerializer):

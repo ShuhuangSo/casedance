@@ -1998,6 +1998,11 @@ class MLOrder(models.Model):
                                     blank=True,
                                     verbose_name='服务商费率',
                                     help_text='服务商费率')
+    group_id = models.CharField(max_length=40,
+                                null=True,
+                                blank=True,
+                                verbose_name='合并ID',
+                                help_text='合并ID')
 
     class Meta:
         verbose_name = '销售订单'

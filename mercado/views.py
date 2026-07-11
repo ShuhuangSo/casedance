@@ -5174,7 +5174,7 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         'order_status': ['exact'],
         'finance_check1': ['exact'],
     }
-    search_fields = ('order_number', 'sku', 'p_name', 'item_id')  # 配置搜索字段
+    search_fields = ('order_number', 'sku', 'p_name', 'item_id', 'group_id')  # 配置搜索字段
     ordering_fields = ('create_time', 'order_time', 'order_time_bj', 'price',
                        'profit')  # 配置排序字段
 
@@ -5312,6 +5312,7 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                         buyer_state=buyer_state,
                         buyer_postcode=buyer_postcode,
                         buyer_country=buyer_country,
+                        group_id=shop_stock.group_id,
                     ))
                 shop_stock.qty -= qty
                 shop_stock.save()
@@ -5436,6 +5437,70 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             'status': 'success'
         },
                         status=status.HTTP_200_OK)
+
+    # 销售排行统计
+    @action(methods=['get'], detail=False, url_path='sales_ranking')
+    def sales_ranking(self, request):
+        """销售排行：按 group_id(链接) 或 sku(产品) 统计区间内销量排行"""
+        shop_id = request.query_params.get('shop_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        rank_by = request.query_params.get('rank_by', 'group_id')
+        limit = int(request.query_params.get('limit', 50))
+
+        if not all([shop_id, start_date, end_date]):
+            return Response({
+                'msg': 'shop_id, start_date, end_date 为必填',
+                'status': 'error'
+            },
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        base_qs = MLOrder.objects.filter(
+            shop_id=shop_id,
+            order_time__date__gte=start_date,
+            order_time__date__lte=end_date
+        )
+        if not user.is_superuser:
+            base_qs = base_qs.filter(shop__user=user)
+
+        if rank_by == 'sku':
+            ranking = base_qs.values('sku').annotate(
+                total_qty=Sum('qty')
+            ).order_by('-total_qty')[:limit]
+            result = []
+            for item in ranking:
+                order = base_qs.filter(sku=item['sku']).first()
+                result.append({
+                    'sku': item['sku'],
+                    'p_name': order.p_name if order else '',
+                    'image': order.image.url if order and order.image else None,
+                    'group_id': order.group_id if order else '',
+                    'total_qty': item['total_qty'],
+                })
+        else:
+            ranking = base_qs.exclude(
+                group_id='').exclude(group_id__isnull=True).values(
+                    'group_id').annotate(total_qty=Sum('qty')).order_by(
+                        '-total_qty')[:limit]
+            result = []
+            for item in ranking:
+                # 取该 group_id 下销量最高的 SKU 作为代表
+                top_sku = base_qs.filter(
+                    group_id=item['group_id']).values('sku').annotate(
+                        sku_qty=Sum('qty')).order_by('-sku_qty').first()
+                sku = top_sku['sku'] if top_sku else ''
+                order = base_qs.filter(
+                    group_id=item['group_id'], sku=sku).first()
+                result.append({
+                    'group_id': item['group_id'],
+                    'sku': sku,
+                    'p_name': order.p_name if order else '',
+                    'image': order.image.url if order and order.image else None,
+                    'total_qty': item['total_qty'],
+                })
+
+        return Response({'results': result, 'status': 'success'})
 
 
 class MLOperateLogViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,

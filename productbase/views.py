@@ -17,7 +17,8 @@ from .models import (BaseProductGroup, ProductGroup, ProductCore, ProductShop,
                      ShopConfig, ListingConfig, FetchConfig, PricingRule,
                      DifyUsageLog, VariantMappingAttribute, WarehouseConfig)
 from .serializers import (BaseProductGroupSerializer, BaseProductGroupListSerializer,
-                           ProductGroupSerializer, FetchTaskSerializer,
+                           ProductGroupSerializer, ProductGroupListSerializer,
+                           FetchTaskSerializer,
                            SupplierSerializer, ProductSeriesSerializer,
                            ProductLogSerializer, ShopConfigSerializer,
                            ListingConfigSerializer, FetchConfigSerializer,
@@ -762,17 +763,53 @@ class BaseProductGroupViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         return resp
 
 
-class ProductGroupViewSet(mixins.RetrieveModelMixin,
+class ProductGroupFilter(FilterSet):
+    base_status = CharFilter(field_name='base__p_status', label='产品状态')
+    creator = CharFilter(field_name='base__creator', label='创建人')
+    synced = CharFilter(method='filter_synced', label='同步状态')
+
+    def filter_synced(self, queryset, name, value):
+        if value.lower() in ('true', '1'):
+            return queryset.filter(shop_synced_at__isnull=False)
+        if value.lower() in ('false', '0'):
+            return queryset.filter(shop_synced_at__isnull=True)
+        return queryset
+
+    class Meta:
+        model = ProductGroup
+        fields = ['shop_account', 'listing_config', 'creator']
+
+
+class ProductGroupViewSet(mixins.ListModelMixin,
+                           mixins.RetrieveModelMixin,
                            mixins.UpdateModelMixin,
                            mixins.DestroyModelMixin,
                            viewsets.GenericViewSet):
     """
-    店铺产品组接口：查看 / 修改 / 删除店铺。
+    店铺产品组接口：列表 / 查看 / 修改 / 删除店铺。
     DELETE 会级联删除该店铺下所有 ProductShop，不影响 ProductCore。
     """
     serializer_class = ProductGroupSerializer
     queryset = ProductGroup.objects.prefetch_related(
         "shop_skus__core_sku__images", "images").all()
+    pagination_class = DefaultPagination
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    filterset_class = ProductGroupFilter
+    search_fields = ('title', 'base__supplier', 'base__series')
+    ordering_fields = ('id', 'title', 'shop_account')
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ProductGroupListSerializer
+        return ProductGroupSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == 'list':
+            qs = qs.select_related('base', 'listing_config').prefetch_related(
+                'images')
+        return qs
 
     def perform_destroy(self, instance):
         log_product_action(instance.base, 'DELETE_SHOP',
@@ -842,6 +879,93 @@ class ProductGroupViewSet(mixins.RetrieveModelMixin,
                 'total_price': str(usage.get('total_price', '0')),
             },
         })
+
+    @action(methods=['post'], detail=False, url_path='batch_update_listing')
+    def batch_update_listing(self, request):
+        """批量修改店铺关联的刊登配置，校验配置是否匹配店铺/平台/站点"""
+        ids = request.data.get("ids", [])
+        config_id = request.data.get("listing_config_id")
+        if not isinstance(ids, list) or len(ids) == 0:
+            return Response({'msg': 'ids 必须是非空数组', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+        if not config_id:
+            return Response({'msg': 'listing_config_id 不能为空', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
+        config = ListingConfig.objects.filter(id=config_id).first()
+        if not config:
+            return Response({'msg': f'刊登配置 {config_id} 不存在', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
+        pgs = ProductGroup.objects.filter(id__in=ids).select_related('listing_config')
+        if not pgs.exists():
+            return Response({'msg': '未找到匹配的店铺', 'status': 'error'},
+                            status=status.HTTP_202_ACCEPTED)
+
+        # 校验配置是否匹配每个店铺
+        match_accounts = [a.strip().lower() for a in config.match_shop_account.split(',') if a.strip()] if config.match_shop_account else []
+        match_sites = [s.strip().lower() for s in config.match_site.split(',') if s.strip()] if config.match_site else []
+
+        mismatched = []
+        for pg in pgs:
+            issues = []
+            if match_accounts and pg.shop_account.strip().lower() not in match_accounts:
+                issues.append(f'账号 {pg.shop_account} 不匹配')
+            if match_sites and pg.site.strip().lower() not in match_sites:
+                issues.append(f'站点 {pg.site} 不匹配')
+            if issues:
+                mismatched.append(f'#{pg.id} {pg.shop_account}: {"; ".join(issues)}')
+
+        if mismatched:
+            return Response({
+                'msg': f'刊登配置 "{config.name}" 与以下店铺不匹配',
+                'mismatched': mismatched,
+                'status': 'error'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        # 全部匹配，批量更新
+        updated = 0
+        for pg in pgs:
+            if pg.listing_config_id != config.id:
+                pg.listing_config = config
+                pg.shop_synced_at = None
+                pg.save(update_fields=['listing_config', 'shop_synced_at'])
+                log_product_action(pg.base, 'UPDATE',
+                                   f'批量修改刊登配置: {pg.shop_account} → {config.name}',
+                                   operator=request.user.username)
+                updated += 1
+
+        return Response({
+            'msg': f'成功更新 {updated} 个店铺的刊登配置为 "{config.name}"',
+            'status': 'success'
+        }, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='batch_delete')
+    def batch_delete(self, request):
+        ids = request.data.get("ids", [])
+        if not isinstance(ids, list) or len(ids) == 0:
+            return Response({
+                'msg': 'ids 必须是非空数组',
+                'status': 'error'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        try:
+            with transaction.atomic():
+                pgs = list(ProductGroup.objects.filter(id__in=ids))
+                for pg in pgs:
+                    log_product_action(pg.base, 'DELETE_SHOP',
+                                       f'批量删除店铺: {pg.shop_account} ({pg.platform})',
+                                       operator=request.user.username)
+                ProductGroup.objects.filter(id__in=ids).delete()
+            return Response({
+                'msg': f'成功删除 {len(pgs)} 个店铺',
+                'status': 'success'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'msg': f'删除失败: {str(e)}',
+                'status': 'error'
+            }, status=status.HTTP_202_ACCEPTED)
 
 
 class SupplierViewSet(viewsets.ModelViewSet):

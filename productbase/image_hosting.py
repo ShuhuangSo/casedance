@@ -62,47 +62,55 @@ class SuperBedService(ImageHostingService):
         return None
 
     def get_all_images(self) -> dict:
-        """分页遍历 timeline API，返回 {url: created_at} 字典"""
+        """游标分页遍历 entries API，返回 {url: {"id": file_id, "created_at": created_at}} 字典"""
         result = {}
-        page = 1
-        page_size = 100
+        params = {'limit': 100}
+        max_retries = 3
+        consecutive_errors = 0
         while True:
             try:
                 resp = requests.get(
-                    'https://www.superbed.cc/timeline',
-                    params={
-                        'token': self.token,
-                        'f': 'json',
-                        'page': page,
-                        'size': page_size
-                    },
+                    'https://www.superbed.cc/api/v1/entries/',
+                    headers={'X-API-Key': self.token},
+                    params=params,
                     timeout=30)
                 data = resp.json()
-                docs = data.get('docs', [])
-                if not docs:
-                    break
-                for doc in docs:
-                    url = doc.get('url', '')
+                for entry in data.get('entries', []):
+                    if entry.get('type') != 'file':
+                        continue
+                    url = entry.get('url', '')
                     if url:
-                        result[url] = doc.get('created_at', '')
-                total_pages = data.get('pages', 0)
-                if page >= total_pages:
+                        result[url] = {
+                            'id': entry.get('id', ''),
+                            'created_at': entry.get('created_at', ''),
+                        }
+                consecutive_errors = 0
+                if not data.get('has_more'):
                     break
-                page += 1
+                params['before'] = data.get('next_cursor')
             except Exception as e:
-                print(f'[ImageHosting] timeline page {page} error: {e}')
-                break
+                consecutive_errors += 1
+                print(f'[ImageHosting] entries error (attempt {consecutive_errors}/{max_retries}): {e}')
+                if consecutive_errors >= max_retries:
+                    break
+                time.sleep(2 ** (consecutive_errors - 1))
         return result
 
-    def delete_images(self, urls: list) -> tuple:
-        """批量删除 CDN 图片，返回 (success: bool, msg: str)"""
+    def delete_images(self, file_ids: list) -> tuple:
+        """批量删除 CDN 图片（通过 file_id），返回 (success: bool, msg: str)"""
+        if not file_ids:
+            return True, ''
         try:
             resp = requests.post(
-                'https://www.superbed.cc/delete',
-                json={'token': self.token, 'urls': urls},
+                'https://www.superbed.cc/api/v1/files/batch/delete',
+                headers={'X-API-Key': self.token},
+                json={'file_ids': file_ids},
                 timeout=30)
             data = resp.json()
-            return data.get('err') == 0, data.get('msg', '')
+            failed = data.get('failed_count', 0)
+            if failed:
+                return False, data.get('message', f'{failed} failed')
+            return True, data.get('message', '')
         except Exception as e:
             return False, str(e)
 
@@ -154,13 +162,13 @@ def upload_image_file(file_data: bytes, filename: str = None) -> Optional[str]:
 
 
 def get_all_cdn_images() -> dict:
-    """获取 CDN 上所有图片 {url: created_at} 字典"""
+    """获取 CDN 上所有图片 {url: {"id": file_id, "created_at": created_at}} 字典"""
     return get_service().get_all_images()
 
 
-def delete_cdn_images(urls: list) -> tuple:
-    """批量删除 CDN 图片，返回 (success: bool, msg: str)"""
-    return get_service().delete_images(urls)
+def delete_cdn_images(file_ids: list) -> tuple:
+    """批量删除 CDN 图片（通过 file_id），返回 (success: bool, msg: str)"""
+    return get_service().delete_images(file_ids)
 
 
 # ======================

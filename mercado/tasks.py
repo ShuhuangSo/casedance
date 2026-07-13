@@ -2037,7 +2037,7 @@ def upload_ozon_order(shop_id, notify_id):
             format_checked = False
         if sheet['L' + str(oz_row)].value not in title_group_l:
             format_checked = False
-        if sheet['Q' + str(oz_row)].value not in title_group_q:
+        if sheet['S' + str(oz_row)].value not in title_group_q:
             format_checked = False
         if not format_checked:
             # 修改上传通知
@@ -2070,7 +2070,7 @@ def upload_ozon_order(shop_id, notify_id):
             order_number = cell_row[0].value
             dispatch_number = cell_row[1].value
             order_time = cell_row[2].value
-            qty = cell_row[16].value
+            qty = cell_row[18].value
             price = cell_row[7].value
 
             oz_status = cell_row[4].value

@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'mercado',  # 美客多app
     'devproduct',  # 产品开发app
     'productbase',  # 上架产品库app
+    'feishu',  # 飞书集成（免登 + 通知）
 ]
 
 MIDDLEWARE = [
@@ -219,6 +220,15 @@ SUPERBED_TOKEN = os.environ.get('SUPERBED_TOKEN', '')
 CDN_RATE_LIMIT_PER_HOUR = int(os.environ.get('CDN_RATE_LIMIT_PER_HOUR', '1000'))
 EBAY_CLIENT_ID = os.environ.get('EBAY_CLIENT_ID', '')
 EBAY_CLIENT_SECRET = os.environ.get('EBAY_CLIENT_SECRET', '')
+
+# Redis 配置（供飞书等模块使用）
+REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
+REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
+REDIS_DB = int(os.environ.get('REDIS_CACHE_DB', '1'))
+
+# 飞书应用凭证
+FEISHU_APP_ID = os.environ.get('FEISHU_APP_ID', '')
+FEISHU_APP_SECRET = os.environ.get('FEISHU_APP_SECRET', '')
 
 # ======================
 # 盛德物流认证（优先读 env，否则从 sd_config.json 读取，兼容运行时写入）

@@ -329,4 +329,5 @@ urlpatterns = [
     re_path(r'media/(?P<path>.*)$', serve,
             {'document_root': settings.MEDIA_ROOT}),  # 配置media root
     path('api/', include(router.urls)),
+    path('api/feishu/', include('feishu.urls')),
 ]

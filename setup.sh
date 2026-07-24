@@ -79,36 +79,68 @@ fi
 
 # ========== 6. 迁移 + 静态文件 ==========
 step "执行数据库迁移..."
-docker exec casedance_web python manage.py migrate --noinput 2>/dev/null || warn "迁移失败，可能已是最新"
+docker exec casedance_web python manage.py migrate --noinput || warn "迁移失败，继续..."
 
 step "收集静态文件..."
-docker exec casedance_web python manage.py collectstatic --noinput 2>/dev/null || warn "静态文件收集失败"
+docker exec casedance_web python manage.py collectstatic --noinput || warn "静态文件收集失败"
 
 # ========== 7. Nginx ==========
 step "配置 Nginx..."
-if command -v nginx &>/dev/null; then
-    if [ -f "$PROJECT_DIR/nginx.conf" ]; then
-        SERVER_NAME=$(grep SERVER_NAME "$PROJECT_DIR/.env" | cut -d= -f2)
-        sed "s/<域名或IP>/${SERVER_NAME:-_}/g" "$PROJECT_DIR/nginx.conf" > /etc/nginx/conf.d/casedance.conf
-        nginx -t && nginx -s reload 2>/dev/null && step "Nginx 已配置并重载" || warn "Nginx 配置有误，请检查 /etc/nginx/conf.d/casedance.conf"
-    fi
-else
+
+# 安装 Nginx（如未安装）
+if ! command -v nginx &>/dev/null; then
     step "安装 Nginx..."
-    apt install nginx -y
-    SERVER_NAME=$(grep SERVER_NAME "$PROJECT_DIR/.env" | cut -d= -f2)
-    sed "s/<域名或IP>/${SERVER_NAME:-_}/g" "$PROJECT_DIR/nginx.conf" > /etc/nginx/conf.d/casedance.conf
-    nginx -t && nginx -s reload && step "Nginx 已安装并启动"
+    apt update -qq && apt install nginx -y
 fi
 
-# ========== 8. 完成 ==========
-IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+# 删除 Ubuntu 默认站点，避免劫持请求
+if [ -f /etc/nginx/sites-enabled/default ]; then
+    rm -f /etc/nginx/sites-enabled/default
+    step "已移除 Nginx 默认站点"
+fi
+
+# 写入配置
+SERVER_NAME=$(grep SERVER_NAME "$PROJECT_DIR/.env" | cut -d= -f2)
+sed "s/<域名或IP>/${SERVER_NAME:-_}/g" "$PROJECT_DIR/nginx.conf" > /etc/nginx/conf.d/casedance.conf
+
+# 验证并重载
+if nginx -t 2>/dev/null; then
+    systemctl enable nginx 2>/dev/null || true
+    nginx -s reload 2>/dev/null || nginx
+    step "Nginx 已配置并启动"
+else
+    warn "Nginx 配置有误，请手动检查 /etc/nginx/conf.d/casedance.conf"
+fi
+
+# ========== 8. 验证 ==========
+step "验证部署..."
+
+# 检查静态文件
+if [ -f "$PROJECT_DIR/static/admin/css/login.css" ]; then
+    step "静态文件: OK"
+else
+    warn "静态文件可能未正确收集"
+fi
+
+# 检查 API 可达
+if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/api/ 2>/dev/null | grep -q "30[12]\|200\|40[34]"; then
+    step "Django API: OK"
+else
+    warn "Django 可能未就绪，稍后重试: docker compose logs web --tail=20"
+fi
+
+# ========== 9. 完成 ==========
+PRIVATE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "未知")
 echo ""
 echo -e "${GREEN}============================================${NC}"
 echo -e "${GREEN}  部署完成！${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
-echo "  访问地址:  http://$IP:8000"
-echo "  Flower:    http://$IP:5555"
+echo "  内网访问:  http://$PRIVATE_IP"
+echo "  公网访问:  http://$PUBLIC_IP"
+echo "  Flower:    http://$PUBLIC_IP:5555"
+echo "  Django API: http://${SERVER_NAME:-$PUBLIC_IP}:8000/api/"
 echo ""
 echo "  常用命令:"
 echo "    cd $PROJECT_DIR"

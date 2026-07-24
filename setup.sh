@@ -56,14 +56,14 @@ if [ -f docker-compose.prod.yaml ]; then
 else
     COMPOSE_FILES="-f docker-compose.yaml"
 fi
-docker-compose $COMPOSE_FILES build
+docker compose $COMPOSE_FILES build
 
 step "启动服务..."
-docker-compose $COMPOSE_FILES up -d
+docker compose $COMPOSE_FILES up -d
 
 step "等待服务就绪..."
 sleep 5
-docker-compose $COMPOSE_FILES ps
+docker compose $COMPOSE_FILES ps
 
 # ========== 5. 导入数据库（如果有备份文件） ==========
 if [ -f "$DB_BACKUP_FILE" ]; then
@@ -112,8 +112,8 @@ echo "  Flower:    http://$IP:5555"
 echo ""
 echo "  常用命令:"
 echo "    cd $PROJECT_DIR"
-echo "    docker-compose logs -f web       # 查看 Web 日志"
-echo "    docker-compose restart celery     # 重启 Celery"
-echo "    docker-compose up -d --build     # 重新构建并启动"
-echo "    docker-compose ps                # 查看服务状态"
+echo "    docker compose logs -f web        # 查看 Web 日志"
+echo "    docker compose restart celery      # 重启 Celery"
+echo "    docker compose up -d --build      # 重新构建并启动"
+echo "    docker compose ps                 # 查看服务状态"
 echo ""

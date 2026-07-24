@@ -1,0 +1,17 @@
+# 生产环境叠加配置
+# 用法：docker-compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
+# 本地开发只用 docker-compose up 即可（不加 prod 文件，使用 runserver）
+
+services:
+  web:
+    command: uwsgi --ini /app/uwsgi.ini
+    # 挂载 static/media 目录供宿主机 nginx 访问
+    volumes:
+      - ./static:/app/static
+      - ./media:/app/media
+
+  celery:
+    command: celery -A casedance worker -l info --concurrency=2
+
+  celery_beat:
+    command: celery -A casedance beat -l info

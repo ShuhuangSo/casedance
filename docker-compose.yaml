@@ -93,6 +93,7 @@ services:
     container_name: casedance_celery
     restart: always
     command: celery -A casedance worker -l info
+    mem_limit: 512m
     volumes:
       - .:/app
     depends_on:
@@ -109,6 +110,7 @@ services:
     container_name: casedance_celery_beat
     restart: always
     command: celery -A casedance beat -l info
+    mem_limit: 256m
     volumes:
       - .:/app
     depends_on:

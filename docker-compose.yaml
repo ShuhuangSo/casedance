@@ -74,7 +74,6 @@ services:
     container_name: casedance_web
     restart: always
     command: python manage.py runserver 0.0.0.0:8000
-    mem_limit: 2g
     volumes:
       - .:/app
     ports:

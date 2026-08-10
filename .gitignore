@@ -21,6 +21,9 @@ celerybeat.pid
 site_config.json
 sd_config.json
 
+# 部署脚本（含服务器信息，不入库）
+deploy.sh
+
 # 用户上传文件
 media/
 

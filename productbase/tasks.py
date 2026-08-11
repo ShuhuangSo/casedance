@@ -1040,7 +1040,7 @@ def _cdn_rate_limit_record(redis_conn):
 
 
 @app.task(bind=True, max_retries=5, time_limit=7200, soft_time_limit=6900)
-def migrate_images_to_cdn(self, base_id):
+def migrate_images_to_cdn(self, base_id, **kwargs):
     """
     Celery 异步任务：将 BaseProductGroup 下所有 eBay 图片迁移到聚合图床。
     - 滑动窗口限速: 1000张/小时（用 Redis Sorted Set），空闲时全速上传
@@ -1092,12 +1092,18 @@ def migrate_images_to_cdn(self, base_id):
     failed = 0
     failed_urls = []
     updated_records = 0
+    start_from = kwargs.get('start_from', 0)  # retry 后从上次断点继续
 
     try:
         for i, old_url in enumerate(unique_urls):
+            if i < start_from:
+                continue  # 跳过已完成的上传
             # 速率限制检查
             wait = _cdn_rate_limit_wait(redis_conn)
-            if wait > 0:
+            if wait > 30:
+                print(f'[CDN] Rate limited, waiting {wait:.0f}s, releasing worker...')
+                raise self.retry(kwargs={'start_from': i}, countdown=min(wait, 3600))
+            elif wait > 0:
                 print(f'[CDN] Rate limited, waiting {wait:.0f}s...')
                 time.sleep(wait)
 
@@ -1120,10 +1126,13 @@ def migrate_images_to_cdn(self, base_id):
 
     except SoftTimeLimitExceeded:
         print(f'[CDN] Base {base_id} soft time limit, retrying...')
-        raise self.retry(countdown=300)
+        raise self.retry(kwargs={'start_from': start_from}, countdown=300)
     except Exception as e:
-        print(f'[CDN] Base {base_id} error: {e}, retrying...')
-        raise self.retry(exc=e, countdown=300)
+        from celery.exceptions import Retry
+        if not isinstance(e, Retry):
+            print(f'[CDN] Base {base_id} error: {e}, retrying...')
+            raise self.retry(exc=e, kwargs={'start_from': start_from}, countdown=300)
+        raise
 
     # 4. 刷新迁移状态 + 记录日志
     result = {

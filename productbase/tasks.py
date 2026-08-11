@@ -1087,6 +1087,9 @@ def migrate_images_to_cdn(self, base_id, **kwargs):
     print(f'[CDN] Base {base_id}: {len(ebay_images)} images, '
           f'{len(unique_urls)} unique URLs to migrate')
 
+    # CDN 上传可能耗时很长，先关闭 DB 连接避免 MySQL wait_timeout 断连
+    close_old_connections()
+
     # 3. 逐个上传，每张成功后立即写入 DB
     migrated = 0
     failed = 0

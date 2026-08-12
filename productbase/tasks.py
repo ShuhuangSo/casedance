@@ -1296,6 +1296,33 @@ def recover_stuck_fetch_tasks():
     return {'recovered': recovered}
 
 
+@app.task
+def retry_stuck_image_migrations():
+    """每30分钟检查 image_migrated=False 的产品，补发迁移任务"""
+    from productbase.models import BaseProductGroup
+    from productbase.image_hosting import is_ebay_image
+    from django.db.models import Q
+
+    bases = BaseProductGroup.objects.filter(
+        p_status='PREPARING',
+        image_migrated=False,
+    ).values_list('id', flat=True)
+
+    dispatched = 0
+    for base_id in bases:
+        from productbase.models import ProductImage
+        has_ebay = ProductImage.objects.filter(
+            group__base_id=base_id, image_url__icontains='ebayimg.com'
+        ).exists()
+        if has_ebay:
+            migrate_images_to_cdn.delay(base_id)
+            dispatched += 1
+
+    if dispatched:
+        print(f'[IMG-RETRY] Dispatched migration for {dispatched} bases')
+    return {'dispatched': dispatched}
+
+
 # ======================
 # 图片统计 & 清理（异步）
 # ======================

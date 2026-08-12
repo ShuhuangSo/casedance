@@ -60,6 +60,10 @@ app.conf.beat_schedule = {
         'task': 'productbase.tasks.recover_stuck_fetch_tasks',  # 恢复卡住的抓取任务
         'schedule': timedelta(minutes=1),  # 每1分钟一次
     },
+    'retry-stuck-image-migrations': {
+        'task': 'productbase.tasks.retry_stuck_image_migrations',  # 重试图片迁移
+        'schedule': timedelta(minutes=30),  # 每30分钟一次
+    },
 }
 # 自动从所有已注册的django app中加载任务
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)

@@ -1016,21 +1016,33 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
         sheet = wb.active
 
         month_dict = {
-            'enero': '01',
-            'febrero': '02',
-            'marzo': '03',
-            'abril': '04',
-            'mayo': '05',
-            'junio': '06',
-            'julio': '07',
-            'agosto': '08',
-            'septiembre': '09',
-            'octubre': '10',
-            'noviembre': '11',
-            'diciembre': '12'
+            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+            'septiembre': '09', 'octubre': '10', 'noviembre': '11',
+            'diciembre': '12',
         }
-        # 定义所需表头
-        required_headers = [
+        # 中文月份映射
+        cn_month_dict = {
+            '一月': '01', '二月': '02', '三月': '03', '四月': '04',
+            '五月': '05', '六月': '06', '七月': '07', '八月': '08',
+            '九月': '09', '十月': '10', '十一月': '11', '十二月': '12',
+        }
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        er = ExRate.objects.filter(currency=shop.currency).first()
+        ex_rate = er.value
+        sp = GeneralSettings.objects.filter(
+            item_name='mel_sp').first()
+
+        # 中文模板表头定义（先定义，用于自动搜索表头行）
+        CN_REQUIRED_HEADERS = [
+            '订单号', '销售日期', '状态',
+            '单位', '销售费用及税费（MXN）', '运费(MXN)',
+            '总计 (MXN)', '广告带来的销售额', 'SKU', '# 列表编号',
+            '商品销售单价（MXN）', '买家',
+            '地址', '城市', '邮编', '国家/地区',
+        ]
+        ES_REQUIRED_HEADERS = [
             '# de venta', 'Fecha de venta', 'Estado', 'Unidades',
             'Cargo por venta e impuestos (MXN)', 'Costos de envío (MXN)',
             'Total (MXN)', 'Venta por publicidad', 'SKU', '# de publicación',
@@ -1039,224 +1051,404 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
             'País'
         ]
 
-        shop = Shop.objects.filter(id=shop_id).first()
-        er = ExRate.objects.filter(currency=shop.currency).first()
-        ex_rate = er.value  # 获取汇率
-        sp = GeneralSettings.objects.filter(
-            item_name='mel_sp').first()  # 获取服务商费用
+        def build_header_index(row, headers):
+            """从指定行构建表头列索引，返回 dict；若不匹配则返回 None"""
+            idx = {}
+            for col_index, cell in enumerate(row, start=0):
+                h = cell.value
+                if h in headers and h not in idx:
+                    idx[h] = col_index
+            return idx if all(h in idx for h in headers) else None
 
-        # 模板格式检查
-        # 记录表头对应的列索引
-        header_index = {}
-        header_row = sheet[mel_row]
-        if header_row is None:
+        # 搜索表头行（从 mel_row 开始最多搜 10 行，兼容前端传错行号）
+        header_index = None
+        is_chinese = False
+        header_row_idx = int(mel_row)  # 实际表头行号
+        for offset in range(10):
+            try_row = sheet[int(mel_row) + offset]
+            if try_row is None:
+                continue
+            # 先试中文
+            idx = build_header_index(try_row, CN_REQUIRED_HEADERS)
+            if idx:
+                header_index = idx
+                is_chinese = True
+                header_row_idx = int(mel_row) + offset
+                break
+            # 再试西班牙语
+            idx = build_header_index(try_row, ES_REQUIRED_HEADERS)
+            if idx:
+                header_index = idx
+                is_chinese = False
+                header_row_idx = int(mel_row) + offset
+                break
+
+        if header_index is None:
             file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
             file_upload.upload_status = 'ERROR'
-            file_upload.desc = '未找到表头行'
-            file_upload.save()
-            return 'ERROR'
-        for col_index, cell in enumerate(header_row, start=0):
-            header = cell.value
-            if header in required_headers and header not in header_index:
-                header_index[header] = col_index
-
-        # 检查是否所有必需的表头都存在
-        if not all(header in header_index for header in required_headers):
-            # 修改上传通知
-            file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
-            file_upload.upload_status = 'ERROR'
-            file_upload.desc = '模板格式有误，缺少必要的表头，请检查!'
+            file_upload.desc = '未找到匹配的表头行，请检查模板格式!'
             file_upload.save()
             return 'ERROR'
 
-        add_list = []
-        for cell_row in list(sheet)[int(mel_row):]:
-            if cell_row is None:
-                continue
-            qty = cell_row[header_index['Unidades']].value
-            if not qty:
-                continue
-            sku = cell_row[header_index['SKU']].value
-            item_id = cell_row[header_index['# de publicación']].value[3:]
+        if is_chinese:
 
-            # 如果不在fmb库存中，或者所在店铺不对应，则跳出
-            shop_stock = ShopStock.objects.filter(sku=sku,
-                                                  item_id=item_id,
+            # 中文状态映射
+            cn_status_map = {
+                '已发货': 'FINISHED',
+                '已送达': 'FINISHED',
+                '已交付': 'FINISHED',
+                '已完成': 'FINISHED',
+                '在仓库处理中': 'PROCESS',
+                '我们将在明天发出包裹': 'PROCESS',
+                '等待发货': 'PROCESS',
+                '买家取消了购买': 'CANCEL',
+                '订单已取消': 'CANCEL',
+                '包裹因故被取消': 'CANCEL',
+                '退货途中': 'RETURN',
+                '已退货': 'RETURN',
+                '退货已完成并退款给买家': 'RETURN',
+                '投诉已解决并退款给买家': 'CASE',
+            }
+
+            add_list = []
+            for cell_row in list(sheet)[header_row_idx:]:
+                if cell_row is None:
+                    continue
+
+                sku = cell_row[header_index['SKU']].value
+                # 中文组合订单：首行是汇总行，无 SKU，跳过
+                if not sku or not str(sku).strip():
+                    continue
+
+                qty = cell_row[header_index['单位']].value
+                if not qty:
+                    continue
+
+                raw_item_id = str(cell_row[header_index['# 列表编号']].value)
+                # 去掉 "MLM" 前缀，与 DB 中存储格式一致
+                item_id = raw_item_id[3:] if raw_item_id.startswith('MLM') else raw_item_id
+
+                shop_stock = ShopStock.objects.filter(sku=sku,
+                                                      item_id=item_id,
+                                                      shop=shop).first()
+                if not shop_stock:
+                    continue
+                first_ship_cost = shop_stock.first_ship_cost or 0
+
+                order_number = str(cell_row[header_index['订单号']].value)
+
+                # 解析日期: "10 de 八月 de 2026 21:40 hs."
+                t = str(cell_row[header_index['销售日期']].value)
+                de_locate = [m.start() for m in re.finditer('de', t)]
+                day = t[:de_locate[0] - 1].strip()
+                if int(day) < 10:
+                    day = '0' + day
+                month_cn = t[de_locate[0] + 3:de_locate[1] - 1].strip()
+                year = t[de_locate[1] + 3:de_locate[1] + 7]
+                month = cn_month_dict.get(month_cn, '01')
+                time_part = t[de_locate[1] + 8:]
+                hs_loc = time_part.find('hs')
+                if hs_loc > 0:
+                    hour_min = time_part[:hs_loc].strip()
+                else:
+                    hour_min = time_part.strip()
+                if ':' in hour_min:
+                    hour, minute = hour_min.split(':')
+                else:
+                    hour, minute = hour_min[:2], hour_min[2:4] if len(hour_min) >= 4 else ('00', '00')
+                order_time = '%s-%s-%s %s:%s:00' % (
+                    year, month, day, hour.zfill(2), minute.zfill(2))
+
+                bj = datetime.strptime(order_time,
+                                       '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+                order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
+
+                # 读取金额字段
+                price = cell_row[header_index[
+                    '商品销售单价（MXN）']].value or 0
+                fees = cell_row[header_index[
+                    '销售费用及税费（MXN）']].value or 0
+                postage = cell_row[header_index['运费(MXN)']].value or 0
+                receive_fund = cell_row[header_index[
+                    '总计 (MXN)']].value or 0
+
+                ad_val = cell_row[header_index['广告带来的销售额']].value
+                is_ad = True if ad_val and str(ad_val) == '是' else False
+
+                buyer_name = cell_row[header_index['买家']].value
+                buyer_address = cell_row[header_index['地址']].value
+                buyer_city = cell_row[header_index['城市']].value
+                buyer_state = ''  # 和订单状态表头同名，不使用
+                buyer_postcode = str(cell_row[header_index['邮编']].value
+                                     ) if cell_row[header_index['邮编']].value else ''
+                buyer_country = cell_row[header_index['国家/地区']].value
+
+                # 利润
+                sp_fee = 0
+                sp_fee_rate = 0
+                if sp:
+                    sp_fee_rate = sp.value1
+                    sp_fee = float(price) * sp_fee_rate
+                profit = (
+                    (float(receive_fund) - sp_fee) * 0.99
+                ) * ex_rate - shop_stock.unit_cost * qty - first_ship_cost * qty
+                if price:
+                    profit_rate = profit / (float(price) * ex_rate)
+                else:
+                    profit_rate = 0
+                if profit_rate < 0:
+                    profit_rate = 0
+
+                # 状态
+                status_cn = str(cell_row[header_index['状态']].value)
+                order_status = 'OTHERS'
+                for kw, st in cn_status_map.items():
+                    if kw in status_cn:
+                        order_status = st
+                        break
+
+                # 检查重复
+                ml_order = MLOrder.objects.filter(order_number=order_number,
                                                   shop=shop).first()
-            if not shop_stock:
-                continue
-            first_ship_cost = shop_stock.first_ship_cost
-            if not first_ship_cost:
-                first_ship_cost = 0
+                if not ml_order:
+                    add_list.append(
+                        MLOrder(
+                            shop=shop, platform='MERCADO',
+                            order_number=order_number,
+                            order_status=order_status,
+                            order_time=order_time,
+                            order_time_bj=order_time_bj,
+                            qty=qty,
+                            currency=shop.currency,
+                            ex_rate=ex_rate,
+                            price=price,
+                            fees=fees, postage=postage,
+                            receive_fund=receive_fund,
+                            is_ad=is_ad,
+                            sku=sku,
+                            p_name=shop_stock.p_name,
+                            item_id=item_id,
+                            image=shop_stock.image,
+                            unit_cost=shop_stock.unit_cost * qty,
+                            first_ship_cost=first_ship_cost * qty,
+                            profit=profit,
+                            profit_rate=profit_rate,
+                            buyer_name=buyer_name,
+                            buyer_address=buyer_address,
+                            buyer_city=buyer_city,
+                            buyer_state=buyer_state,
+                            buyer_postcode=buyer_postcode,
+                            buyer_country=buyer_country,
+                            sp_fee=sp_fee,
+                            sp_fee_rate=sp_fee_rate,
+                            group_id=shop_stock.group_id,
+                        ))
+                    shop_stock.qty -= qty
+                    shop_stock.save()
+                    stock_log = StockLog()
+                    stock_log.shop_stock = shop_stock
+                    stock_log.current_stock = shop_stock.qty
+                    stock_log.qty = qty
+                    stock_log.in_out = 'OUT'
+                    stock_log.action = 'SALE'
+                    stock_log.desc = '销售订单号: ' + order_number
+                    stock_log.user_id = 0
+                    stock_log.save()
+                    stock_log.create_time = order_time
+                    stock_log.save()
+                else:
+                    if ml_order.fees != fees:
+                        ml_order.receive_fund = receive_fund
+                        ml_order.fees = fees
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+                    if ml_order.order_status != order_status:
+                        ml_order.order_status = order_status
+                        ml_order.receive_fund = receive_fund
+                        ml_order.fees = fees
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+                        if order_status == 'CANCEL':
+                            shop_stock.qty += qty
+                            shop_stock.save()
+                            stock_log = StockLog()
+                            stock_log.shop_stock = shop_stock
+                            stock_log.current_stock = shop_stock.qty
+                            stock_log.qty = qty
+                            stock_log.in_out = 'IN'
+                            stock_log.action = 'CANCEL'
+                            stock_log.desc = '取消订单入库, 订单号: ' + order_number
+                            stock_log.user_id = 0
+                            stock_log.save()
 
-            order_number = cell_row[header_index['# de venta']].value
+            if len(add_list):
+                MLOrder.objects.bulk_create(add_list)
 
-            t = cell_row[header_index['Fecha de venta']].value
-            de_locate = [m.start() for m in re.finditer('de', t)]
-            day = t[:de_locate[0] - 1]
-            if int(day) < 10:
-                day = '0' + day
-            month = t[de_locate[0] + 3:de_locate[1] - 1]
-            year = t[de_locate[1] + 3:de_locate[1] + 7]
-            hour = t[de_locate[1] + 8:de_locate[1] + 10]
-            min = t[de_locate[1] + 11:de_locate[1] + 13]
-            order_time = '%s-%s-%s %s:%s:00' % (year, month_dict[month], day,
-                                                hour, min)
+        else:
+            # ---------- 西班牙语模板 ----------
+            add_list = []
+            for cell_row in list(sheet)[header_row_idx:]:
+                if cell_row is None:
+                    continue
+                qty = cell_row[header_index['Unidades']].value
+                if not qty:
+                    continue
+                sku = cell_row[header_index['SKU']].value
+                item_id = cell_row[header_index['# de publicación']].value[3:]
 
-            bj = datetime.strptime(order_time,
-                                   '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
-            order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
+                shop_stock = ShopStock.objects.filter(sku=sku,
+                                                      item_id=item_id,
+                                                      shop=shop).first()
+                if not shop_stock:
+                    continue
+                first_ship_cost = shop_stock.first_ship_cost or 0
 
-            price = cell_row[header_index[
-                'Precio unitario de venta de la publicación (MXN)']].value if cell_row[
-                    header_index[
-                        'Precio unitario de venta de la publicación (MXN)']].value else 0
-            postage = cell_row[
-                header_index['Costos de envío (MXN)']].value if cell_row[
-                    header_index['Costos de envío (MXN)']].value else 0
-            fees = cell_row[header_index[
-                'Cargo por venta e impuestos (MXN)']].value if cell_row[
-                    header_index[
-                        'Cargo por venta e impuestos (MXN)']].value else 0
-            receive_fund = cell_row[
-                header_index['Total (MXN)']].value if cell_row[
-                    header_index['Total (MXN)']].value else 0
-            is_ad = True if cell_row[
-                header_index['Venta por publicidad']].value == 'Sí' else False
+                order_number = cell_row[header_index['# de venta']].value
 
-            buyer_name = cell_row[header_index['Comprador']].value
-            buyer_address = cell_row[header_index['Domicilio']].value
-            buyer_city = cell_row[header_index['Municipio/Alcaldía']].value
-            buyer_state = ''  # 与订单状态表头冲突，不使用
-            buyer_postcode = cell_row[header_index['Código postal']].value
-            buyer_country = cell_row[header_index['País']].value
+                t = cell_row[header_index['Fecha de venta']].value
+                de_locate = [m.start() for m in re.finditer('de', t)]
+                day = t[:de_locate[0] - 1]
+                if int(day) < 10:
+                    day = '0' + day
+                month = t[de_locate[0] + 3:de_locate[1] - 1]
+                year = t[de_locate[1] + 3:de_locate[1] + 7]
+                hour = t[de_locate[1] + 8:de_locate[1] + 10]
+                min_ = t[de_locate[1] + 11:de_locate[1] + 13]
+                order_time = '%s-%s-%s %s:%s:00' % (
+                    year, month_dict[month], day, hour, min_)
 
-            # 计算服务商费用
-            sp_fee = 0
-            sp_fee_rate = 0
-            if sp:
-                sp_fee_rate = sp.value1
-                sp_fee = price * sp_fee_rate
-            # 利润计算
-            profit = (
-                (float(receive_fund) - sp_fee) * 0.99
-            ) * ex_rate - shop_stock.unit_cost * qty - shop_stock.first_ship_cost * qty
-            profit_rate = profit / (price * ex_rate)
-            if profit_rate < 0:
-                profit_rate = 0
+                bj = datetime.strptime(order_time,
+                                       '%Y-%m-%d %H:%M:%S') + timedelta(hours=14)
+                order_time_bj = bj.strftime('%Y-%m-%d %H:%M:%S')
 
-            order_status = 'FINISHED'
+                price = cell_row[header_index[
+                    'Precio unitario de venta de la publicación (MXN)']].value or 0
+                postage = cell_row[
+                    header_index['Costos de envío (MXN)']].value or 0
+                fees = cell_row[header_index[
+                    'Cargo por venta e impuestos (MXN)']].value or 0
+                receive_fund = cell_row[
+                    header_index['Total (MXN)']].value or 0
+                is_ad = True if cell_row[
+                    header_index['Venta por publicidad']].value == 'Sí' else False
 
-            if cell_row[
-                    header_index['Estado']].value == 'Procesando en la bodega':
-                order_status = 'PROCESS'
-            if cell_row[header_index[
-                    'Estado']].value == 'Cancelada por el comprador':
-                order_status = 'CANCEL'
-            if cell_row[header_index[
-                    'Estado']].value == 'Paquete cancelado por Mercado Libre':
-                order_status = 'CANCEL'
-            if cell_row[
-                    header_index['Estado']].value == 'Devolución en camino':
-                order_status = 'RETURN'
-            if cell_row[header_index[
-                    'Estado']].value == 'Reclamo cerrado con reembolso al comprador':
-                order_status = 'CASE'
-            if cell_row[header_index['Estado']].value[:8] == 'Devuelto':
-                order_status = 'RETURN'
-            if cell_row[header_index['Estado']].value == 'En devolución':
-                order_status = 'RETURN'
-            if cell_row[header_index[
-                    'Estado']].value == 'Devolución finalizada con reembolso al comprador':
-                order_status = 'RETURN'
+                buyer_name = cell_row[header_index['Comprador']].value
+                buyer_address = cell_row[header_index['Domicilio']].value
+                buyer_city = cell_row[header_index['Municipio/Alcaldía']].value
+                buyer_state = ''
+                buyer_postcode = cell_row[header_index['Código postal']].value
+                buyer_country = cell_row[header_index['País']].value
 
-            # 检查同一店铺订单编号是否存在
-            ml_order = MLOrder.objects.filter(order_number=order_number,
-                                              shop=shop).first()
-            if not ml_order:
-                add_list.append(
-                    MLOrder(
-                        shop=shop,
-                        platform='MERCADO',
-                        order_number=order_number,
-                        order_status=order_status,
-                        order_time=order_time,
-                        order_time_bj=order_time_bj,
-                        qty=qty,
-                        currency=shop.currency,
-                        ex_rate=ex_rate,
-                        price=price,
-                        fees=fees,
-                        postage=postage,
-                        receive_fund=receive_fund,
-                        is_ad=is_ad,
-                        sku=sku,
-                        p_name=shop_stock.p_name,
-                        item_id=item_id,
-                        image=shop_stock.image,
-                        unit_cost=shop_stock.unit_cost * qty,
-                        first_ship_cost=first_ship_cost * qty,
-                        profit=profit,
-                        profit_rate=profit_rate,
-                        buyer_name=buyer_name,
-                        buyer_address=buyer_address,
-                        buyer_city=buyer_city,
-                        buyer_state=buyer_state,
-                        buyer_postcode=buyer_postcode,
-                        buyer_country=buyer_country,
-                        sp_fee=sp_fee,
-                        sp_fee_rate=sp_fee_rate,
-                        group_id=shop_stock.group_id,
-                    ))
-                shop_stock.qty -= qty
-                shop_stock.save()
+                sp_fee = 0
+                sp_fee_rate = 0
+                if sp:
+                    sp_fee_rate = sp.value1
+                    sp_fee = price * sp_fee_rate
+                profit = (
+                    (float(receive_fund) - sp_fee) * 0.99
+                ) * ex_rate - shop_stock.unit_cost * qty - first_ship_cost * qty
+                profit_rate = profit / (price * ex_rate)
+                if profit_rate < 0:
+                    profit_rate = 0
 
-                # 创建库存日志
-                stock_log = StockLog()
-                stock_log.shop_stock = shop_stock
-                stock_log.current_stock = shop_stock.qty
-                stock_log.qty = qty
-                stock_log.in_out = 'OUT'
-                stock_log.action = 'SALE'
-                stock_log.desc = '销售订单号: ' + order_number
-                stock_log.user_id = 0
-                stock_log.save()
-                stock_log.create_time = order_time  # order_time
-                stock_log.save()
-            else:
-                # 如果费用更新
-                if ml_order.fees != fees:
-                    ml_order.receive_fund = receive_fund
-                    ml_order.fees = fees
-                    ml_order.profit = profit
-                    ml_order.profit_rate = profit_rate
-                    ml_order.save()
-                # 如果订单状态更新
-                if ml_order.order_status != order_status:
-                    ml_order.order_status = order_status
-                    ml_order.receive_fund = receive_fund
-                    ml_order.fees = fees
-                    ml_order.profit = profit
-                    ml_order.profit_rate = profit_rate
-                    ml_order.save()
+                order_status = 'FINISHED'
+                estado = cell_row[header_index['Estado']].value
+                if estado == 'Procesando en la bodega':
+                    order_status = 'PROCESS'
+                if estado == 'Cancelada por el comprador':
+                    order_status = 'CANCEL'
+                if estado == 'Paquete cancelado por Mercado Libre':
+                    order_status = 'CANCEL'
+                if estado == 'Devolución en camino':
+                    order_status = 'RETURN'
+                if estado == 'Reclamo cerrado con reembolso al comprador':
+                    order_status = 'CASE'
+                if str(estado)[:8] == 'Devuelto':
+                    order_status = 'RETURN'
+                if estado == 'En devolución':
+                    order_status = 'RETURN'
+                if estado == 'Devolución finalizada con reembolso al comprador':
+                    order_status = 'RETURN'
 
-                    # 如果订单是取消状态，库存增加回来
-                    if order_status == 'CANCEL':
-                        shop_stock.qty += qty
-                        shop_stock.save()
+                ml_order = MLOrder.objects.filter(order_number=order_number,
+                                                  shop=shop).first()
+                if not ml_order:
+                    add_list.append(
+                        MLOrder(
+                            shop=shop, platform='MERCADO',
+                            order_number=order_number,
+                            order_status=order_status,
+                            order_time=order_time,
+                            order_time_bj=order_time_bj,
+                            qty=qty,
+                            currency=shop.currency,
+                            ex_rate=ex_rate,
+                            price=price,
+                            fees=fees, postage=postage,
+                            receive_fund=receive_fund,
+                            is_ad=is_ad,
+                            sku=sku,
+                            p_name=shop_stock.p_name,
+                            item_id=item_id,
+                            image=shop_stock.image,
+                            unit_cost=shop_stock.unit_cost * qty,
+                            first_ship_cost=first_ship_cost * qty,
+                            profit=profit,
+                            profit_rate=profit_rate,
+                            buyer_name=buyer_name,
+                            buyer_address=buyer_address,
+                            buyer_city=buyer_city,
+                            buyer_state=buyer_state,
+                            buyer_postcode=buyer_postcode,
+                            buyer_country=buyer_country,
+                            sp_fee=sp_fee,
+                            sp_fee_rate=sp_fee_rate,
+                            group_id=shop_stock.group_id,
+                        ))
+                    shop_stock.qty -= qty
+                    shop_stock.save()
+                    stock_log = StockLog()
+                    stock_log.shop_stock = shop_stock
+                    stock_log.current_stock = shop_stock.qty
+                    stock_log.qty = qty
+                    stock_log.in_out = 'OUT'
+                    stock_log.action = 'SALE'
+                    stock_log.desc = '销售订单号: ' + order_number
+                    stock_log.user_id = 0
+                    stock_log.save()
+                    stock_log.create_time = order_time
+                    stock_log.save()
+                else:
+                    if ml_order.fees != fees:
+                        ml_order.receive_fund = receive_fund
+                        ml_order.fees = fees
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+                    if ml_order.order_status != order_status:
+                        ml_order.order_status = order_status
+                        ml_order.receive_fund = receive_fund
+                        ml_order.fees = fees
+                        ml_order.profit = profit
+                        ml_order.profit_rate = profit_rate
+                        ml_order.save()
+                        if order_status == 'CANCEL':
+                            shop_stock.qty += qty
+                            shop_stock.save()
+                            stock_log = StockLog()
+                            stock_log.shop_stock = shop_stock
+                            stock_log.current_stock = shop_stock.qty
+                            stock_log.qty = qty
+                            stock_log.in_out = 'IN'
+                            stock_log.action = 'CANCEL'
+                            stock_log.desc = '取消订单入库, 订单号: ' + order_number
+                            stock_log.user_id = 0
+                            stock_log.save()
 
-                        # 创建库存日志
-                        stock_log = StockLog()
-                        stock_log.shop_stock = shop_stock
-                        stock_log.current_stock = shop_stock.qty
-                        stock_log.qty = qty
-                        stock_log.in_out = 'IN'
-                        stock_log.action = 'CANCEL'
-                        stock_log.desc = '取消订单入库, 订单号: ' + order_number
-                        stock_log.user_id = 0
-                        stock_log.save()
-        if len(add_list):
-            MLOrder.objects.bulk_create(add_list)
+            if len(add_list):
+                MLOrder.objects.bulk_create(add_list)
 
         # 修改上传通知
         file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
@@ -1266,7 +1458,6 @@ def upload_mercado_order(shop_id, notify_id, mel_row):
 
         return 'SUCESS'
     except Exception as e:
-        # 处理异常并更新上传通知
         file_upload = FileUploadNotify.objects.filter(id=notify_id).first()
         file_upload.upload_status = 'ERROR'
         file_upload.desc = f'上传过程中出现错误: {str(e)}'

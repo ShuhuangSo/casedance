@@ -5403,26 +5403,31 @@ class MLOrderViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         file_upload.desc = '订单正在上传中...'
         file_upload.save()
 
+        # 确定上传任务
         if shop.platform == 'MERCADO':
             if shop.shop_type == 'LOCAL':
-                tasks.upload_mercado_order.delay(shop_id, file_upload.id,
-                                                 mel_row)
+                upload_task = tasks.upload_mercado_order.s(
+                    shop_id, file_upload.id, mel_row)
             else:
-                tasks.upload_mercado_kj_order.delay(shop_id, file_upload.id,
-                                                    mel_row)
-        if shop.platform == 'EMAG':
-            tasks.upload_emag_order.delay(shop_id, file_upload.id, 1)
-            # tasks.upload_emag_order(shop_id, file_upload.id, 1)
-        if shop.platform == 'NOON':
-            tasks.upload_noon_order.delay(shop_id, file_upload.id)
-        if shop.platform == 'OZON':
-            tasks.upload_ozon_order.delay(shop_id, file_upload.id)
+                upload_task = tasks.upload_mercado_kj_order.s(
+                    shop_id, file_upload.id, mel_row)
+        elif shop.platform == 'EMAG':
+            upload_task = tasks.upload_emag_order.s(shop_id, file_upload.id, 1)
+        elif shop.platform == 'NOON':
+            upload_task = tasks.upload_noon_order.s(shop_id, file_upload.id)
+        elif shop.platform == 'OZON':
+            upload_task = tasks.upload_ozon_order.s(shop_id, file_upload.id)
+        else:
+            upload_task = None
 
-        # 计算产品销量
-        tasks.calc_product_sales.delay()
-
-        # 统计过去30天每天销量
-        tasks.calc_shop_sale.delay()
+        # 串行执行：上传完成 → 计算产品销量 → 统计30天每天销量
+        if upload_task:
+            from celery import chain
+            chain(
+                upload_task,
+                tasks.calc_product_sales.si(),
+                tasks.calc_shop_sale.si()
+            ).apply_async()
 
         # 创建操作日志
         log = MLOperateLog()

@@ -14,4 +14,4 @@ services:
     command: celery -A casedance worker -l info --concurrency=2
 
   celery_beat:
-    command: celery -A casedance beat -l info
+    command: sh -c "rm -f celerybeat.pid celerybeat-schedule && celery -A casedance beat -l info --pidfile=/dev/null"

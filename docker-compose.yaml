@@ -108,7 +108,7 @@ services:
     build: .
     container_name: casedance_celery_beat
     restart: always
-    command: sh -c "rm -f celerybeat.pid celerybeat-schedule && celery -A casedance beat -l info --pidfile="
+    command: sh -c "rm -f celerybeat.pid celerybeat-schedule && celery -A casedance beat -l info --pidfile=/dev/null"
     mem_limit: 256m
     volumes:
       - .:/app

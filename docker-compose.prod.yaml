@@ -5,6 +5,7 @@
 services:
   web:
     command: uwsgi --ini /app/uwsgi.ini
+    mem_limit: 512m
     # 挂载 static/media 目录供宿主机 nginx 访问
     volumes:
       - ./static:/app/static

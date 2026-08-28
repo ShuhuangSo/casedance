@@ -16,6 +16,7 @@ from fpdf import FPDF
 from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.db.models import Q
+from django.db import transaction
 
 from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR, SD_COOKIES, DIFY_INVOICE_APIKEY, DIFY_HOST
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
@@ -1512,67 +1513,90 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             "results": paginated_groups
         })
 
-    # FBM库存上传
+    # FBM库存盘点上传（第一步：解析Excel，返回差异）
     @action(methods=['post'], detail=False, url_path='fbm_upload')
     def fbm_upload(self, request):
-        import warnings
-        warnings.filterwarnings('ignore')
-
         data = request.data
         shop_id = data['id']
         wb = openpyxl.load_workbook(data['excel'])
-        sheet = wb['Reporte general de stock']
-        shop = Shop.objects.filter(id=shop_id).first()
+        sheet = wb.active
 
-        for cell_row in list(sheet)[5:]:
-            sku = cell_row[1].value
-            item_id = cell_row[3].value
-            qty = cell_row[16].value
+        # 解析Excel：2列，第1列sku，第2列盘点数量
+        count_map = {}
+        for row in sheet.iter_rows(min_row=1, values_only=True):
+            sku = str(row[0]).strip() if row[0] else ''
+            qty = row[1]
+            if sku and qty is not None:
+                try:
+                    count_map[sku] = int(qty)
+                except (ValueError, TypeError):
+                    continue
 
-            shop_stock = ShopStock.objects.filter(sku=sku,
-                                                  item_id=item_id).first()
-            if shop_stock:
-                shop_stock.qty = qty
-                shop_stock.save()
-            else:
-                ml_product = MLProduct.objects.filter(sku=sku,
-                                                      item_id=item_id).first()
-                url = ''
-                if shop.platform == 'MERCADO':
-                    url = 'https://articulo.mercadolibre.com.mx/' + shop.site + '-' + ml_product.item_id
-                if shop.platform == 'NOON':
-                    url = 'https://www.noon.com/product/{item_id}/p/?o={item_id}-1'.format(
-                        item_id=ml_product.item_id)
-                if ml_product:
-                    shop_stock = ShopStock()
-                    shop_stock.shop = shop
-                    shop_stock.sku = ml_product.sku
-                    shop_stock.p_name = ml_product.p_name
-                    shop_stock.label_code = ml_product.label_code
-                    shop_stock.upc = ml_product.upc
-                    shop_stock.item_id = ml_product.item_id
-                    shop_stock.image = ml_product.image
-                    shop_stock.qty = qty
-                    shop_stock.weight = ml_product.weight
-                    shop_stock.length = ml_product.length
-                    shop_stock.width = ml_product.width
-                    shop_stock.heigth = ml_product.heigth
-                    shop_stock.unit_cost = ml_product.unit_cost
-                    shop_stock.first_ship_cost = ml_product.first_ship_cost
-                    shop_stock.sale_url = url
-                    shop_stock.save()
+        if not count_map:
+            return Response({'msg': '未读取到有效数据'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if shop:
-            # 创建操作日志
-            log = MLOperateLog()
-            log.op_module = 'FBM'
-            log.op_type = 'CREATE'
-            log.target_type = 'FBM'
-            log.desc = 'FBM库存导入 店铺: {name}'.format(name=shop.name)
-            log.user = request.user
-            log.save()
+        # 查询该店铺下匹配的库存
+        stocks = ShopStock.objects.filter(
+            shop_id=shop_id, sku__in=count_map.keys(), is_active=True
+        ).values('id', 'sku', 'p_name', 'image', 'qty')
 
-        return Response({'msg': '成功上传'}, status=status.HTTP_200_OK)
+        # 只返回有差异的记录
+        result = []
+        for s in stocks:
+            count_qty = count_map.get(s['sku'])
+            if count_qty is not None and count_qty != s['qty']:
+                result.append({
+                    'id': s['id'],
+                    'sku': s['sku'],
+                    'p_name': s['p_name'],
+                    'image': BASE_URL + '/media/' + str(s['image']) if s['image'] else '',
+                    'current_qty': s['qty'],
+                    'count_qty': count_qty,
+                })
+
+        return Response({'items': result, 'shop_id': shop_id}, status=status.HTTP_200_OK)
+
+    # FBM库存盘点确认（第二步：更新库存并记录日志）
+    @action(methods=['post'], detail=False, url_path='fbm_stocktaking_confirm')
+    def fbm_stocktaking_confirm(self, request):
+        items = request.data.get('items', [])
+        user_id = request.user.id
+
+        with transaction.atomic():
+            for item in items:
+                stock = ShopStock.objects.select_for_update().filter(id=item['id']).first()
+                if not stock:
+                    continue
+                old_qty = stock.qty
+                new_qty = int(item['count_qty'])
+                if old_qty == new_qty:
+                    continue
+
+                diff = new_qty - old_qty
+                stock.qty = new_qty
+                stock.save(update_fields=['qty'])
+
+                # 写入库存日志
+                StockLog.objects.create(
+                    shop_stock=stock,
+                    current_stock=new_qty,
+                    qty=abs(diff),
+                    in_out='IN' if diff > 0 else 'OUT',
+                    action='TAKING',
+                    desc='盘点调整',
+                    user_id=user_id,
+                )
+
+            # 操作日志
+            MLOperateLog.objects.create(
+                op_module='FBM',
+                op_type='UPDATE',
+                target_type='FBM',
+                desc='FBM库存盘点调整 {n}项'.format(n=len(items)),
+                user=request.user,
+            )
+
+        return Response({'msg': '盘点完成'}, status=status.HTTP_200_OK)
 
     # 统计店铺数据
     @action(methods=['post'], detail=False, url_path='calc_stock')

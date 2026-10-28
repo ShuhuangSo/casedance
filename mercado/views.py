@@ -725,6 +725,33 @@ class MLProductViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         },
                         status=status.HTTP_200_OK)
 
+    # 产品批量修改
+    @action(methods=['post'], detail=False, url_path='bulk_update')
+    def bulk_update(self, request):
+        ids = request.data.get('ids', [])
+        fields = request.data.get('fields', {})  # 只取允许修改的字段
+
+        if not ids or not fields:
+            return Response({'msg': '参数不完整'}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed_fields = {'p_status', 'item_id', 'site', 'shop', 'platform', 'group_id'}
+        update_data = {k: v for k, v in fields.items() if k in allowed_fields}
+        if not update_data:
+            return Response({'msg': '没有可修改的字段'}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated = MLProduct.objects.filter(id__in=ids).update(**update_data)
+
+        # 操作日志
+        MLOperateLog.objects.create(
+            op_module='PRODUCT',
+            op_type='EDIT',
+            target_type='PRODUCT',
+            desc='批量修改产品 {n}项: {fields}'.format(n=updated, fields=update_data),
+            user=request.user,
+        )
+
+        return Response({'msg': '成功修改 {n} 项'.format(n=updated)}, status=status.HTTP_200_OK)
+
     # 产品标签生成(upc 标签)
     @action(methods=['post'], detail=False, url_path='create_label')
     def create_label(self, request):

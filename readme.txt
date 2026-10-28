@@ -313,3 +313,7 @@ v1.7.3
 统计仪表盘增加Dify消耗统计(token/费用)
 新增部署脚本deploy.sh
 productbase操作日志operator改为用户姓名
+
+v1.7.4
+FBM库存盘点功能改造：上传Excel返回差异，确认后更新库存并记录日志
+ML产品增加批量修改接口(p_status/item_id/site/shop/platform/group_id)

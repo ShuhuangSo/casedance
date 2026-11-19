@@ -2800,6 +2800,9 @@ class AdProductReport(models.Model):
 
     platform = models.CharField(max_length=20, default='MERCADO', verbose_name='平台')
     site = models.CharField(max_length=10, null=True, blank=True, verbose_name='站点')
+    currency = models.CharField(max_length=10, default='', blank=True,
+                                verbose_name='报表币种',
+                                help_text='金额币种：西语报表=店铺本币，英语报表=USD')
     shop = models.ForeignKey(Shop, related_name='shop_ad_product_report',
                              on_delete=models.CASCADE, verbose_name='店铺')
     item_id = models.CharField(max_length=30, verbose_name='链接编号')
@@ -2846,6 +2849,9 @@ class AdCampaignReport(models.Model):
 
     platform = models.CharField(max_length=20, default='MERCADO', verbose_name='平台')
     site = models.CharField(max_length=10, null=True, blank=True, verbose_name='站点')
+    currency = models.CharField(max_length=10, default='', blank=True,
+                                verbose_name='报表币种',
+                                help_text='金额币种：西语报表=店铺本币，英语报表=USD')
     shop = models.ForeignKey(Shop, related_name='shop_ad_campaign_report',
                              on_delete=models.CASCADE, verbose_name='店铺')
     campaign_name = models.CharField(max_length=100, verbose_name='活动名称')

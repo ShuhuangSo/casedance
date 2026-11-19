@@ -7,7 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 import requests
 import openpyxl
-import time, os, re
+import time, os, re, unicodedata
 import random
 import json
 import urllib
@@ -7165,6 +7165,151 @@ class InvoiceCreateViewSet(viewsets.ViewSet):
                             status=status.HTTP_202_ACCEPTED)
 
 
+# ==================== 广告报表Excel解析工具（兼容西班牙语/英语版本） ====================
+
+# 帮助/词汇表sheet（两种语言），跳过
+AD_SKIP_SHEETS = ('Ayuda', 'Glosario', 'Help', 'Glossary')
+
+# 表头原文 -> 字段名（西/英双语）
+AD_HEADER_FIELDS_RAW = {
+    # 日期
+    'Desde': 'date_start', 'From': 'date_start',
+    'Hasta': 'date_end', 'To': 'date_end', 'Up to': 'date_end',
+    # 标题/编号
+    'Campaña': 'campaign_name', 'Nombre de campaña': 'campaign_name',
+    'Campaign': 'campaign_name', 'Name': 'campaign_name',
+    'Título de anuncio': 'ad_title', 'Ad title': 'ad_title',
+    'Número de publicación': 'item_id', 'Listing number': 'item_id',
+    'Estado': 'status', 'Status': 'status',
+    'Presupuesto': 'budget', 'Budget': 'budget',
+    'ROAS Objetivo': 'roas_target', 'ROAS Target': 'roas_target',
+    # 指标
+    'Impresiones': 'impressions', 'Impressions': 'impressions',
+    '% de impresiones ganadas': 'win_rate', 'Impressions share': 'win_rate',
+    '% de impresiones perdidas por presupuesto': 'lost_budget_rate',
+    'Lost Impressions share by budget': 'lost_budget_rate',
+    '% de impresiones perdidas por ranking': 'lost_rank_rate',
+    'Lost Impressions share by ranking': 'lost_rank_rate',
+    '% de impresiones ganadas en los primeros resultados de busqueda': 'top_search_rate',
+    'Impressions won in the top search results': 'top_search_rate',
+    'Clics': 'clicks', 'Clicks': 'clicks',
+    'CPC': 'cpc', 'CTR': 'ctr', 'CVR': 'cvr', 'ACOS': 'acos', 'ROAS': 'roas',
+    'Ingresos': 'revenue', 'Income': 'revenue',
+    'Inversión': 'spend', 'Investment': 'spend',
+    'Ventas directas': 'direct_sales', 'Direct sales': 'direct_sales',
+    'Ventas indirectas': 'indirect_sales', 'Indirect sales': 'indirect_sales',
+    'Ventas por publicidad': 'total_sales', 'Ventas atribuidas': 'total_sales',
+    'Advertising sales': 'total_sales', 'Attributed sales': 'total_sales',
+    'Ingresos por ventas directas': 'direct_revenue',
+    'Income from direct sales': 'direct_revenue',
+    'Revenue from direct sales': 'direct_revenue',
+    'Ingresos por ventas indirectas': 'indirect_revenue',
+    'Income from indirect sales': 'indirect_revenue',
+    'Revenue from indirect sales': 'indirect_revenue',
+    'Unidades vendidas atribuidas': 'units_sold', 'Attributed units sold': 'units_sold',
+}
+
+
+def normalize_ad_header(val):
+    """规范化表头：去括号说明/换行/多余空格/大小写/重音符号"""
+    s = str(val or '')
+    s = re.sub(r'\([^)]*\)', ' ', s)  # 去掉括号里的说明文字
+    s = re.sub(r'\s+', ' ', s).strip().lower()
+    s = ''.join(c for c in unicodedata.normalize('NFKD', s)
+                if not unicodedata.combining(c))
+    return s
+
+
+AD_HEADER_FIELDS = {
+    normalize_ad_header(k): v for k, v in AD_HEADER_FIELDS_RAW.items()
+}
+
+# 西/英月份缩写 -> 数字
+AD_MONTH_MAP = {
+    'ene': '01', 'jan': '01', 'feb': '02', 'mar': '03',
+    'abr': '04', 'apr': '04', 'may': '05', 'jun': '06',
+    'jul': '07', 'ago': '08', 'aug': '08', 'sep': '09',
+    'oct': '10', 'nov': '11', 'dic': '12', 'dec': '12',
+}
+
+# 状态值（西/英，含阴阳性形式）-> 统一编码
+AD_STATUS_MAP = {
+    'activa': 'ACTIVA', 'activo': 'ACTIVA', 'active': 'ACTIVA',
+    'pausada': 'PAUSADA', 'pausado': 'PAUSADA', 'paused': 'PAUSADA',
+    'finalizada': 'FINALIZADA', 'finalizado': 'FINALIZADA', 'finished': 'FINALIZADA',
+    'archivada': 'ARCHIVADA', 'archivado': 'ARCHIVADA', 'archived': 'ARCHIVADA',
+    'movido': 'MOVIDO', 'movida': 'MOVIDO', 'moved': 'MOVIDO',
+    'deshabilitado': 'DESHABILITADO', 'deshabilitada': 'DESHABILITADO',
+    'disabled': 'DESHABILITADO',
+}
+
+
+def parse_ad_date(val):
+    """解析日期：'18-ago-2026'/'01-Oct-2026'（西/英月份缩写）或 '2026-08-18'，失败返回''"""
+    if hasattr(val, 'strftime'):  # datetime/date对象
+        return val.strftime('%Y-%m-%d')
+    s = str(val).strip()
+    parts = s.split('-')
+    if len(parts) == 3 and parts[1][:3].isalpha():
+        mon = AD_MONTH_MAP.get(parts[1][:3].lower())
+        if not mon:
+            return ''
+        return f'{parts[2]}-{mon}-{parts[0].zfill(2)}'
+    return s
+
+
+def ad_to_float(v):
+    try:
+        return float(v) if v and v != '-' else 0
+    except (ValueError, TypeError):
+        return 0
+
+
+def ad_to_int(v):
+    try:
+        return int(float(v)) if v and v != '-' else 0
+    except (ValueError, TypeError):
+        return 0
+
+
+def ad_status(v):
+    """状态值统一为编码（西/英同义），未知值原样保留"""
+    s = str(v).strip() if v else ''
+    return AD_STATUS_MAP.get(s.lower(), s)
+
+
+def detect_ad_currency(header_row, default):
+    """从表头括号标注识别报表金额币种：
+    (Dollar) -> USD；(Moneda local) -> 店铺本币(default)"""
+    text = ' '.join(str(h or '') for h in (header_row or ()))
+    marks = ' '.join(re.findall(r'\(([^)]*)\)', text)).lower()
+    if 'dollar' in marks:
+        return 'USD'
+    return default
+
+
+def find_ad_data_sheet(wb):
+    """自动识别数据sheet及表头行（兼容西/英版本），返回 (sheet, 列映射, 数据起始行号)"""
+    best_sheet, best_map, best_count, best_row = None, {}, 0, 3
+    for s in wb:
+        if s.title in AD_SKIP_SHEETS:
+            continue
+        for r_idx, row in enumerate(
+                s.iter_rows(min_row=1, max_row=6, values_only=True), start=1):
+            col = {}
+            for i, h in enumerate(row):
+                f = AD_HEADER_FIELDS.get(normalize_ad_header(h))
+                if f and f not in col:
+                    col[f] = i
+            if len(col) > best_count:
+                best_sheet, best_map, best_count, best_row = s, col, len(
+                    col), r_idx + 1
+    # 至少识别出5个字段才认为是数据sheet
+    if best_count < 5:
+        return None, {}, 3
+    return best_sheet, best_map, best_row
+
+
 class AdProductReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                              mixins.DestroyModelMixin, viewsets.GenericViewSet):
     """
@@ -7226,50 +7371,41 @@ class AdProductReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         if not shop:
             return Response({'msg': '店铺不存在'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 解析Excel
+        # 解析Excel（自动识别西/英版本、表头行、列位置）
         wb = openpyxl.load_workbook(excel, read_only=True)
-        # 找到数据sheet（跳过 Ayuda/Glosario）
-        sheet = None
-        for s in wb:
-            if s.title not in ('Ayuda', 'Glosario'):
-                sheet = s
-                break
+        sheet, col, data_row = find_ad_data_sheet(wb)
         if not sheet:
             wb.close()
             return Response({'msg': '未找到数据sheet'}, status=status.HTTP_400_BAD_REQUEST)
+        if not all(f in col for f in ('date_start', 'date_end', 'item_id')):
+            wb.close()
+            return Response({'msg': 'Excel缺少必要列(Desde/Hasta/Número de publicación 或 From/To/Listing number)'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        rows = list(sheet.iter_rows(min_row=3, values_only=True))
+        rows = list(sheet.iter_rows(min_row=data_row, values_only=True))
+        # 表头行（识别金额币种：西语=店铺本币，英语=USD）
+        header = next(sheet.iter_rows(min_row=data_row - 1, max_row=data_row - 1,
+                                      values_only=True), ())
+        currency = detect_ad_currency(header, shop.currency or '')
         wb.close()
 
         if not rows:
             return Response({'msg': 'Excel无数据'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 解析月份名（西班牙语月份缩写）
-        month_map = {
-            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
-            'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-            'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
-        }
-
-        def parse_date(val):
-            """解析 '18-ago-2026' 或 '2026-08-18' 格式"""
-            s = str(val).strip()
-            if '-' in s and s.split('-')[1].isalpha():
-                parts = s.split('-')
-                day = parts[0].zfill(2)
-                mon = month_map.get(parts[1][:3].lower())
-                yr = parts[2]
-                return f'{yr}-{mon}-{day}'
-            return s
+        def cell(row, field):
+            i = col.get(field)
+            return row[i] if i is not None and i < len(row) else None
 
         # 校验Excel中日期是否与所选时间块匹配
         excel_starts = set()
         excel_ends = set()
         for row in rows:
-            if row[0]:
-                excel_starts.add(parse_date(row[0]))
-            if row[1]:
-                excel_ends.add(parse_date(row[1]))
+            v = cell(row, 'date_start')
+            if v:
+                excel_starts.add(parse_ad_date(v))
+            v = cell(row, 'date_end')
+            if v:
+                excel_ends.add(parse_ad_date(v))
 
         if not excel_starts or not excel_ends:
             return Response({'msg': '无法解析Excel中的日期'}, status=status.HTTP_400_BAD_REQUEST)
@@ -7290,21 +7426,9 @@ class AdProductReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         imported = 0
         with transaction.atomic():
             for row in rows:
-                item_id = str(row[4]).strip() if row[4] else ''
+                item_id = str(cell(row, 'item_id') or '').strip()
                 if not item_id:
                     continue
-
-                def to_float(v):
-                    try:
-                        return float(v) if v and v != '-' else 0
-                    except (ValueError, TypeError):
-                        return 0
-
-                def to_int(v):
-                    try:
-                        return int(float(v)) if v and v != '-' else 0
-                    except (ValueError, TypeError):
-                        return 0
 
                 AdProductReport.objects.update_or_create(
                     shop=shop,
@@ -7314,23 +7438,24 @@ class AdProductReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                     defaults={
                         'platform': shop.platform,
                         'site': shop.site,
-                        'campaign_name': str(row[2]).strip() if row[2] else '',
-                        'ad_title': str(row[3]).strip() if row[3] else '',
-                        'status': str(row[5]).strip() if row[5] else '',
-                        'impressions': to_int(row[6]),
-                        'clicks': to_int(row[7]),
-                        'cpc': to_float(row[8]),
-                        'ctr': to_float(row[9]),
-                        'cvr': to_float(row[10]),
-                        'revenue': to_float(row[11]),
-                        'spend': to_float(row[12]),
-                        'acos': to_float(row[13]),
-                        'roas': to_float(row[14]),
-                        'direct_sales': to_int(row[15]),
-                        'indirect_sales': to_int(row[16]),
-                        'total_sales': to_int(row[17]),
-                        'direct_revenue': to_float(row[18]),
-                        'indirect_revenue': to_float(row[19]),
+                        'currency': currency,
+                        'campaign_name': str(cell(row, 'campaign_name') or '').strip(),
+                        'ad_title': str(cell(row, 'ad_title') or '').strip(),
+                        'status': ad_status(cell(row, 'status')),
+                        'impressions': ad_to_int(cell(row, 'impressions')),
+                        'clicks': ad_to_int(cell(row, 'clicks')),
+                        'cpc': ad_to_float(cell(row, 'cpc')),
+                        'ctr': ad_to_float(cell(row, 'ctr')),
+                        'cvr': ad_to_float(cell(row, 'cvr')),
+                        'revenue': ad_to_float(cell(row, 'revenue')),
+                        'spend': ad_to_float(cell(row, 'spend')),
+                        'acos': ad_to_float(cell(row, 'acos')),
+                        'roas': ad_to_float(cell(row, 'roas')),
+                        'direct_sales': ad_to_int(cell(row, 'direct_sales')),
+                        'indirect_sales': ad_to_int(cell(row, 'indirect_sales')),
+                        'total_sales': ad_to_int(cell(row, 'total_sales')),
+                        'direct_revenue': ad_to_float(cell(row, 'direct_revenue')),
+                        'indirect_revenue': ad_to_float(cell(row, 'indirect_revenue')),
                     }
                 )
                 imported += 1
@@ -7377,55 +7502,36 @@ class AdCampaignReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         if not shop:
             return Response({'msg': '店铺不存在'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 解析Excel（自动识别西/英版本、表头行、列位置）
         wb = openpyxl.load_workbook(excel, read_only=True)
-        sheet = None
-        for s in wb:
-            if s.title not in ('Ayuda', 'Glosario'):
-                sheet = s
-                break
+        sheet, col, data_row = find_ad_data_sheet(wb)
         if not sheet:
             wb.close()
             return Response({'msg': '未找到数据sheet'}, status=status.HTTP_400_BAD_REQUEST)
+        if not all(f in col for f in ('campaign_name', 'date_start')):
+            wb.close()
+            return Response({'msg': 'Excel缺少必要列(Nombre de campaña/Desde 或 Name/From)'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        rows = list(sheet.iter_rows(min_row=3, values_only=True))
+        rows = list(sheet.iter_rows(min_row=data_row, values_only=True))
+        # 表头行（识别金额币种：西语=店铺本币，英语=USD）
+        header = next(sheet.iter_rows(min_row=data_row - 1, max_row=data_row - 1,
+                                      values_only=True), ())
+        currency = detect_ad_currency(header, shop.currency or '')
         wb.close()
 
         if not rows:
             return Response({'msg': 'Excel无数据'}, status=status.HTTP_400_BAD_REQUEST)
 
-        month_map = {
-            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
-            'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-            'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
-        }
-
-        def parse_date(val):
-            s = str(val).strip()
-            if '-' in s and s.split('-')[1].isalpha():
-                parts = s.split('-')
-                day = parts[0].zfill(2)
-                mon = month_map.get(parts[1][:3].lower())
-                yr = parts[2]
-                return f'{yr}-{mon}-{day}'
-            return s
-
-        def to_float(v):
-            try:
-                return float(v) if v and v != '-' else 0
-            except (ValueError, TypeError):
-                return 0
-
-        def to_int(v):
-            try:
-                return int(float(v)) if v and v != '-' else 0
-            except (ValueError, TypeError):
-                return 0
+        def cell(row, field):
+            i = col.get(field)
+            return row[i] if i is not None and i < len(row) else None
 
         imported = 0
         with transaction.atomic():
             for row in rows:
-                campaign_name = str(row[0]).strip() if row[0] else ''
-                date_str = parse_date(row[4]) if row[4] else ''  # Desde
+                campaign_name = str(cell(row, 'campaign_name') or '').strip()
+                date_str = parse_ad_date(cell(row, 'date_start')) if cell(row, 'date_start') else ''
                 if not campaign_name or not date_str:
                     continue
 
@@ -7436,28 +7542,29 @@ class AdCampaignReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                     defaults={
                         'platform': shop.platform,
                         'site': shop.site,
-                        'status': str(row[1]).strip() if row[1] else '',
-                        'budget': to_float(row[2]),
-                        'roas_target': to_float(row[3]),
-                        'impressions': to_int(row[6]),
-                        'win_rate': to_float(row[7]),
-                        'lost_budget_rate': to_float(row[8]),
-                        'lost_rank_rate': to_float(row[9]),
-                        'top_search_rate': to_float(row[10]),
-                        'clicks': to_int(row[11]),
-                        'cpc': to_float(row[12]),
-                        'ctr': to_float(row[13]),
-                        'cvr': to_float(row[14]),
-                        'revenue': to_float(row[15]),
-                        'spend': to_float(row[16]),
-                        'acos': to_float(row[17]),
-                        'roas': to_float(row[18]),
-                        'total_sales': to_int(row[19]),
-                        'direct_sales': to_int(row[20]),
-                        'indirect_sales': to_int(row[21]),
-                        'direct_revenue': to_float(row[22]),
-                        'indirect_revenue': to_float(row[23]),
-                        'units_sold': to_int(row[24]),
+                        'currency': currency,
+                        'status': ad_status(cell(row, 'status')),
+                        'budget': ad_to_float(cell(row, 'budget')),
+                        'roas_target': ad_to_float(cell(row, 'roas_target')),
+                        'impressions': ad_to_int(cell(row, 'impressions')),
+                        'win_rate': ad_to_float(cell(row, 'win_rate')),
+                        'lost_budget_rate': ad_to_float(cell(row, 'lost_budget_rate')),
+                        'lost_rank_rate': ad_to_float(cell(row, 'lost_rank_rate')),
+                        'top_search_rate': ad_to_float(cell(row, 'top_search_rate')),
+                        'clicks': ad_to_int(cell(row, 'clicks')),
+                        'cpc': ad_to_float(cell(row, 'cpc')),
+                        'ctr': ad_to_float(cell(row, 'ctr')),
+                        'cvr': ad_to_float(cell(row, 'cvr')),
+                        'revenue': ad_to_float(cell(row, 'revenue')),
+                        'spend': ad_to_float(cell(row, 'spend')),
+                        'acos': ad_to_float(cell(row, 'acos')),
+                        'roas': ad_to_float(cell(row, 'roas')),
+                        'total_sales': ad_to_int(cell(row, 'total_sales')),
+                        'direct_sales': ad_to_int(cell(row, 'direct_sales')),
+                        'indirect_sales': ad_to_int(cell(row, 'indirect_sales')),
+                        'direct_revenue': ad_to_float(cell(row, 'direct_revenue')),
+                        'indirect_revenue': ad_to_float(cell(row, 'indirect_revenue')),
+                        'units_sold': ad_to_int(cell(row, 'units_sold')),
                     }
                 )
                 imported += 1

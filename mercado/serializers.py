@@ -304,17 +304,21 @@ class ShopStockSerializer(serializers.ModelSerializer):
         prefix = 'MLM' if obj.shop.platform == 'MERCADO' else ''
         ad_item_id = prefix + obj.item_id
 
-        total_spend = AdProductReport.objects.filter(
+        # 按报表币种分组汇总（西语报表=店铺本币，英语报表=USD），各自按汇率转RMB
+        rows = AdProductReport.objects.filter(
             shop=obj.shop, item_id=ad_item_id
-        ).aggregate(total=Sum('spend'))['total'] or 0
-
-        if not total_spend:
+        ).values('currency').annotate(total=Sum('spend'))
+        if not rows:
             return 0
 
-        # 广告费是店铺货币（如MXN），转RMB
-        er = ExRate.objects.filter(currency=obj.shop.currency).first()
-        ex_rate = er.value if er else 0
-        total_spend_rmb = total_spend * ex_rate
+        total_spend_rmb = 0
+        for r in rows:
+            cur = r['currency'] or obj.shop.currency
+            er = ExRate.objects.filter(currency=cur).first()
+            total_spend_rmb += (r['total'] or 0) * (er.value if er else 0)
+
+        if not total_spend_rmb:
+            return 0
 
         # 同一item_id的SKU数量，均摊广告费
         sku_count = ShopStock.objects.filter(

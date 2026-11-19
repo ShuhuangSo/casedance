@@ -22,14 +22,15 @@ from casedance.settings import BASE_URL, MEDIA_ROOT, BASE_DIR, SD_COOKIES, DIFY_
 from mercado.models import Listing, ListingTrack, Categories, ApiSetting, TransApiSetting, Keywords, Seller, \
     SellerTrack, MLProduct, Shop, ShopStock, Ship, ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, \
     MLOrder, ExRate, Finance, Packing, MLOperateLog, ShopReport, PurchaseManage, ShipItemRemove, ShipAttachment, UPC, \
-    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify, PlatformCategoryRate, ShippingPrice, ShippingAreaCode
+    RefillRecommend, RefillSettings, CarrierTrack, StockLog, FileUploadNotify, PlatformCategoryRate, ShippingPrice, \
+    ShippingAreaCode, AdProductReport, AdCampaignReport
 from mercado.serializers import ListingSerializer, ListingTrackSerializer, CategoriesSerializer, SellerSerializer, \
     SellerTrackSerializer, MLProductSerializer, ShopSerializer, ShopStockSerializer, ShipSerializer, \
     ShipDetailSerializer, ShipBoxSerializer, CarrierSerializer, TransStockSerializer, MLSiteSerializer, \
     FBMWarehouseSerializer, MLOrderSerializer, FinanceSerializer, PackingSerializer, MLOperateLogSerializer, \
     ShopReportSerializer, PurchaseManageSerializer, ShipItemRemoveSerializer, ShipAttachmentSerializer, UPCSerializer, \
     RefillRecommendSerializer, RefillSettingsSerializer, CarrierTrackSerializer, StockLogSerializer, \
-    FileUploadNotifySerializer, PlatformCategoryRateSerializer
+    FileUploadNotifySerializer, PlatformCategoryRateSerializer, AdProductReportSerializer, AdCampaignReportSerializer
 from mercado import tasks
 from report.models import ProductReport
 
@@ -1446,6 +1447,8 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                 "total_p_onway_qty": 0,
                 "total_p_rec_qty": 0,
                 "total_stock_value": 0,
+                "total_ad_spend": 0,
+                "total_net_profit": 0,
                 "is_group": True,
                 "other_skus": 0,
                 "children": []
@@ -1479,6 +1482,10 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             g["total_p_onway_qty"] += item.get("p_onway_qty") or 0
             g["total_p_rec_qty"] += item.get("p_rec_qty") or 0
 
+            # 累计广告费 / 累计净利润（按SKU均摊后的合计，用于链接汇总与排序）
+            g["total_ad_spend"] += float(item.get("total_ad_spend") or 0)
+            g["total_net_profit"] += float(item.get("total_net_profit") or 0)
+
             unit_cost = float(item.get("unit_cost") or 0)
             first_ship_cost = float(item.get("first_ship_cost") or 0)
             qty = int(item.get("qty") or 0)
@@ -1506,6 +1513,9 @@ class ShopStockViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             else:
                 g["total_avg_profit"] = 0
                 g["total_avg_profit_rate"] = 0
+
+            g["total_ad_spend"] = round(g["total_ad_spend"], 2)
+            g["total_net_profit"] = round(g["total_net_profit"], 2)
 
             real_total = real_queryset.filter(
                 group_id=g["group_id"]).values("sku").distinct().count()
@@ -7153,3 +7163,312 @@ class InvoiceCreateViewSet(viewsets.ViewSet):
                 "msg": str(e)
             },
                             status=status.HTTP_202_ACCEPTED)
+
+
+class AdProductReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                             mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """
+    广告产品报表 list/retrieve/destroy
+    """
+    queryset = AdProductReport.objects.all().order_by('-period_start')
+    serializer_class = AdProductReportSerializer
+    pagination_class = DefaultPagination
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    filter_fields = ('platform', 'site', 'shop', 'item_id', 'status')
+    search_fields = ('item_id', 'campaign_name', 'ad_title')
+    ordering_fields = ('period_start', 'spend', 'revenue', 'acos')
+
+    # 查询指定店铺/年份下已导入的时间块
+    @action(methods=['get'], detail=False, url_path='time_blocks')
+    def time_blocks(self, request):
+        shop_id = request.query_params.get('shop_id')
+        year = request.query_params.get('year')
+        if not shop_id or not year:
+            return Response({'msg': '缺少参数'}, status=status.HTTP_400_BAD_REQUEST)
+
+        year = int(year)
+        # 查询该店铺该年份所有已导入的记录的时间块
+        records = AdProductReport.objects.filter(
+            shop_id=shop_id,
+            period_start__year=year
+        ).values('period_start', 'period_end').distinct()
+
+        blocks = []
+        seen = set()
+        for r in records:
+            key = (str(r['period_start']), str(r['period_end']))
+            if key not in seen:
+                seen.add(key)
+                blocks.append({
+                    'period_start': str(r['period_start']),
+                    'period_end': str(r['period_end']),
+                    'imported': True,
+                })
+
+        return Response({'blocks': blocks}, status=status.HTTP_200_OK)
+
+    # 导入广告产品报表（表2）
+    @action(methods=['post'], detail=False, url_path='ad_import')
+    def ad_import(self, request):
+        data = request.data
+        shop_id = data.get('shop_id')
+        excel = data.get('excel')
+        # 用户选择的时间块
+        block_start = data.get('period_start')  # e.g. '2026-08-18'
+        block_end = data.get('period_end')      # e.g. '2026-08-31'
+
+        if not (shop_id and excel and block_start and block_end):
+            return Response({'msg': '参数不完整'}, status=status.HTTP_400_BAD_REQUEST)
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        if not shop:
+            return Response({'msg': '店铺不存在'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 解析Excel
+        wb = openpyxl.load_workbook(excel, read_only=True)
+        # 找到数据sheet（跳过 Ayuda/Glosario）
+        sheet = None
+        for s in wb:
+            if s.title not in ('Ayuda', 'Glosario'):
+                sheet = s
+                break
+        if not sheet:
+            wb.close()
+            return Response({'msg': '未找到数据sheet'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rows = list(sheet.iter_rows(min_row=3, values_only=True))
+        wb.close()
+
+        if not rows:
+            return Response({'msg': 'Excel无数据'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 解析月份名（西班牙语月份缩写）
+        month_map = {
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
+            'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+            'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
+        }
+
+        def parse_date(val):
+            """解析 '18-ago-2026' 或 '2026-08-18' 格式"""
+            s = str(val).strip()
+            if '-' in s and s.split('-')[1].isalpha():
+                parts = s.split('-')
+                day = parts[0].zfill(2)
+                mon = month_map.get(parts[1][:3].lower())
+                yr = parts[2]
+                return f'{yr}-{mon}-{day}'
+            return s
+
+        # 校验Excel中日期是否与所选时间块匹配
+        excel_starts = set()
+        excel_ends = set()
+        for row in rows:
+            if row[0]:
+                excel_starts.add(parse_date(row[0]))
+            if row[1]:
+                excel_ends.add(parse_date(row[1]))
+
+        if not excel_starts or not excel_ends:
+            return Response({'msg': '无法解析Excel中的日期'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Excel中的日期必须与所选时间块一致
+        if len(excel_starts) > 1 or len(excel_ends) > 1:
+            return Response({'msg': 'Excel中包含多个时间段，请按单一时间段导入'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        excel_start = excel_starts.pop()
+        excel_end = excel_ends.pop()
+        if excel_start != block_start or excel_end != block_end:
+            return Response({
+                'msg': f'Excel时间段({excel_start}~{excel_end})与所选时间段({block_start}~{block_end})不一致'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 解析并导入数据
+        imported = 0
+        with transaction.atomic():
+            for row in rows:
+                item_id = str(row[4]).strip() if row[4] else ''
+                if not item_id:
+                    continue
+
+                def to_float(v):
+                    try:
+                        return float(v) if v and v != '-' else 0
+                    except (ValueError, TypeError):
+                        return 0
+
+                def to_int(v):
+                    try:
+                        return int(float(v)) if v and v != '-' else 0
+                    except (ValueError, TypeError):
+                        return 0
+
+                AdProductReport.objects.update_or_create(
+                    shop=shop,
+                    item_id=item_id,
+                    period_start=block_start,
+                    period_end=block_end,
+                    defaults={
+                        'platform': shop.platform,
+                        'site': shop.site,
+                        'campaign_name': str(row[2]).strip() if row[2] else '',
+                        'ad_title': str(row[3]).strip() if row[3] else '',
+                        'status': str(row[5]).strip() if row[5] else '',
+                        'impressions': to_int(row[6]),
+                        'clicks': to_int(row[7]),
+                        'cpc': to_float(row[8]),
+                        'ctr': to_float(row[9]),
+                        'cvr': to_float(row[10]),
+                        'revenue': to_float(row[11]),
+                        'spend': to_float(row[12]),
+                        'acos': to_float(row[13]),
+                        'roas': to_float(row[14]),
+                        'direct_sales': to_int(row[15]),
+                        'indirect_sales': to_int(row[16]),
+                        'total_sales': to_int(row[17]),
+                        'direct_revenue': to_float(row[18]),
+                        'indirect_revenue': to_float(row[19]),
+                    }
+                )
+                imported += 1
+
+        # 操作日志
+        MLOperateLog.objects.create(
+            op_module='AD_REPORT',
+            op_type='CREATE',
+            target_type='AD_REPORT',
+            desc=f'导入广告产品报表 店铺:{shop.name} 时间:{block_start}~{block_end} 共{imported}条',
+            user=request.user,
+        )
+
+        return Response({'msg': f'成功导入 {imported} 条', 'imported': imported},
+                        status=status.HTTP_200_OK)
+
+
+class AdCampaignReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                              mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """
+    广告活动日报 list/retrieve/destroy
+    """
+    queryset = AdCampaignReport.objects.all().order_by('-date')
+    serializer_class = AdCampaignReportSerializer
+    pagination_class = DefaultPagination
+
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    filter_fields = ('platform', 'site', 'shop', 'campaign_name', 'date')
+    search_fields = ('campaign_name',)
+    ordering_fields = ('date', 'spend', 'revenue', 'acos')
+
+    # 导入广告活动日报（表1）
+    @action(methods=['post'], detail=False, url_path='import_daily')
+    def import_daily(self, request):
+        data = request.data
+        shop_id = data.get('shop_id')
+        excel = data.get('excel')
+
+        if not (shop_id and excel):
+            return Response({'msg': '参数不完整'}, status=status.HTTP_400_BAD_REQUEST)
+
+        shop = Shop.objects.filter(id=shop_id).first()
+        if not shop:
+            return Response({'msg': '店铺不存在'}, status=status.HTTP_400_BAD_REQUEST)
+
+        wb = openpyxl.load_workbook(excel, read_only=True)
+        sheet = None
+        for s in wb:
+            if s.title not in ('Ayuda', 'Glosario'):
+                sheet = s
+                break
+        if not sheet:
+            wb.close()
+            return Response({'msg': '未找到数据sheet'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rows = list(sheet.iter_rows(min_row=3, values_only=True))
+        wb.close()
+
+        if not rows:
+            return Response({'msg': 'Excel无数据'}, status=status.HTTP_400_BAD_REQUEST)
+
+        month_map = {
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
+            'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+            'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
+        }
+
+        def parse_date(val):
+            s = str(val).strip()
+            if '-' in s and s.split('-')[1].isalpha():
+                parts = s.split('-')
+                day = parts[0].zfill(2)
+                mon = month_map.get(parts[1][:3].lower())
+                yr = parts[2]
+                return f'{yr}-{mon}-{day}'
+            return s
+
+        def to_float(v):
+            try:
+                return float(v) if v and v != '-' else 0
+            except (ValueError, TypeError):
+                return 0
+
+        def to_int(v):
+            try:
+                return int(float(v)) if v and v != '-' else 0
+            except (ValueError, TypeError):
+                return 0
+
+        imported = 0
+        with transaction.atomic():
+            for row in rows:
+                campaign_name = str(row[0]).strip() if row[0] else ''
+                date_str = parse_date(row[4]) if row[4] else ''  # Desde
+                if not campaign_name or not date_str:
+                    continue
+
+                AdCampaignReport.objects.update_or_create(
+                    shop=shop,
+                    campaign_name=campaign_name,
+                    date=date_str,
+                    defaults={
+                        'platform': shop.platform,
+                        'site': shop.site,
+                        'status': str(row[1]).strip() if row[1] else '',
+                        'budget': to_float(row[2]),
+                        'roas_target': to_float(row[3]),
+                        'impressions': to_int(row[6]),
+                        'win_rate': to_float(row[7]),
+                        'lost_budget_rate': to_float(row[8]),
+                        'lost_rank_rate': to_float(row[9]),
+                        'top_search_rate': to_float(row[10]),
+                        'clicks': to_int(row[11]),
+                        'cpc': to_float(row[12]),
+                        'ctr': to_float(row[13]),
+                        'cvr': to_float(row[14]),
+                        'revenue': to_float(row[15]),
+                        'spend': to_float(row[16]),
+                        'acos': to_float(row[17]),
+                        'roas': to_float(row[18]),
+                        'total_sales': to_int(row[19]),
+                        'direct_sales': to_int(row[20]),
+                        'indirect_sales': to_int(row[21]),
+                        'direct_revenue': to_float(row[22]),
+                        'indirect_revenue': to_float(row[23]),
+                        'units_sold': to_int(row[24]),
+                    }
+                )
+                imported += 1
+
+        MLOperateLog.objects.create(
+            op_module='AD_REPORT',
+            op_type='CREATE',
+            target_type='AD_REPORT',
+            desc=f'导入广告活动报表 店铺:{shop.name} 共{imported}条',
+            user=request.user,
+        )
+
+        return Response({'msg': f'成功导入 {imported} 条', 'imported': imported},
+                        status=status.HTTP_200_OK)

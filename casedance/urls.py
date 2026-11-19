@@ -28,7 +28,8 @@ from mercado.views import ListingViewSet, ListingTrackViewSet, CategoriesViewSet
     TransStockViewSet, MLSiteViewSet, FBMWarehouseViewSet, MLOrderViewSet, FinanceViewSet, PackingViewSet, \
     MLOperateLogViewSet, ShopReportViewSet, PurchaseManageViewSet, ShipItemRemoveViewSet, ShipAttachmentViewSet, \
     UPCViewSet, RefillSettingsViewSet, RefillRecommendViewSet, CarrierTrackViewSet, MLStockLogViewSet, \
-    FileUploadNotifyViewSet, PlatformCategoryRateViewSet, ScreenshotRecognizeViewSet, InvoiceCreateViewSet
+    FileUploadNotifyViewSet, PlatformCategoryRateViewSet, ScreenshotRecognizeViewSet, InvoiceCreateViewSet, \
+    AdProductReportViewSet, AdCampaignReportViewSet
 from product.views import ProductViewSet, ProductExtraInfoViewSet, DeviceModelViewSet, CompatibleModelViewSet, \
     ProductTagViewSet, SupplierViewSet, SimpleProductViewSet, DeviceBrandViewSet
 from purchase.views import PurchaseOrderViewSet, PurchaseDetailViewSet, PurchaseOrderTagViewSet, RefillPromoteViewSet
@@ -321,6 +322,8 @@ router.register('warehouse_configs',
                 WarehouseConfigViewSet,
                 basename='warehouse_configs')
 router.register('stats', StatsViewSet, basename='stats')
+router.register('ad_product_reports', AdProductReportViewSet, basename='ad_product_reports')
+router.register('ad_campaign_reports', AdCampaignReportViewSet, basename='ad_campaign_reports')
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # 管理员账号: admin 密码: admin123456

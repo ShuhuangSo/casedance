@@ -2,13 +2,13 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from datetime import datetime, timedelta
 from xToolkit import xstring
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from casedance.settings import BASE_URL, MEDIA_URL
 from mercado.models import Listing, ListingTrack, Categories, Seller, SellerTrack, MLProduct, Shop, ShopStock, Ship, \
     ShipDetail, ShipBox, Carrier, TransStock, MLSite, FBMWarehouse, MLOrder, Finance, Packing, MLOperateLog, ShopReport, \
     PurchaseManage, ShipItemRemove, ShipAttachment, UPC, RefillRecommend, RefillSettings, CarrierTrack, StockLog, \
-    FileUploadNotify, PlatformCategoryRate
+    FileUploadNotify, PlatformCategoryRate, AdProductReport, AdCampaignReport
 from devproduct.models import DevProduct
 
 
@@ -235,6 +235,8 @@ class ShopStockSerializer(serializers.ModelSerializer):
     fbm_onway_qty = serializers.SerializerMethodField()  # fbm在途数量
     trans_onway_qty = serializers.SerializerMethodField()  # 中转在途数量
     trans_qty_new = serializers.SerializerMethodField()  # 中转库存数量
+    total_ad_spend = serializers.SerializerMethodField()  # 累计广告费
+    total_net_profit = serializers.SerializerMethodField()  # 累计净利润(总利润-广告费)
 
     def get_trans_qty_new(self, obj):
         qty = 0
@@ -293,6 +295,40 @@ class ShopStockSerializer(serializers.ModelSerializer):
                 qty += i.pack_qty
         return qty
 
+    # 累计广告费（同一item_id多个SKU均摊，转换为RMB）
+    def get_total_ad_spend(self, obj):
+        if not obj.item_id:
+            return 0
+        from mercado.models import AdProductReport, ExRate
+        # 广告报表item_id带MLM前缀，库存item_id不带，加前缀匹配
+        prefix = 'MLM' if obj.shop.platform == 'MERCADO' else ''
+        ad_item_id = prefix + obj.item_id
+
+        total_spend = AdProductReport.objects.filter(
+            shop=obj.shop, item_id=ad_item_id
+        ).aggregate(total=Sum('spend'))['total'] or 0
+
+        if not total_spend:
+            return 0
+
+        # 广告费是店铺货币（如MXN），转RMB
+        er = ExRate.objects.filter(currency=obj.shop.currency).first()
+        ex_rate = er.value if er else 0
+        total_spend_rmb = total_spend * ex_rate
+
+        # 同一item_id的SKU数量，均摊广告费
+        sku_count = ShopStock.objects.filter(
+            shop=obj.shop, item_id=obj.item_id, is_active=True
+        ).count() or 1
+
+        return round(total_spend_rmb / sku_count, 2)
+
+    # 累计净利润 = 总利润 - 广告费(RMB)
+    def get_total_net_profit(self, obj):
+        total_profit = obj.total_profit or 0
+        ad_spend = self.get_total_ad_spend(obj)
+        return round(total_profit - ad_spend, 2)
+
     class Meta:
         model = ShopStock
         fields = ('id', 'shop', 'sku', 'p_name', 'label_code', 'upc',
@@ -303,7 +339,8 @@ class ShopStockSerializer(serializers.ModelSerializer):
                   'total_profit', 'total_weight', 'total_cbm', 'stock_value',
                   'refund_rate', 'avg_profit', 'avg_profit_rate', 'sale_url',
                   'note', 'create_time', 'is_active', 'is_collect',
-                  'preparing_qty', 'p_onway_qty', 'p_rec_qty', 'group_id')
+                  'preparing_qty', 'p_onway_qty', 'p_rec_qty', 'group_id',
+                  'total_ad_spend', 'total_net_profit')
 
 
 class StockLogSerializer(serializers.ModelSerializer):
@@ -863,4 +900,48 @@ class PlatformCategoryRateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PlatformCategoryRate
+        fields = "__all__"
+
+
+class AdProductReportSerializer(serializers.ModelSerializer):
+    """
+    广告产品报表
+    """
+    image = serializers.SerializerMethodField()  # 产品图片
+
+    # 产品图片：通过item_id关联店铺库存/产品库获取
+    def get_image(self, obj):
+        if not obj.item_id:
+            return ''
+        # 广告报表item_id带站点前缀(如MLM123)，库存item_id不带，去前缀匹配
+        item_ids = [obj.item_id]
+        stripped = obj.item_id
+        if obj.site and stripped.startswith(obj.site):
+            stripped = stripped[len(obj.site):]
+        elif stripped[:3].isalpha():
+            stripped = stripped[3:]
+        if stripped != obj.item_id:
+            item_ids.append(stripped)
+
+        s = ShopStock.objects.filter(shop=obj.shop, item_id__in=item_ids).exclude(
+            Q(image='') | Q(image=None)).first()
+        if not s:
+            s = MLProduct.objects.filter(item_id__in=item_ids).exclude(
+                Q(image='') | Q(image=None)).first()
+        if s and s.image:
+            return BASE_URL + '/media/' + str(s.image)
+        return ''
+
+    class Meta:
+        model = AdProductReport
+        fields = "__all__"
+
+
+class AdCampaignReportSerializer(serializers.ModelSerializer):
+    """
+    广告活动报表
+    """
+
+    class Meta:
+        model = AdCampaignReport
         fields = "__all__"

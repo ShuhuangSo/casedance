@@ -317,3 +317,8 @@ productbase操作日志operator改为用户姓名
 v1.7.4
 FBM库存盘点功能改造：上传Excel返回差异，确认后更新库存并记录日志
 ML产品增加批量修改接口(p_status/item_id/site/shop/platform/group_id)
+
+v1.7.5
+新增广告产品报表/广告活动报表功能（Excel导入、时间块校验、导入状态查询）
+广告产品报表列表返回产品图片(image字段)
+店铺库存增加累计广告费、累计净利润字段（广告费按item_id均摊并转RMB）

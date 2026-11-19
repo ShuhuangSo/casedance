@@ -2785,3 +2785,99 @@ class ShippingAreaCode(models.Model):
 
     def __str__(self):
         return self.postcode
+
+
+class AdProductReport(models.Model):
+    """
+    广告产品报表（按时间块导入）
+    """
+    STATUS = (
+        ('ACTIVA', '在投'),
+        ('PAUSADA', '暂停'),
+        ('FINALIZADA', '结束'),
+        ('ARCHIVADA', '归档'),
+    )
+
+    platform = models.CharField(max_length=20, default='MERCADO', verbose_name='平台')
+    site = models.CharField(max_length=10, null=True, blank=True, verbose_name='站点')
+    shop = models.ForeignKey(Shop, related_name='shop_ad_product_report',
+                             on_delete=models.CASCADE, verbose_name='店铺')
+    item_id = models.CharField(max_length=30, verbose_name='链接编号')
+    period_start = models.DateField(verbose_name='统计起始日期')
+    period_end = models.DateField(verbose_name='统计结束日期')
+    campaign_name = models.CharField(max_length=100, null=True, blank=True, verbose_name='活动名称')
+    ad_title = models.CharField(max_length=200, null=True, blank=True, verbose_name='广告标题')
+    status = models.CharField(max_length=20, null=True, blank=True, verbose_name='状态')
+    impressions = models.IntegerField(default=0, verbose_name='曝光')
+    clicks = models.IntegerField(default=0, verbose_name='点击')
+    cpc = models.FloatField(default=0, verbose_name='平均点击费')
+    ctr = models.FloatField(default=0, verbose_name='CTR')
+    cvr = models.FloatField(default=0, verbose_name='CVR')
+    revenue = models.FloatField(default=0, verbose_name='广告收入(本币)')
+    spend = models.FloatField(default=0, verbose_name='广告花费(本币)')
+    acos = models.FloatField(default=0, verbose_name='ACOS')
+    roas = models.FloatField(default=0, verbose_name='ROAS')
+    direct_sales = models.IntegerField(default=0, verbose_name='直接销售')
+    indirect_sales = models.IntegerField(default=0, verbose_name='间接销售')
+    total_sales = models.IntegerField(default=0, verbose_name='广告销售')
+    direct_revenue = models.FloatField(default=0, verbose_name='直接销售金额')
+    indirect_revenue = models.FloatField(default=0, verbose_name='间接销售金额')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+
+    class Meta:
+        verbose_name = '广告产品报表'
+        verbose_name_plural = verbose_name
+        unique_together = ('shop', 'item_id', 'period_start', 'period_end')
+
+    def __str__(self):
+        return self.item_id
+
+
+class AdCampaignReport(models.Model):
+    """
+    广告活动日报
+    """
+    STATUS = (
+        ('ACTIVA', '在投'),
+        ('PAUSADA', '暂停'),
+        ('FINALIZADA', '结束'),
+        ('ARCHIVADA', '归档'),
+    )
+
+    platform = models.CharField(max_length=20, default='MERCADO', verbose_name='平台')
+    site = models.CharField(max_length=10, null=True, blank=True, verbose_name='站点')
+    shop = models.ForeignKey(Shop, related_name='shop_ad_campaign_report',
+                             on_delete=models.CASCADE, verbose_name='店铺')
+    campaign_name = models.CharField(max_length=100, verbose_name='活动名称')
+    date = models.DateField(verbose_name='日期')
+    status = models.CharField(max_length=20, null=True, blank=True, verbose_name='状态')
+    budget = models.FloatField(default=0, verbose_name='预算')
+    roas_target = models.FloatField(default=0, verbose_name='ROAS目标')
+    impressions = models.IntegerField(default=0, verbose_name='曝光')
+    win_rate = models.FloatField(default=0, verbose_name='曝光赢得率')
+    lost_budget_rate = models.FloatField(default=0, verbose_name='因预算损失曝光率')
+    lost_rank_rate = models.FloatField(default=0, verbose_name='因排名损失曝光率')
+    top_search_rate = models.FloatField(default=0, verbose_name='搜索首页曝光率')
+    clicks = models.IntegerField(default=0, verbose_name='点击')
+    cpc = models.FloatField(default=0, verbose_name='平均点击费')
+    ctr = models.FloatField(default=0, verbose_name='CTR')
+    cvr = models.FloatField(default=0, verbose_name='CVR')
+    revenue = models.FloatField(default=0, verbose_name='广告收入(本币)')
+    spend = models.FloatField(default=0, verbose_name='广告花费(本币)')
+    acos = models.FloatField(default=0, verbose_name='ACOS')
+    roas = models.FloatField(default=0, verbose_name='ROAS')
+    total_sales = models.IntegerField(default=0, verbose_name='广告销售')
+    direct_sales = models.IntegerField(default=0, verbose_name='直接销售')
+    indirect_sales = models.IntegerField(default=0, verbose_name='间接销售')
+    direct_revenue = models.FloatField(default=0, verbose_name='直接销售金额')
+    indirect_revenue = models.FloatField(default=0, verbose_name='间接销售金额')
+    units_sold = models.IntegerField(default=0, verbose_name='销售数量')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+
+    class Meta:
+        verbose_name = '广告活动报表'
+        verbose_name_plural = verbose_name
+        unique_together = ('shop', 'campaign_name', 'date')
+
+    def __str__(self):
+        return self.campaign_name
